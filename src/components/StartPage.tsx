@@ -145,17 +145,24 @@ export const StartPage: React.FC<StartPageProps> = ({
           className="inline-flex items-center gap-2 px-3 py-1 rounded bg-stone-100 border border-stone-300 shadow-inner text-stone-600 text-xs font-mono select-none"
         >
           <Keyboard className="w-3.5 h-3.5 text-amber-600" />
-          <span>FIFTY-SOUNDS TYPING ENZYME V1.2</span>
+          <span>KATAKATA TYPEWRITER LAB V1.2</span>
         </motion.div>
 
-        <h1 
-          className="text-4xl md:text-5xl font-black text-stone-900 font-serif tracking-tight select-none pt-2"
-          style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
-        >
-          五十音人名集卡练习页
-        </h1>
-        <p className="text-stone-600 max-w-xl mx-auto text-sm md:text-base leading-relaxed">
-          极简复古、极具仪式感的日系拼歌。通过<span className="font-bold text-rose-600">强制深度熟化模式</span>，锁定单个人名重复肌肉记忆，让五十音化为你的直觉本能。
+        <div className="space-y-1">
+          <h1 
+            className="text-5xl md:text-6xl font-black text-stone-900 font-serif tracking-wide select-none pt-2 flex items-center justify-center gap-1"
+            style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
+          >
+            カタカタ
+            <span className="inline-block w-3.5 h-10 md:h-12 bg-amber-500 animate-[pulse_1s_infinite] ml-1 shrink-0" title="Cursor" />
+          </h1>
+          <div className="text-lg md:text-xl font-serif font-bold text-stone-700 tracking-wider">
+            五十音集卡练习 / 假名打字图鉴
+          </div>
+        </div>
+
+        <p className="text-stone-600 max-w-xl mx-auto text-xs md:text-sm leading-relaxed font-sans border-t border-stone-200/60 pt-3 mt-2">
+          🌸 <strong className="text-stone-800">名之由来：</strong>「カタカタ」（Katakata）是日语中敲击键盘、打字机发出的“咔哒咔哒”清脆拟声词。每一次的键入与对答，都伴随着指尖的触觉与回响，带您在典雅温润的墨香与卡牌收集之中开启五十音探寻之路。
         </p>
       </div>
 

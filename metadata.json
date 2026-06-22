@@ -1,6 +1,6 @@
 {
-  "name": "五十音人名集卡练习",
-  "description": "一款融合人名物品收集与五十音深度练习的游戏化单页应用，自定练习时长，纯正日系复古打字机质感，结合 Gemini AI 提供姓氏文化故事解读与美妙的集卡奖励。",
+  "name": "Katakata「カタカタ」",
+  "description": "Katakata「カタカタ」五十音集卡练习。融合人名物品收集与五十音深度练习的游戏化应用，自定练习时长，纯正日系复古打字机质感，双模式打字与手写描红任意切换，结合丰富卡牌库温故知新。",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

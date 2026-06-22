@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { BookOpen, Sparkles, Calendar, RotateCw, ArrowLeft, Lightbulb, Hourglass, HelpCircle, Activity, Volume2, PenTool } from "lucide-react";
+import { BookOpen, Sparkles, Calendar, RotateCw, ArrowLeft, Lightbulb, Hourglass, HelpCircle, Activity, Volume2, PenTool, Download, Upload } from "lucide-react";
 import { DICTIONARY, DictionaryItem } from "../data/dictionary";
 import { audioSynth } from "../utils/audio";
 import { CalligraphyCanvas } from "./CalligraphyCanvas";
@@ -10,18 +10,142 @@ interface CardLibraryPageProps {
   collectedIds: string[];
   practiceTimes: Record<string, number>; // Maps cardId to total completed practice rounds
   onGoBack: () => void;
+  onImportData: (unlockedCards: string[], ptTimes: Record<string, number>, settings?: any) => void;
 }
 
 export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
   collectedIds,
   practiceTimes,
   onGoBack,
+  onImportData,
 }) => {
   const [selectedCard, setSelectedCard] = useState<DictionaryItem | null>(null);
   const [aiStory, setAiStory] = useState<string>("");
   const [loadingAi, setLoadingAi] = useState<boolean>(false);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [activeDetailTab, setActiveDetailTab] = useState<"story" | "drawing">("story");
+
+  const [isStorageAvailable] = useState<boolean>(() => {
+    try {
+      const testKey = "__test_key__";
+      localStorage.setItem(testKey, testKey);
+      localStorage.removeItem(testKey);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleExportBackup = () => {
+    if (!isStorageAvailable) {
+      alert("⚠️ 当前浏览器限制了本地存储，导出存档功能不可用。");
+      return;
+    }
+    try {
+      const keys = [
+        "fifty_sound_unlocked_cards",
+        "fifty_sound_practice_times",
+        "fifty_sound_muted",
+        "fifty_sound_bgm",
+        "fifty_sound_voice_type",
+        "fifty_sound_show_mascot"
+      ];
+      
+      const backupData: Record<string, string | null> = {};
+      keys.forEach(key => {
+        backupData[key] = localStorage.getItem(key);
+      });
+
+      const backupPayload = {
+        app: "katakata",
+        version: "1.0.0",
+        exportedAt: new Date().toISOString(),
+        payload: backupData
+      };
+
+      const jsonString = JSON.stringify(backupPayload, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      
+      const dateStr = new Date().toISOString().split('T')[0];
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `katakata-backup-${dateStr}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      audioSynth.playCarriageReturn();
+    } catch (error) {
+      console.error("Export save error", error);
+      alert("😰 导出存档失败，请检查浏览器限制设置。");
+    }
+  };
+
+  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isStorageAvailable) {
+      alert("⚠️ 当前浏览器限制了本地存储，导入存档功能不可用。");
+      return;
+    }
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const dataStr = event.target?.result as string;
+        const parsed = JSON.parse(dataStr);
+        
+        if (parsed.app !== "katakata" || !parsed.payload) {
+          throw new Error("格式不正确：未能识别有效的 Katakata 存档。");
+        }
+
+        const confirmProceed = window.confirm("💡 导入将覆盖当前所有数据，是否继续？");
+        if (!confirmProceed) {
+          e.target.value = "";
+          return;
+        }
+
+        const payload = parsed.payload;
+        
+        const keysToWrite = Object.keys(payload);
+        keysToWrite.forEach(key => {
+          const val = payload[key];
+          if (val !== null && val !== undefined) {
+            localStorage.setItem(key, val);
+          }
+        });
+
+        const unlockedListRaw = payload["fifty_sound_unlocked_cards"];
+        const practiceTimesRaw = payload["fifty_sound_practice_times"];
+        
+        const unlockedCards = unlockedListRaw ? JSON.parse(unlockedListRaw) : [];
+        const ptTimes = practiceTimesRaw ? JSON.parse(practiceTimesRaw) : {};
+        
+        const settings = {
+          muted: payload["fifty_sound_muted"] === "true",
+          bgm: payload["fifty_sound_bgm"] === "true",
+          voiceType: payload["fifty_sound_voice_type"] || "female",
+          showMascot: payload["fifty_sound_show_mascot"] !== "false"
+        };
+
+        onImportData(unlockedCards, ptTimes, settings);
+
+        audioSynth.playFanfare();
+        alert("🎉 存档导入成功！您的练习卡库、记录和音像效果已完全同步加载。");
+
+      } catch (err: any) {
+        console.error(err);
+        alert(`❌ 导入失败: ${err?.message || "JSON 损坏或不合规"}`);
+      } finally {
+        e.target.value = "";
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // Fetch or trigger Gemini AI Name story teller API
   const handleFetchAiStory = async (item: DictionaryItem) => {
@@ -89,11 +213,84 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
           className="text-3xl font-black text-stone-900 font-serif"
           style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
         >
-          🗃️ 个人五十音闪卡收藏室
+          🗃️ Katakata「カタカタ」闪卡收藏室
         </h1>
         <p className="text-xs text-stone-500 font-mono uppercase tracking-wider">
           THE JAPANESE NOMINAL CARD BINDER LIBRARY & REVISION ROOM
         </p>
+      </div>
+
+      {/* Save Export/Import Panel Box styled with typewriter and monospace aesthetics */}
+      <div className="bg-[#f5f3ef] border-2 border-stone-800/10 rounded-2xl p-4 space-y-3.5 shadow-sm relative overflow-hidden">
+        {/* Typewriter details */}
+        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-stone-200/50 via-transparent to-transparent pointer-events-none" />
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
+              <h3 className="font-mono font-bold text-stone-800 text-xs tracking-wide">
+                KATAKATA SYSTEM ARCHIVE HUB 【打字集卡机存档中心】
+              </h3>
+            </div>
+            <p className="text-[12px] text-stone-550 leading-relaxed font-sans max-w-xl">
+              💡 <span className="font-semibold text-stone-700">说明：</span>卡牌保存在本浏览器中,清除浏览器数据会导致丢失,建议定期导出备份。
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 font-mono">
+            {/* Real input type file hidden */}
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleImportBackup} 
+              accept=".json" 
+              className="hidden" 
+            />
+
+            <button
+              onClick={() => {
+                audioSynth.playCardSlide();
+                handleExportBackup();
+              }}
+              disabled={!isStorageAvailable}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer shadow-sm ${
+                isStorageAvailable 
+                  ? "bg-white border-stone-300 text-stone-600 hover:bg-stone-50 hover:text-stone-900 active:scale-95"
+                  : "bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed opacity-50"
+              }`}
+              title="导出当前集卡进度与统计到本地文件"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-700" />
+              <span>导出存档</span>
+            </button>
+
+            <button
+              onClick={() => {
+                audioSynth.playCardSlide();
+                fileInputRef.current?.click();
+              }}
+              disabled={!isStorageAvailable}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-sm ${
+                isStorageAvailable
+                  ? "bg-stone-900 border-transparent text-stone-50 hover:bg-stone-800 hover:text-white active:scale-95"
+                  : "bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed opacity-50"
+              }`}
+              title="选择一份历史 Katakata JSON 存档进行恢复"
+            >
+              <Upload className="w-3.5 h-3.5 text-amber-400" />
+              <span>导入存档</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Local Storage Restricted Warning Banner */}
+        {!isStorageAvailable && (
+          <div className="bg-red-50 border border-red-200 text-red-700 p-2.5 rounded-xl text-xs font-sans flex items-center gap-2 animate-bounce">
+            <span className="text-sm">⚠️</span>
+            <span>当前浏览器限制了本地存储，存档功能不可用。请确认您未开启极限无痕/隐私保护或禁用了本地 LocalStorage 功能。</span>
+          </div>
+        )}
       </div>
 
       {/* Categories select tabs */}

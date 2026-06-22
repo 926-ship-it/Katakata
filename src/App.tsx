@@ -17,16 +17,32 @@ export default function App() {
   
   // Custom interactive panel states
   const [isMuted, setIsMuted] = useState<boolean>(() => {
-    return localStorage.getItem("fifty_sound_muted") === "true";
+    try {
+      return localStorage.getItem("fifty_sound_muted") === "true";
+    } catch (_) {
+      return false;
+    }
   });
   const [bgmEnabled, setBgmEnabled] = useState<boolean>(() => {
-    return localStorage.getItem("fifty_sound_bgm") === "true";
+    try {
+      return localStorage.getItem("fifty_sound_bgm") === "true";
+    } catch (_) {
+      return false;
+    }
   });
   const [voiceType, setVoiceType] = useState<string>(() => {
-    return localStorage.getItem("fifty_sound_voice_type") || "female";
+    try {
+      return localStorage.getItem("fifty_sound_voice_type") || "female";
+    } catch (_) {
+      return "female";
+    }
   });
   const [showMascot, setShowMascot] = useState<boolean>(() => {
-    return localStorage.getItem("fifty_sound_show_mascot") !== "false";
+    try {
+      return localStorage.getItem("fifty_sound_show_mascot") !== "false";
+    } catch (_) {
+      return true;
+    }
   });
   const [lastAction, setLastAction] = useState<"correct" | "error" | "complete" | "">("");
   const [practiceMode, setPracticeMode] = useState<"typing" | "handwriting">("typing");
@@ -44,7 +60,11 @@ export default function App() {
   // Synchronize state preferences
   useEffect(() => {
     audioSynth.setMute(isMuted);
-    localStorage.setItem("fifty_sound_muted", String(isMuted));
+    try {
+      localStorage.setItem("fifty_sound_muted", String(isMuted));
+    } catch (e) {
+      console.warn("localStorage restricted", e);
+    }
   }, [isMuted]);
 
   useEffect(() => {
@@ -53,16 +73,28 @@ export default function App() {
     } else {
       audioSynth.stopAmbientBGM();
     }
-    localStorage.setItem("fifty_sound_bgm", String(bgmEnabled));
+    try {
+      localStorage.setItem("fifty_sound_bgm", String(bgmEnabled));
+    } catch (e) {
+      console.warn("localStorage restricted", e);
+    }
   }, [bgmEnabled, isMuted]);
 
   useEffect(() => {
     audioSynth.setVoiceType(voiceType);
-    localStorage.setItem("fifty_sound_voice_type", voiceType);
+    try {
+      localStorage.setItem("fifty_sound_voice_type", voiceType);
+    } catch (e) {
+      console.warn("localStorage restricted", e);
+    }
   }, [voiceType]);
 
   useEffect(() => {
-    localStorage.setItem("fifty_sound_show_mascot", String(showMascot));
+    try {
+      localStorage.setItem("fifty_sound_show_mascot", String(showMascot));
+    } catch (e) {
+      console.warn("localStorage restricted", e);
+    }
   }, [showMascot]);
 
   // Robust gesture click handler to bind to AudioContext autoplay permissions
@@ -138,7 +170,11 @@ export default function App() {
       nextPractices[card.id] = (nextPractices[card.id] || 0) + rounds;
     });
     setPracticeTimes(nextPractices);
-    localStorage.setItem("fifty_sound_practice_times", JSON.stringify(nextPractices));
+    try {
+      localStorage.setItem("fifty_sound_practice_times", JSON.stringify(nextPractices));
+    } catch (e) {
+      console.warn("localStorage restricted", e);
+    }
 
     // Handle card unlock criteria (needs at least 3 correct spellings)
     if (rounds >= 3) {
@@ -146,7 +182,11 @@ export default function App() {
       if (isNewUnlockList.length > 0) {
         const nextCollected = [...collectedIds, ...isNewUnlockList.map(c => c.id)];
         setCollectedIds(nextCollected);
-        localStorage.setItem("fifty_sound_unlocked_cards", JSON.stringify(nextCollected));
+        try {
+          localStorage.setItem("fifty_sound_unlocked_cards", JSON.stringify(nextCollected));
+        } catch (e) {
+          console.warn("localStorage restricted", e);
+        }
       }
 
       setCeremonyCards(activeCards);
@@ -160,6 +200,17 @@ export default function App() {
     }
 
     setActiveCards([]);
+  };
+
+  const handleImportData = (unlockedCards: string[], ptTimes: Record<string, number>, settings?: any) => {
+    setCollectedIds(unlockedCards);
+    setPracticeTimes(ptTimes);
+    if (settings) {
+      if (settings.hasOwnProperty("muted")) setIsMuted(settings.muted);
+      if (settings.hasOwnProperty("bgm")) setBgmEnabled(settings.bgm);
+      if (settings.hasOwnProperty("voiceType")) setVoiceType(settings.voiceType);
+      if (settings.hasOwnProperty("showMascot")) setShowMascot(settings.showMascot);
+    }
   };
 
   const handleStartTraining = (cardsList: DictionaryItem[], durationMs: number) => {
@@ -378,11 +429,11 @@ export default function App() {
             className="flex items-center gap-2 cursor-pointer"
           >
             <div className="w-8 h-8 rounded-lg bg-stone-900 border border-stone-800 flex items-center justify-center text-stone-100 text-sm font-serif font-black">
-              五
+              カ
             </div>
             <div>
-              <span className="font-serif font-black tracking-tight text-stone-900">五十音人名集卡练习</span>
-              <span className="text-[9px] font-mono block text-stone-400 -mt-1 font-bold">50-SOUNDS TYPING ENZYME</span>
+              <span className="font-serif font-black tracking-tight text-stone-900">Katakata「カタカタ」</span>
+              <span className="text-[9px] font-mono block text-stone-400 -mt-1 font-bold">50-SOUNDS COLLECTIVE TRAINING</span>
             </div>
           </div>
 
@@ -570,6 +621,7 @@ export default function App() {
                 collectedIds={collectedIds}
                 practiceTimes={practiceTimes}
                 onGoBack={() => setCurrentPage("start")}
+                onImportData={handleImportData}
               />
             </motion.div>
           )}
@@ -595,7 +647,7 @@ export default function App() {
 
       {/* Footer information bar */}
       <footer className="text-center text-stone-400 py-6 text-xs font-mono max-w-xl mx-auto space-y-1.5 border-t border-stone-200 select-none">
-        <p>©五十音人名集卡练习 2026 EDITION. POWERED BY GOOGLE DEEPMIND GEMINI & REACT.</p>
+        <p>©Katakata「カタカタ」五十音集卡练习 2026 EDITION. POWERED BY GOOGLE DEEPMIND GEMINI & REACT.</p>
         <p className="text-[10px] text-stone-300">
           DESIGNED FOR CLASSICAL JAPANESE ROMAJI LEARNING RETENTION. ALL INTELLECTUALS SECURE.
         </p>
