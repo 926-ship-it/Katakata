@@ -1,0 +1,795 @@
+import React, { useState } from "react";
+import { motion } from "motion/react";
+import { BookOpen, Sparkles, Trophy, Settings, HelpCircle, Flame, Keyboard, BarChart2, Calendar, Award, Clock, ArrowRight, RotateCw, Play, BookOpenCheck } from "lucide-react";
+import { DICTIONARY, DictionaryItem } from "../data/dictionary";
+
+interface StartPageProps {
+  onStartTraining: (items: DictionaryItem[], durationMs: number) => void;
+  onGoToLibrary: () => void;
+  collectedIds: string[];
+  practiceTimes: Record<string, number>;
+  practiceMode: "typing" | "handwriting";
+  setPracticeMode: (mode: "typing" | "handwriting") => void;
+}
+
+export const StartPage: React.FC<StartPageProps> = ({
+  onStartTraining,
+  onGoToLibrary,
+  collectedIds,
+  practiceTimes = {},
+  practiceMode,
+  setPracticeMode,
+}) => {
+  // Strongly-typed practice stats calculation
+  const practiceValues = Object.values(practiceTimes) as number[];
+  const totalRounds = practiceValues.reduce((accum, val) => accum + Number(val || 0), 0);
+
+  // Config states
+  const [sessionLimit, setSessionLimit] = useState<number>(3); // How many items they want to practice or unlock 
+  const [durationMinutes, setDurationMinutes] = useState<number>(3); // Customizable minutes: 1, 3, 5, 10, or custom
+  const [customMinutesText, setCustomMinutesText] = useState<string>("");
+  const [showCustomTime, setShowCustomTime] = useState<boolean>(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
+
+  const [activeTab, setActiveTab ] = useState<"intro" | "rules">("intro");
+
+  // Filter dictionary based on unlocked status or category
+  const filteredDict = DICTIONARY.filter((item) => {
+    if (selectedCategory === "all") return true;
+    if (selectedCategory === "locked") return !collectedIds.includes(item.id);
+    if (selectedCategory === "unlocked") return collectedIds.includes(item.id);
+    return item.category === selectedCategory;
+  });
+
+  // Automatically keep CARD selections synchronized with sessionLimit
+  React.useEffect(() => {
+    setSelectedCardIds((prev) => {
+      const poolIds = filteredDict.map(item => item.id);
+      
+      // Filter visible on current pool list
+      let currentValid = prev.filter(id => poolIds.includes(id));
+      
+      if (currentValid.length > sessionLimit) {
+        return currentValid.slice(0, sessionLimit);
+      }
+      
+      if (currentValid.length < sessionLimit) {
+        const needed = sessionLimit - currentValid.length;
+        const remaining = poolIds.filter(id => !currentValid.includes(id));
+        const extra = remaining.slice(0, needed);
+        return [...currentValid, ...extra];
+      }
+      
+      return currentValid;
+    });
+  }, [sessionLimit, selectedCategory]);
+
+  const handleToggleCheckbox = (id: string) => {
+    setSelectedCardIds((prev) => {
+      if (prev.includes(id)) {
+        if (prev.length <= 1) return prev; // Keep at least one checked
+        return prev.filter((x) => x !== id);
+      } else {
+        if (prev.length >= sessionLimit) {
+          // CAP at limit and rotate (FIFO)
+          return [...prev.slice(1), id];
+        }
+        return [...prev, id];
+      }
+    });
+  };
+
+  const handleStartGroupTraining = () => {
+    const selectedItems = selectedCardIds
+      .map((id) => DICTIONARY.find((item) => item.id === id))
+      .filter((it): it is DictionaryItem => !!it);
+
+    if (selectedItems.length === 0) return;
+
+    let finalMinutes = durationMinutes;
+    if (showCustomTime) {
+      const parsed = parseInt(customMinutesText, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        finalMinutes = parsed;
+      } else {
+        alert("请输入有效的自定义训练时间（分钟）！");
+        return;
+      }
+    }
+    onStartTraining(selectedItems, finalMinutes * 60 * 1000);
+  };
+
+  // Pick a target card to lock-in for training
+  const handleSelectCardForTraining = (item: DictionaryItem) => {
+    let finalMinutes = durationMinutes;
+    if (showCustomTime) {
+      const parsed = parseInt(customMinutesText, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        finalMinutes = parsed;
+      } else {
+        alert("请输入有效的自定义训练时间（分钟）！");
+        return;
+      }
+    }
+    onStartTraining([item], finalMinutes * 60 * 1000);
+  };
+
+  const handleRandomDraw = () => {
+    // Pick from locked first to encourage collecting, or any if all are collected
+    const lockedList = DICTIONARY.filter(item => !collectedIds.includes(item.id));
+    const targetPool = lockedList.length > 0 ? lockedList : DICTIONARY;
+    const randomIndex = Math.floor(Math.random() * targetPool.length);
+    handleSelectCardForTraining(targetPool[randomIndex]);
+  };
+
+  const currentProgressPercent = Math.min(
+    100,
+    Math.round((collectedIds.length / DICTIONARY.length) * 100)
+  );
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-8 px-2 md:px-0">
+      {/* Title Header: Ink stamps + Retro retro computer headers */}
+      <div className="text-center space-y-3 relative py-4">
+        <div className="absolute top-0 right-10 opacity-10 pointer-events-none select-none">
+          {/* Virtual Large Japanese Calligraphy stamp */}
+          <div className="w-24 h-24 rounded border-4 border-rose-700 flex items-center justify-center text-rose-700 text-3xl font-serif font-bold transform rotate-12">
+            極秘
+          </div>
+        </div>
+
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="inline-flex items-center gap-2 px-3 py-1 rounded bg-stone-100 border border-stone-300 shadow-inner text-stone-600 text-xs font-mono select-none"
+        >
+          <Keyboard className="w-3.5 h-3.5 text-amber-600" />
+          <span>FIFTY-SOUNDS TYPING ENZYME V1.2</span>
+        </motion.div>
+
+        <h1 
+          className="text-4xl md:text-5xl font-black text-stone-900 font-serif tracking-tight select-none pt-2"
+          style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
+        >
+          五十音人名集卡练习页
+        </h1>
+        <p className="text-stone-600 max-w-xl mx-auto text-sm md:text-base leading-relaxed">
+          极简复古、极具仪式感的日系拼歌。通过<span className="font-bold text-rose-600">强制深度熟化模式</span>，锁定单个人名重复肌肉记忆，让五十音化为你的直觉本能。
+        </p>
+      </div>
+
+      {/* Progress Cards Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Binder collection statistics */}
+        <div className="p-4 rounded-xl border border-stone-300 bg-white shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-lg bg-stone-100 border border-stone-200 flex items-center justify-center text-amber-500">
+            <Trophy className="w-6 h-6" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs text-stone-500 font-mono">BINDER COLLECTION PROGRESS</div>
+            <div className="text-2xl font-black text-stone-800 font-serif">
+              {collectedIds.length} <span className="text-sm text-stone-400 font-sans">/ {DICTIONARY.length} 卡片</span>
+            </div>
+            <div className="w-full bg-stone-100 rounded-full h-1.5 mt-1 overflow-hidden">
+              <div 
+                className="bg-amber-500 h-1.5 rounded-full transition-all duration-500" 
+                style={{ width: `${currentProgressPercent}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Hot Streaks */}
+        <div className="p-4 rounded-xl border border-stone-300 bg-white shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-lg bg-red-50 border border-red-200 flex items-center justify-center text-red-500">
+            <Flame className="w-6 h-6 animate-pulse" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs text-stone-500 font-mono">TODAY UNLOCKED LIMIT</div>
+            <div className="text-xl font-bold text-stone-800">
+              目标: <span className="text-rose-600 font-serif font-black">{sessionLimit}</span> 位姓名
+            </div>
+            <div className="text-xs text-stone-400 mt-1">
+              由你每日自行选定，稳扎稳打
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <button 
+              onClick={() => setSessionLimit(prev => Math.max(1, prev - 1))}
+              className="px-1.5 py-0.5 rounded border border-stone-200 text-xs bg-stone-50 hover:bg-stone-100 text-stone-700"
+            >
+              -
+            </button>
+            <button 
+              onClick={() => setSessionLimit(prev => Math.min(10, prev + 1))}
+              className="px-1.5 py-0.5 rounded border border-stone-200 text-xs bg-stone-50 hover:bg-stone-100 text-stone-700"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Entrance Binder */}
+        <button
+          onClick={onGoToLibrary}
+          className="p-4 rounded-xl border border-stone-300 bg-amber-50 hover:bg-amber-100/70 transition-all duration-200 shadow-sm flex items-center gap-4 text-left group cursor-pointer"
+        >
+          <div className="w-12 h-12 rounded-lg bg-amber-200 border border-amber-300 flex items-center justify-center text-amber-700 group-hover:scale-105 transition-transform duration-200">
+            <BookOpen className="w-6 h-6" />
+          </div>
+          <div className="flex-1">
+            <div className="text-xs text-stone-500 font-mono">MEMORIES & FOLKLORES</div>
+            <p className="text-base font-black text-amber-900 font-serif">个人收藏卡牌库</p>
+            <p className="text-xs text-amber-700 mt-0.5">翻阅已收集卡片，查阅AI文化解析 →</p>
+          </div>
+        </button>
+      </div>
+
+      {/* COMPREHENSIVE PRACTICE DASHBOARD & DAILY REVISION ENGINE ("练习仪表盘" & "每日回顾") */}
+      <div className="p-6 rounded-2xl border-2 border-stone-800 bg-[#f9f7f4] space-y-6 shadow-sm select-none relative overflow-hidden">
+        {/* Abstract background ink painting watermark */}
+        <div className="absolute top-0 right-0 w-32 h-32 opacity-[0.02] pointer-events-none">
+          <svg viewBox="0 0 100 100" className="w-full h-full fill-stone-900">
+            <circle cx="50" cy="50" r="40" />
+          </svg>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-300/60 pb-4">
+          <div className="space-y-1">
+            <span className="text-[9px] font-mono font-black text-amber-800 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full uppercase tracking-wider">
+              Ledger & Revision Station
+            </span>
+            <h2 className="text-xl font-black text-stone-900 font-serif flex items-center gap-1.5">
+              <BarChart2 className="w-5 h-5 text-amber-600" />
+              <span>练习数据仪表盘 & 每日回顾温故</span>
+            </h2>
+          </div>
+          <p className="text-xs text-stone-500 font-mono text-left sm:text-right">
+            当前熟力值 : <span className="text-amber-800 font-bold">{totalRounds}</span> 圈大熟化
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          {/* Dashboard Left Column: Stats & Category Mastery */}
+          <div className="md:col-span-7 space-y-4">
+            <div className="p-4 rounded-xl border border-stone-300/80 bg-white shadow-inner grid grid-cols-3 gap-3">
+              {/* Level progressive badge */}
+              <div className="text-center border-r border-stone-200 pr-1 flex flex-col justify-between">
+                <span className="text-[9px] font-mono text-stone-400 block">练力称号</span>
+                <div className="my-1.5 flex flex-col items-center justify-center">
+                  <Award className="w-7 h-7 text-amber-600 animate-pulse" />
+                  <span className="text-xs font-serif font-black text-stone-800 mt-1 block leading-tight">
+                    {(() => {
+                      if (totalRounds < 3) return "🌱 初心侍";
+                      if (totalRounds < 10) return "⚔️ 研墨侍";
+                      if (totalRounds < 25) return "🎭 吟牌使";
+                      if (totalRounds < 50) return "🏔️ 富士客";
+                      return "👑 大御所";
+                    })()}
+                  </span>
+                </div>
+                <span className="text-[8px] font-mono text-stone-400 block scale-90">连续打卡动力</span>
+              </div>
+
+              {/* Unlocked cards percent */}
+              <div className="text-center border-r border-stone-200 px-1 flex flex-col justify-between">
+                <span className="text-[9px] font-mono text-stone-400 block">收集比例</span>
+                <span className="text-2xl font-black text-stone-900 font-serif block my-1">
+                  {Math.round((collectedIds.length / DICTIONARY.length) * 100)}%
+                </span>
+                <span className="text-[8px] font-mono text-stone-400 block scale-90">
+                  {collectedIds.length}张 / {DICTIONARY.length}张
+                </span>
+              </div>
+
+              {/* estimated keystrokes */}
+              <div className="text-center pl-1 flex flex-col justify-between">
+                <span className="text-[9px] font-mono text-stone-400 block">指尖压键数</span>
+                <span className="text-2xl font-black text-amber-800 font-serif block my-1 animate-pulse">
+                  {Object.entries(practiceTimes).reduce((accum: number, [cardId, rounds]) => {
+                    const item = DICTIONARY.find(x => x.id === cardId);
+                    const cost = item ? item.segments.length : 3;
+                    const roundsNum = Number(rounds || 0);
+                    return accum + (roundsNum * cost * 3); // Average keystrokes per session rounds due to error reset overhead
+                  }, 0)}+
+                </span>
+                <span className="text-[8px] font-mono text-stone-400 block scale-90">估计打字功力</span>
+              </div>
+            </div>
+
+            {/* Category visual progress meters */}
+            <div className="space-y-2.5">
+              <span className="text-[10px] font-mono text-stone-450 uppercase tracking-widest font-bold block">
+                类别拼写全熟化比例 Breakdown
+              </span>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { id: "name", name: "🇯🇵 人名册", color: "bg-slate-450", border: "border-slate-350" },
+                  { id: "nature", name: "🌸 自然物", color: "bg-pink-400", border: "border-pink-300" },
+                  { id: "culture", name: "🎭 民俗祭", color: "bg-purple-500", border: "border-purple-300" },
+                  { id: "food", name: "🍡 和美味", color: "bg-rose-450", border: "border-rose-450" },
+                ].map(cat => {
+                  const catItems = DICTIONARY.filter(x => x.category === cat.id);
+                  const catUnlocked = catItems.filter(x => collectedIds.includes(x.id));
+                  const percent = catItems.length > 0 ? Math.round((catUnlocked.length / catItems.length) * 100) : 0;
+                  return (
+                    <div key={cat.id} className="p-2.5 rounded-lg bg-white border border-stone-250 shadow-sm space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-serif font-bold text-stone-700">{cat.name}</span>
+                        <span className="text-[10px] font-mono text-stone-450 font-bold">{catUnlocked.length}/{catItems.length}</span>
+                      </div>
+                      <div className="w-full bg-stone-100 rounded-full h-1.5 overflow-hidden">
+                        <div className={`h-full ${cat.color} rounded-full`} style={{ width: `${percent}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Dashboard Right Column: "每日回顾 (Daily Review)" suggestion module */}
+          <div className="md:col-span-5 flex flex-col justify-between border-t md:border-t-0 md:border-l border-stone-300/60 pt-4 md:pt-0 md:pl-6 space-y-3">
+            <div className="space-y-1">
+              <span className="text-[10px] font-mono text-rose-700 font-black uppercase tracking-wider flex items-center gap-1">
+                <Clock className="w-3 h-3 text-rose-600 animate-spin-slow" />
+                <span>艾宾浩斯防忘曲轨推荐</span>
+              </span>
+              <h3 className="text-sm font-black font-serif text-stone-850">
+                每日防遗温故循环 Daily Review
+              </h3>
+              <p className="text-[11px] text-stone-500 leading-relaxed">
+                以下3个你已解锁的历史老卡，练力次数最少点，已被定为今日必练的温顾循环词条：
+              </p>
+            </div>
+
+            {(() => {
+              const unlockedItems = DICTIONARY.filter(item => collectedIds.includes(item.id));
+              const sortedUnlocked = [...unlockedItems].sort((a, b) => (practiceTimes[a.id] || 0) - (practiceTimes[b.id] || 0));
+              const reviewCards = sortedUnlocked.slice(0, 3);
+
+              if (reviewCards.length === 0) {
+                return (
+                  <div className="flex-1 p-4 rounded-xl border border-dashed border-stone-300 flex flex-col items-center justify-center text-center space-y-1.5 bg-white">
+                    <BookOpenCheck className="w-7 h-7 text-stone-350" />
+                    <p className="text-[11px] font-bold text-stone-600">拼写待解卡推荐</p>
+                    <p className="text-[10px] text-stone-400 max-w-xs">
+                      目前你还没有收集到任何卡牌。在下方词库列表点击【拼写熟化】一轮，即可开启每日温顾智能引擎！
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    {reviewCards.map(item => (
+                      <div key={item.id} className="p-1.5 px-2.5 rounded-lg bg-white border border-stone-250 flex items-center justify-between gap-2 shadow-sm">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-serif font-black text-stone-900 text-sm">{item.kanji}</span>
+                          <span className="text-[10px] text-stone-450 font-mono">({item.kanaStr})</span>
+                        </div>
+                        <span className="text-[9px] font-mono text-amber-800 bg-amber-500/10 px-1.5 rounded font-black border border-amber-500/20">
+                          已练 {practiceTimes[item.id] || 0} 轮
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      // Begin targeted training immediately for 3 minutes
+                      onStartTraining(reviewCards, 3 * 60 * 1000);
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-stone-900 border border-stone-850 hover:bg-amber-600 text-stone-50 hover:text-stone-950 font-black text-[11px] flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    <span>温故知新：一键拼通今日老卡 (3分钟) ＞</span>
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+
+        {/* 7-Day practice streak matrix simulation */}
+        <div className="pt-3 border-t border-stone-200/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-stone-500 text-xs">
+          <div className="flex items-center gap-1.5">
+            <Calendar className="w-4 h-4 text-stone-450" />
+            <span className="font-serif font-bold text-stone-750">七日功勋印社（假名打卡大连契）:</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold">
+            {["月", "火", "水", "木", "金", "土", "日"].map((day, idx) => {
+              // Simulate day highlights based on user practicing active rounds
+              const isActive = totalRounds > 0 && (idx === 0 || idx === 1 || (totalRounds >= 4 && idx === 2) || (totalRounds >= 10 && idx === 4) || (totalRounds >= 20 && idx === 6));
+              return (
+                <div key={idx} className="flex flex-col items-center gap-1">
+                  <span className="text-[9px] text-stone-400 select-all">{day}</span>
+                  <div 
+                    className={`w-6 h-6 rounded-md border flex items-center justify-center transition-all ${
+                      isActive 
+                        ? "bg-amber-500/20 border-amber-500 text-amber-900 font-black animate-pulse shadow-md" 
+                        : "bg-white border-stone-250 text-stone-350"
+                    }`}
+                    title={isActive ? "已熟健敲印" : "待指打契印"}
+                  >
+                    {isActive ? "印" : "默"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Main training config panel */}
+      <div className="p-6 md:p-8 rounded-2xl border-2 border-stone-800 bg-stone-50 shadow-md space-y-6">
+        <div>
+          <h2 className="text-2xl font-black text-stone-950 font-serif flex items-center gap-2">
+            <Settings className="w-5.5 h-5.5 text-amber-600" />
+            第一步：设定本次循环的时长
+          </h2>
+          <p className="text-xs text-stone-500 font-mono mt-1">THE TRAINING TIME ENGINE CONFIGURATION</p>
+        </div>
+
+        {/* Customized training period picker - Full implementation of User requested customizable training duration */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {[1, 3, 5, 10].map((mins) => (
+            <button
+              key={mins}
+              onClick={() => {
+                setDurationMinutes(mins);
+                setShowCustomTime(false);
+              }}
+              className={`py-3 px-4 rounded-xl border-2 text-sm font-mono font-bold transition-all duration-200 ${
+                durationMinutes === mins && !showCustomTime
+                  ? "border-stone-900 bg-stone-900 text-stone-50 shadow-inner"
+                  : "border-stone-300 bg-white text-stone-700 hover:border-stone-500 hover:bg-stone-100"
+              }`}
+            >
+              ⏱ {mins} 分钟
+            </button>
+          ))}
+          <button
+            onClick={() => setShowCustomTime(true)}
+            className={`py-3 px-4 rounded-xl border-2 text-xs font-bold transition-all duration-200 ${
+              showCustomTime
+                ? "border-amber-600 bg-amber-50 text-amber-900"
+                : "border-stone-300 bg-white text-stone-700 hover:border-stone-500 hover:bg-stone-100"
+            }`}
+          >
+            ✏ 其它自定义
+          </button>
+        </div>
+
+        {/* Custom time text field */}
+        {showCustomTime && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            className="p-4 rounded-xl border border-dashed border-amber-300 bg-amber-50/50 flex flex-col sm:flex-row items-start sm:items-center gap-3 overflow-hidden"
+          >
+            <div className="text-xs text-amber-800 font-medium">
+              请输入您的自定义计时长度（分钟）:
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <input
+                type="number"
+                min="1"
+                max="120"
+                value={customMinutesText}
+                onChange={(e) => setCustomMinutesText(e.target.value)}
+                placeholder="例如: 8"
+                className="w-24 px-3 py-1.5 rounded border border-stone-300 bg-white font-mono text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+              <span className="text-xs text-stone-600 font-sans">分钟</span>
+            </div>
+            <div className="text-[11px] text-amber-700 italic">
+              （训练将在极短时间内产生肌肉习惯，建议设定 3 至 10 分钟）
+            </div>
+          </motion.div>
+        )}
+
+        <hr className="border-stone-300" />
+
+        {/* Practice Mode Toggle Block */}
+        <div>
+          <h2 className="text-2xl font-black text-stone-950 font-serif flex items-center gap-2">
+            <Settings className="w-5.5 h-5.5 text-amber-600" />
+            第二步：选择练习模式
+          </h2>
+          <p className="text-xs text-stone-500 font-mono mt-1">SELECT PREFERRED INTERACTION SYSTEM MODE</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <button
+            onClick={() => setPracticeMode("typing")}
+            className={`p-4 rounded-xl border-2 text-left transition-all duration-200 cursor-pointer flex items-start gap-3 ${
+              practiceMode === "typing"
+                ? "border-stone-900 bg-stone-900 text-stone-50 shadow-md"
+                : "border-stone-300 bg-white text-stone-700 hover:border-stone-500 hover:bg-stone-50"
+            }`}
+          >
+            <div className={`p-2.5 rounded-lg shrink-0 ${practiceMode === "typing" ? "bg-amber-500 text-stone-950" : "bg-stone-100 text-stone-600"}`}>
+              <Keyboard className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="font-bold text-sm">⌨️ 打字练习模式</div>
+              <p className={`text-[11px] mt-1 leading-normal ${practiceMode === "typing" ? "text-stone-300" : "text-stone-500"}`}>
+                敲击键盘物理键位或虚拟输入。以罗马音（Romaji）进行高速拼写验证，在规定循环内牢固肌肉敲击神经直觉。
+              </p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setPracticeMode("handwriting")}
+            className={`p-4 rounded-xl border-2 text-left transition-all duration-200 cursor-pointer flex items-start gap-3 ${
+              practiceMode === "handwriting"
+                ? "border-stone-900 bg-stone-900 text-stone-50 shadow-md"
+                : "border-stone-300 bg-white text-stone-700 hover:border-stone-500 hover:bg-stone-50"
+            }`}
+          >
+            <div className={`p-2.5 rounded-lg shrink-0 ${practiceMode === "handwriting" ? "bg-amber-500 text-stone-950" : "bg-stone-100 text-stone-600"}`}>
+              <BookOpenCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="font-bold text-sm">✍️ 手写描红模式</div>
+              <p className={`text-[11px] mt-1 leading-normal ${practiceMode === "handwriting" ? "text-stone-300" : "text-stone-500"}`}>
+                在格内进行指尖或手写笔划描红临摹。AI 智能审查笔锋契合度与溢出率，契合物理触觉，快速掌握假名风骨结构。
+              </p>
+            </div>
+          </button>
+        </div>
+
+        <hr className="border-stone-300" />
+
+        {/* Select Card deck section */}
+        <div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-black text-stone-950 font-serif flex items-center gap-2">
+                <Sparkles className="w-5.5 h-5.5 text-amber-600" />
+                第三步：选择目标人名 / 词汇组合进行熟化
+              </h2>
+              <p className="text-xs text-stone-500 font-mono mt-1">CHOOSE TARGET CARDS ACCORDING TO DEEPEST TYPING ENZYME LIMIT</p>
+            </div>
+            <button
+              onClick={handleRandomDraw}
+              className="px-4 py-2 rounded-xl bg-orange-600 text-stone-50 hover:bg-orange-700 font-bold text-sm shadow-sm hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>🎲 随机大密抽卡</span>
+            </button>
+          </div>
+
+          {/* Dictionary Filtering Controls */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-4 border-b border-stone-200 pb-3">
+            {[
+              { id: "all", label: "全部词库" },
+              { id: "locked", label: "🔒 尚未解锁" },
+              { id: "unlocked", label: "🔓 已经收集" },
+              { id: "name", label: "🇯🇵 日本常见人名" },
+              { id: "nature", label: "🌸 四季自然" },
+              { id: "culture", label: "🎭 民俗祭典" },
+              { id: "food", label: "🍡 和食美味" },
+            ].map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`py-1 px-3 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                  selectedCategory === cat.id
+                    ? "bg-stone-900 text-stone-50"
+                    : "bg-stone-200 text-stone-600 hover:bg-stone-300"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Active selection combination bar */}
+          {selectedCardIds.length > 0 && (
+            <div className="mt-4 p-4 bg-amber-500 text-stone-950 rounded-2xl border border-amber-600 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md select-none">
+              <div className="space-y-0.5 text-left">
+                <div className="text-[10px] font-mono font-black text-amber-950 tracking-wider">
+                  ACTIVE COMBINATION LIST MATCHING TARGET SIZE ({selectedCardIds.length}/{sessionLimit})
+                </div>
+                <div className="text-sm font-bold">
+                  已在下方勾选{" "}
+                  <span className="bg-stone-900 font-mono font-black text-rose-50 px-2 py-0.5 rounded text-xs select-all">
+                    {selectedCardIds.length}
+                  </span>{" "}
+                  位人名词条：
+                  <span className="ml-1 font-serif font-black underline decoration-stone-900 decoration-wavy underline-offset-4">
+                    {selectedCardIds
+                      .map((id) => DICTIONARY.find((item) => item.id === id)?.kanji || "")
+                      .filter(Boolean)
+                      .join("、")}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={handleStartGroupTraining}
+                className="w-full sm:w-auto px-5 py-3 bg-stone-900 hover:bg-stone-850 text-stone-50 hover:text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                <span>开启 {selectedCardIds.length} 字连环拼音熟化 ＞</span>
+              </button>
+            </div>
+          )}
+
+          {/* Cards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4 max-h-[380px] overflow-y-auto pr-1">
+            {filteredDict.map((item) => {
+              const isUnlocked = collectedIds.includes(item.id);
+              const isChecked = selectedCardIds.includes(item.id);
+              
+              // Custom luxurious background styles depending on rarity & unlocked state
+              let cardBgClass = "bg-white";
+              let cardBorderClass = "border-stone-200";
+              
+              if (isUnlocked) {
+                if (item.rarity === "SSR") {
+                  cardBgClass = "bg-gradient-to-br from-amber-50 via-yellow-100 to-amber-100";
+                  cardBorderClass = "border-amber-400";
+                } else if (item.rarity === "SR") {
+                  cardBgClass = "bg-gradient-to-br from-orange-50 via-stone-50 to-amber-50";
+                  cardBorderClass = "border-orange-300";
+                } else if (item.rarity === "R") {
+                  cardBgClass = "bg-gradient-to-br from-sky-50 via-white to-indigo-50";
+                  cardBorderClass = "border-sky-300";
+                } else {
+                  cardBgClass = "bg-gradient-to-b from-stone-50 to-stone-100";
+                  cardBorderClass = "border-stone-300";
+                }
+              }
+
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => handleToggleCheckbox(item.id)}
+                  className={`p-4 rounded-xl border-2 flex flex-col justify-between transition-all duration-200 group relative overflow-hidden cursor-pointer ${cardBgClass} ${cardBorderClass} ${
+                    isChecked ? "ring-2 ring-amber-500 border-amber-500 bg-amber-100/20 shadow-md scale-[1.01]" : "hover:border-amber-400"
+                  } ${
+                    !isUnlocked ? "opacity-75 bg-stone-100/50" : "shadow-sm"
+                  }`}
+                  style={{
+                    boxShadow: isUnlocked && isChecked ? `0 6px 14px ${item.glowColor}` : ""
+                  }}
+                >
+                  {/* Elegant inner dashed frame to make it feel like an ancient classical voucher paper */}
+                  <div className="absolute inset-1.5 border border-dashed border-stone-900/10 rounded-lg pointer-events-none" />
+
+                  {/* Japanese woodblock corner frame brackets */}
+                  <div className="absolute top-2.5 left-2.5 w-1.5 h-1.5 border-t border-l border-stone-800/40 pointer-events-none" />
+                  <div className="absolute top-2.5 right-2.5 w-1.5 h-1.5 border-t border-r border-stone-800/40 pointer-events-none" />
+                  <div className="absolute bottom-2.5 left-2.5 w-1.5 h-1.5 border-b border-l border-stone-800/40 pointer-events-none" />
+                  <div className="absolute bottom-2.5 right-2.5 w-1.5 h-1.5 border-b border-r border-stone-800/40 pointer-events-none" />
+
+                  {/* Circular visual checkbox at top left */}
+                  <div className="absolute top-3.5 left-3.5 z-10" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        handleToggleCheckbox(item.id);
+                      }}
+                      className="w-4.5 h-4.5 accent-amber-600 rounded cursor-pointer border-stone-300 text-amber-600 hover:scale-105 transition-transform"
+                    />
+                  </div>
+
+                  <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                    <span 
+                      className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded tracking-wider border"
+                      style={{
+                        backgroundColor: item.rarity === "SSR" ? "#fee2e2" : item.rarity === "SR" ? "#ffedd5" : item.rarity === "R" ? "#e0f2fe" : "#f1f5f9",
+                        color: item.rarity === "SSR" ? "#b91c1c" : item.rarity === "SR" ? "#c2410c" : item.rarity === "R" ? "#0369a1" : "#475569",
+                        borderColor: item.rarity === "SSR" ? "#fca5a5" : item.rarity === "SR" ? "#fdbb2d" : "#bae6fd"
+                      }}
+                    >
+                      {item.rarity}
+                    </span>
+                    {isUnlocked ? (
+                      <span className="text-[9px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold border border-emerald-200">
+                        ★ 已收集
+                      </span>
+                    ) : (
+                      <span className="text-[9px] text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded font-mono">
+                        🔒 待解卡
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Red Traditional Calligraphy HANKO seal stamp overlay */}
+                  {isUnlocked && (
+                    <div className="absolute bottom-14 right-4 pointer-events-none select-none opacity-20 transform rotate-12 group-hover:scale-105 transition-transform">
+                      <div className={`w-9 h-9 rounded-full border-2 border-solid flex items-center justify-center font-serif text-[10px] font-black ${
+                        item.rarity === "SSR" ? "border-red-600 text-red-600" : "border-amber-700 text-amber-700"
+                      }`}>
+                        {item.rarity === "SSR" ? "神珍" : item.rarity === "SR" ? "极品" : "珍藏"}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-1 pl-6 pt-2">
+                    <div className="text-[10px] font-mono text-stone-400 font-bold tracking-widest select-none uppercase">
+                      {item.categoryName}
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span 
+                        className="text-2xl font-black text-stone-900 font-serif"
+                        style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
+                      >
+                        {item.kanji}
+                      </span>
+                      <span className="text-xs text-stone-400 font-mono font-bold">({item.kanaStr})</span>
+                    </div>
+                    <p className="text-stone-500 text-[11px] leading-relaxed line-clamp-3 pt-1 font-sans">
+                      {item.meaning}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-dashed border-stone-200 flex items-center justify-between pl-6 z-10">
+                    <div className="text-[10px] font-mono text-stone-450 font-bold bg-stone-100 px-2 py-0.5 rounded">
+                      字条:{item.segments.map(s => s.kana).join("・")}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectCardForTraining(item);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-stone-900 group-hover:bg-amber-500 text-[11px] font-bold text-stone-100 group-hover:text-stone-950 transition-colors duration-200 shadow-sm"
+                    >
+                      拼写熟化 ＞
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Rules / Tutorial tabs */}
+      <div className="bg-stone-100/60 rounded-xl border border-stone-200 p-4">
+        <div className="flex border-b border-stone-300 pb-2 mb-2">
+          <button
+            onClick={() => setActiveTab("intro")}
+            className={`px-3 py-1 text-xs font-bold font-mono transition-all border-b-2 -mb-[10px] ${
+              activeTab === "intro" ? "border-amber-600 text-stone-900" : "border-transparent text-stone-400"
+            }`}
+          >
+            🥋 玩法底层机制 LOGIC
+          </button>
+          <button
+            onClick={() => setActiveTab("rules")}
+            className={`px-3 py-1 text-xs font-bold font-mono transition-all border-b-2 -mb-[10px] ${
+              activeTab === "rules" ? "border-amber-600 text-stone-900" : "border-transparent text-stone-400"
+            }`}
+          >
+            📚 输入容差规范 INPUT RULE
+          </button>
+        </div>
+
+        <div className="text-stone-600 text-xs leading-relaxed pt-2">
+          {activeTab === "intro" ? (
+            <ul className="list-disc pl-4 space-y-1">
+              <li>本系统拒绝廉价的多选题或速配游戏，采用<span className="font-bold text-stone-900">“不记忆不罢休”</span>的定点拼写训练。</li>
+              <li>开启训练后，你讲陷入固定的倒计时循环，你需要在规定时间内将本词不断拼出！</li>
+              <li>拼完一轮将自动归零重新开始。在紧促循环中，拼写将从大脑有意识的辨析，彻底融入手指打字的指尖肌肉直觉记忆。</li>
+              <li>计时结束时，只要你完成了足额拼写，即可翻开本词对应的永久限量版集包卡片！</li>
+            </ul>
+          ) : (
+            <ul className="list-disc pl-4 space-y-1">
+              <li>逐假名匹配对应的罗马音（例如：“さ[sa]”、“と[to]”、“う[u]”）。</li>
+              <li>系统支持多种日本官方通用罗马音输入容差：输入 <span className="font-bold text-stone-800">“shi” / “si”</span> 均可代表 <span className="font-bold text-rose-600">し</span>，部分由于打字习惯细微差异（例如：“じ”输入 <span className="font-bold text-stone-800">“ji” / “zi”</span> ，“ふ”输入 <span className="font-bold text-stone-800">“fu” / “hu”</span>）均有完美匹配支持，杜绝严苛规则带来的拼音卡顿！</li>
+              <li>任何一个字母敲击错误，由于机制限制，该单词需要<span className="font-bold text-red-600">重头开始拼写</span>，这有益于逼迫你对模糊的五十音形成绝对准确的正向条件反射！</li>
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

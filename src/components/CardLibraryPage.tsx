@@ -1,0 +1,471 @@
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { BookOpen, Sparkles, Calendar, RotateCw, ArrowLeft, Lightbulb, Hourglass, HelpCircle, Activity, Volume2, PenTool } from "lucide-react";
+import { DICTIONARY, DictionaryItem } from "../data/dictionary";
+import { audioSynth } from "../utils/audio";
+import { CalligraphyCanvas } from "./CalligraphyCanvas";
+import { CardIllustration } from "./CardIllustration";
+
+interface CardLibraryPageProps {
+  collectedIds: string[];
+  practiceTimes: Record<string, number>; // Maps cardId to total completed practice rounds
+  onGoBack: () => void;
+}
+
+export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
+  collectedIds,
+  practiceTimes,
+  onGoBack,
+}) => {
+  const [selectedCard, setSelectedCard] = useState<DictionaryItem | null>(null);
+  const [aiStory, setAiStory] = useState<string>("");
+  const [loadingAi, setLoadingAi] = useState<boolean>(false);
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [activeDetailTab, setActiveDetailTab] = useState<"story" | "drawing">("story");
+
+  // Fetch or trigger Gemini AI Name story teller API
+  const handleFetchAiStory = async (item: DictionaryItem) => {
+    setLoadingAi(true);
+    setAiStory("");
+    
+    try {
+      const res = await fetch("/api/card-origin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: item.kanji,
+          kana: item.kanaStr,
+          romaji: item.segments.map(s => s.displayRomaji).join(""),
+          meaning: item.meaning,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.story) {
+        setAiStory(data.story);
+      } else {
+        setAiStory(data.error || "获取民俗文化简介失败，外部网络未响应，请稍后再试。");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setAiStory("连接服务器时出错，请确认您的网络设置。");
+    } finally {
+      setLoadingAi(false);
+    }
+  };
+
+  const filteredCollection = DICTIONARY.filter(item => {
+    if (categoryFilter === "all") return true;
+    if (categoryFilter === "collected") return collectedIds.includes(item.id);
+    if (categoryFilter === "locked") return !collectedIds.includes(item.id);
+    return item.category === categoryFilter;
+  });
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6 px-2 md:px-0">
+      {/* Top Navigator */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={onGoBack}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-stone-300 text-stone-600 bg-white hover:bg-stone-50 hover:text-stone-900 text-xs font-bold transition-all cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>返回首页</span>
+        </button>
+
+        <div className="text-right">
+          <span className="text-xs text-stone-500 font-mono">COLLECTION RATIO</span>
+          <p className="text-xs font-bold font-mono text-stone-750">
+            已收集 : {collectedIds.length} / {DICTIONARY.length}张 (
+            {Math.round((collectedIds.length / DICTIONARY.length) * 100)}%)
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <h1 
+          className="text-3xl font-black text-stone-900 font-serif"
+          style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
+        >
+          🗃️ 个人五十音闪卡收藏室
+        </h1>
+        <p className="text-xs text-stone-500 font-mono uppercase tracking-wider">
+          THE JAPANESE NOMINAL CARD BINDER LIBRARY & REVISION ROOM
+        </p>
+      </div>
+
+      {/* Categories select tabs */}
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-stone-200 pb-3">
+        {[
+          { id: "all", label: "全部图鉴" },
+          { id: "collected", label: "★ 已收集闪卡" },
+          { id: "locked", label: "🔒 未解锁图纸" },
+          { id: "name", label: "日本人名" },
+          { id: "nature", label: "自然风物" },
+          { id: "culture", label: "民俗文化" },
+          { id: "food", label: "日本美味" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setCategoryFilter(tab.id)}
+            className={`py-1 right-2 px-3 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+              categoryFilter === tab.id
+                ? "bg-amber-800 text-stone-50"
+                : "bg-stone-200 text-stone-600 hover:bg-stone-300"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Collection Binder Array */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        {filteredCollection.map((item) => {
+          const isCollected = collectedIds.includes(item.id);
+          const practiceRounds = practiceTimes[item.id] || 0;
+
+          // Custom exquisite visual styling depending on rarity & collected states
+          let cardBgClass = "bg-[#fcfbf9]/90 border-stone-250";
+          if (isCollected) {
+            if (item.rarity === "SSR") {
+              cardBgClass = "bg-gradient-to-br from-amber-50 via-yellow-100 to-amber-100 border-amber-400";
+            } else if (item.rarity === "SR") {
+              cardBgClass = "bg-gradient-to-br from-orange-50 via-stone-50 to-amber-50 border-orange-300";
+            } else if (item.rarity === "R") {
+              cardBgClass = "bg-gradient-to-br from-sky-50 via-white to-blue-50 border-sky-300";
+            } else {
+              cardBgClass = "bg-gradient-to-b from-stone-50 to-stone-100 border-stone-300";
+            }
+          }
+
+          return (
+            <motion.div
+              whileHover={{ y: isCollected ? -5 : 0, scale: isCollected ? 1.02 : 1 }}
+              key={item.id}
+              onClick={() => {
+                if (isCollected) {
+                  setSelectedCard(item);
+                  setAiStory(""); // reset AI field
+                  setActiveDetailTab("story");
+                  audioSynth.speakJapanese(item.kanaStr);
+                }
+              }}
+              className={`p-4 rounded-xl border-2 flex flex-col justify-between h-56 transition-all relative overflow-hidden select-none ${
+                isCollected ? "cursor-pointer shadow-sm" : "bg-stone-100/50 border-stone-200 opacity-60"
+              } ${cardBgClass}`}
+              style={{
+                boxShadow: isCollected ? `0 4px 14px ${item.glowColor}` : "none",
+              }}
+            >
+              {/* Antique voucher dashed inner sub-border */}
+              <div className="absolute inset-1.5 border border-dashed border-stone-800/10 rounded-lg pointer-events-none" />
+
+              {/* Japanese corner bracket markers */}
+              <div className="absolute top-2 left-2 w-1.5 h-1.5 border-t border-l border-stone-850/30 pointer-events-none" />
+              <div className="absolute top-2 right-2 w-1.5 h-1.5 border-t border-r border-stone-850/30 pointer-events-none" />
+              <div className="absolute bottom-2 left-2 w-1.5 h-1.5 border-b border-l border-stone-850/30 pointer-events-none" />
+              <div className="absolute bottom-2 right-2 w-1.5 h-1.5 border-b border-r border-stone-850/30 pointer-events-none" />
+
+              {/* Card top badge */}
+              <div className="flex items-center justify-between z-10">
+                <span 
+                  className="text-[9px] font-mono font-black border px-1 rounded-sm tracking-widest scale-90"
+                  style={{
+                    backgroundColor: item.rarity === "SSR" ? "#fee2e2" : item.rarity === "SR" ? "#ffedd5" : item.rarity === "R" ? "#e0f2fe" : "#f1f5f9",
+                    color: item.rarity === "SSR" ? "#b91c1c" : item.rarity === "SR" ? "#c2410c" : item.rarity === "R" ? "#0284c7" : "#475569",
+                    borderColor: item.rarity === "SSR" ? "#fed7aa" : item.rarity === "SR" ? "#fed7aa" : "#bae6fd"
+                  }}
+                >
+                  {item.rarity}
+                </span>
+                {isCollected ? (
+                  <span className="text-[8px] bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded font-black border border-emerald-200">
+                    ★ 已收藏
+                  </span>
+                ) : (
+                  <span className="text-[8px] bg-stone-200/80 text-stone-500 px-1.5 rounded font-bold">
+                    🔒 未完成
+                  </span>
+                )}
+              </div>
+
+              {/* Red calligraphic seal stamp overlay */}
+              {isCollected && (
+                <div className="absolute bottom-11 right-3 pointer-events-none select-none opacity-25 transform rotate-12">
+                  <div className={`w-8 h-8 rounded-full border-2 border-solid flex items-center justify-center font-serif text-[9px] font-bold ${
+                    item.rarity === "SSR" ? "border-red-600 text-red-600" : "border-amber-700 text-amber-700"
+                  }`}>
+                    {item.rarity === "SSR" ? "神珍" : item.rarity === "SR" ? "极品" : "珍藏"}
+                  </div>
+                </div>
+              )}
+
+              {/* Central text layout */}
+              <div className="text-center py-2 space-y-1.5 z-10 flex flex-col items-center justify-center">
+                {/* Embedded Card Illustration */}
+                <div className="mb-1">
+                  <CardIllustration
+                    id={item.id}
+                    category={item.category}
+                    className={`w-12 h-12 transition-all ${isCollected ? "opacity-95 contrast-110" : "opacity-20 grayscale pointer-events-none"}`}
+                  />
+                </div>
+
+                {isCollected ? (
+                  <>
+                    <h3 
+                      className="text-2xl font-extrabold text-stone-950 font-serif drop-shadow-sm select-none tracking-wide"
+                      style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
+                    >
+                      {item.kanji}
+                    </h3>
+                    <p className="text-[10px] font-mono text-stone-500 font-bold italic">({item.kanaStr})</p>
+                  </>
+                ) : (
+                  <>
+                    <span 
+                      className="text-lg font-serif text-stone-350 font-bold select-none tracking-wider block"
+                      style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
+                    >
+                      {item.segments.map(s => s.kana).join("")}
+                    </span>
+                    <p className="text-[9px] font-mono text-stone-400">未解锁隐藏词条</p>
+                  </>
+                )}
+              </div>
+
+              {/* Footer: Rarity & Practice Count statistics */}
+              <div className="pt-2 border-t border-dashed border-stone-800/10 flex items-center justify-between z-10">
+                <span className="text-[9px] font-mono text-stone-450 font-bold">
+                  {item.categoryName}
+                </span>
+                {isCollected && (
+                  <span className="text-[9px] font-mono text-stone-500 flex items-center gap-0.5 font-bold">
+                    <RotateCw className="w-2.5 h-2.5 text-stone-400" />
+                    {practiceRounds}轮连练
+                  </span>
+                )}
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {emptyStatePlaceholder()}
+
+      {/* Floating Modal detailed view / AI Storyteller with Card Flip style layout */}
+      <AnimatePresence>
+        {selectedCard && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/80 backdrop-blur-sm overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="max-w-xl w-full bg-stone-50 rounded-2xl border-2 border-stone-800 p-6 md:p-8 space-y-6 relative shadow-2xl my-8 text-stone-900"
+            >
+              <button
+                onClick={() => setSelectedCard(null)}
+                className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-stone-200 text-stone-600 transition-colors"
+                title="关闭"
+              >
+                ✕
+              </button>
+
+              {/* Inside detail header: beautiful premium styling card view on top */}
+              <div 
+                className={`p-6 rounded-xl border-2 bg-gradient-to-br ${selectedCard.bgGradient} ${selectedCard.borderColor} text-center space-y-3 relative overflow-hidden`}
+                style={{ boxShadow: `0 4px 15px ${selectedCard.glowColor}` }}
+              >
+                <span className="absolute top-2 left-3 text-[10px] font-mono text-stone-500 font-bold">
+                  {selectedCard.rarityName}  ・  #{selectedCard.id.toUpperCase()}
+                </span>
+
+                <div className="flex justify-center pt-2">
+                  <div className="p-3 bg-white/70 backdrop-blur-sm border border-stone-200/50 rounded-2xl shadow-sm">
+                    <CardIllustration
+                      id={selectedCard.id}
+                      category={selectedCard.category}
+                      className="w-16 h-16"
+                    />
+                  </div>
+                </div>
+                
+                <h2 
+                  className="text-4xl font-black text-stone-950 font-serif"
+                  style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
+                >
+                  {selectedCard.kanji}
+                </h2>
+                
+                <div className="flex justify-center gap-3">
+                  <span className="text-sm font-mono text-stone-600">假名: <b>{selectedCard.kanaStr}</b></span>
+                  <span className="text-stone-300">|</span>
+                  <span className="text-sm font-mono text-stone-600">罗马音: <b>{selectedCard.segments.map(s => s.displayRomaji).join("")}</b></span>
+                </div>
+
+                <div className="flex justify-center pt-0.5">
+                  <button
+                    onClick={() => audioSynth.speakJapanese(selectedCard.kanaStr)}
+                    className="px-3 py-1 rounded-full bg-stone-900/10 hover:bg-stone-900/20 text-stone-850 transition-all text-[11px] font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    <Volume2 className="w-3 h-3 text-stone-700" />
+                    <span>原声播音</span>
+                  </button>
+                </div>
+
+                <div className="flex gap-2 justify-center pt-2">
+                  {selectedCard.segments.map((s, idx) => (
+                    <div key={idx} className="bg-stone-900/5 px-2 py-1 rounded text-xs">
+                      <span className="font-serif font-black pr-1">{s.kana}</span>
+                      <span className="font-mono text-[9px] text-stone-500">{s.displayRomaji}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tab Selector */}
+              <div className="flex border-b border-stone-200">
+                <button
+                  onClick={() => setActiveDetailTab("story")}
+                  className={`flex-1 pb-2 text-xs font-bold text-center border-b-2 transition-all ${
+                    activeDetailTab === "story"
+                      ? "border-amber-500 text-stone-950 font-black"
+                      : "border-transparent text-stone-400 hover:text-stone-700"
+                  }`}
+                >
+                  🔮 文化历史释义
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveDetailTab("drawing");
+                  }}
+                  className={`flex-1 pb-2 text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-1 ${
+                    activeDetailTab === "drawing"
+                      ? "border-amber-500 text-stone-950 font-black"
+                      : "border-transparent text-stone-400 hover:text-stone-700"
+                  }`}
+                >
+                  <PenTool className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
+                  <span>✍️ 手写描红临摹</span>
+                </button>
+              </div>
+
+              {activeDetailTab === "story" && (
+                <>
+                  {/* Explanatory metadata */}
+                  <div className="space-y-2 bg-white p-4 rounded-xl border border-stone-200">
+                    <div className="text-xs text-stone-400 font-mono">STANDARD LEXICON MEANING</div>
+                    <p className="text-xs leading-relaxed text-stone-600 font-sans">
+                      {selectedCard.meaning}
+                    </p>
+                    <div className="pt-2 border-t border-stone-100 flex justify-between text-[11px] font-mono text-stone-500">
+                      <span className="flex items-center gap-1">
+                        <Activity className="w-3.5 h-3.5 text-amber-600" />
+                        累积熟练轮次: <b>{practiceTimes[selectedCard.id] || 0} 轮</b>
+                      </span>
+                      <span>类别: {selectedCard.categoryName}</span>
+                    </div>
+                  </div>
+
+                  {/* Gemini AI Storyteller Block! Highly engaging, interactive point */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-rose-500" />
+                        <span className="text-xs font-mono font-bold text-stone-800">GEMINI AI 文化起源大百科</span>
+                      </div>
+                      {!aiStory && !loadingAi && (
+                        <button
+                          onClick={() => handleFetchAiStory(selectedCard)}
+                          className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-stone-50 font-bold text-xs flex items-center gap-1 cursor-pointer shadow-sm animate-bounce"
+                        >
+                          🔮 探索文化轶事故事
+                        </button>
+                      )}
+                    </div>
+
+                    {loadingAi && (
+                      <div className="p-5 bg-stone-100 border border-dashed border-stone-300 rounded-xl space-y-2 flex flex-col items-center justify-center text-center">
+                        <div className="relative w-8 h-8 flex items-center justify-center">
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                            className="w-6 h-6 rounded-full border-2 border-amber-600 border-t-transparent"
+                          />
+                        </div>
+                        <span className="text-xs font-mono text-stone-500 animate-pulse">
+                          Gemini 正在根据本姓氏检索历史编年志与民俗起源，请稍候...
+                        </span>
+                      </div>
+                    )}
+
+                    {aiStory && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-4 rounded-xl border border-rose-200 bg-rose-50/20 shadow-inner relative"
+                      >
+                        {/* Retro callout design */}
+                        <div className="absolute top-2 right-3 text-[10px] font-mono text-rose-400 font-bold">
+                          GEMINI DECODING
+                        </div>
+                        <p className="text-xs leading-relaxed text-stone-800 whitespace-pre-wrap font-sans">
+                          {aiStory}
+                        </p>
+                        <div className="mt-3 pt-2 border-t border-rose-100/50 flex justify-between items-center">
+                          <span className="text-[10px] text-rose-500 font-mono italic">
+                            ★ 由 Google Gemini 3.5 AI 倾情提供
+                          </span>
+                          <button
+                            onClick={() => handleFetchAiStory(selectedCard)}
+                            className="text-[10px] text-stone-500 hover:text-stone-800 font-mono font-bold underline"
+                          >
+                            重新解释 ↻
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {activeDetailTab === "drawing" && (
+                <div className="space-y-4 animate-fadeIn">
+                  <CalligraphyCanvas segments={selectedCard.segments} />
+                </div>
+              )}
+
+              <div className="pt-2">
+                <button
+                  onClick={() => setSelectedCard(null)}
+                  className="w-full py-2.5 rounded-xl border border-stone-300 hover:bg-stone-100 text-stone-800 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  合上相册
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+
+  function emptyStatePlaceholder() {
+    if (filteredCollection.length !== 0) return null;
+    return (
+      <div className="p-8 text-center border-2 border-dashed border-stone-300 rounded-2xl bg-stone-50 text-stone-400 font-serif">
+        <BookOpen className="w-12 h-12 text-stone-300 mx-auto mb-2" />
+        <p className="text-sm">暂无符合当前过滤条件的名人闪卡。</p>
+        <p className="text-xs text-stone-400 mt-1 font-sans">开启拼写训练来解锁属于你的五十音大图鉴吧！</p>
+      </div>
+    );
+  }
+};
