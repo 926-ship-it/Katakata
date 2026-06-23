@@ -25,7 +25,7 @@ async function startServer() {
 
   // API endpoint for generating card stories/origins
   app.post("/api/card-origin", async (req, res) => {
-    const { name, meaning, kana, romaji } = req.body;
+    const { name, meaning, kana, romaji, isEnglish } = req.body;
     
     if (!name || !kana) {
       return res.status(400).json({ error: "Missing name or pronunciation details." });
@@ -33,18 +33,30 @@ async function startServer() {
 
     if (!apiKey) {
       return res.status(500).json({ 
-        error: "未配置系统的 GEMINI_API_KEY。请在 Settings > Secrets 面板中添加您的 API Key。" 
+        error: isEnglish 
+          ? "System GEMINI_API_KEY not configured. Please add your key in Settings > Secrets."
+          : "未配置系统的 GEMINI_API_KEY。请在 Settings > Secrets 面板中添加您的 API Key。" 
       });
     }
 
     try {
-      const prompt = `你是一个博学、亲切的日本民俗文化学者和日语高级教师。
+      let prompt = "";
+      if (isEnglish) {
+        prompt = `You are an erudite, friendly scholar of Japanese folklore and cultures, and an advanced Japanese language instructor.
+Please write a short cultural backstory or interesting wind-tale of the name/word "${name}" (Kana: ${kana}, Romaji: ${romaji}, Meaning: ${meaning}) which the user just unlocked.
+Requirements:
+1. Elegant, vivid, easy to understand, and highly engaging for beginners (ideal for card-collecting encyclopedias).
+2. Word limit: 160 words, clean formatting.
+3. End the description with a warm, encouraging sentence (with Japanese kana/romaji) to keep the user motivated in learning.`;
+      } else {
+        prompt = `你是一个博学、亲切的日本民俗文化学者和日语高级教师。
 请针对日语五十音练习中，用户解锁的这个人名（或特定词汇）“${name}”（假名：${kana}，罗马音：${romaji}，中文释义：${meaning}），
 写一段关于该姓氏/词汇起源、它在日本社会或历史中对应的文化背景、有趣的风俗小故事。
 要求：
 1. 语言优雅生动、通俗易懂，富有画面感和故事感（非常适合初学者，像在看集卡大百科）。
 2. 字数限制在 160 字以内，排版清晰。
 3. 在结尾写一句热情、积极的日语假名学习或练习鼓励语句。`;
+      }
 
       const response = await ai.models.generateContent({
         model: "gemini-3.5-flash",
@@ -54,9 +66,13 @@ async function startServer() {
       res.json({ story: response.text });
     } catch (error: any) {
       console.error("Gemini Story Generation failed:", error);
+      const fallbackMsg = isEnglish
+        ? `"${name}" (${kana}) is a classic Japanese name/word representing "${meaning}". Practicing continuously helps lock it in memory. Keep going!`
+        : `“${name}”（${kana}）是日本经典词汇，大意是“${meaning}”。不断重复练习能让大脑分泌多巴胺，加油！`;
       res.status(500).json({ 
-        error: "生成生动故事失败，可能是因为网络或 API Key 限制，以下是备用解析：" + 
-               `“${name}”（${kana}）是日本经典词汇，大意是“${meaning}”。不断重复练习能让大脑分泌多巴胺，加油！`
+        error: isEnglish
+          ? "Story generation failed. Backup interpretation: " + fallbackMsg
+          : "生成生动故事失败，可能是因为网络或 API Key 限制，以下是备用解析：" + fallbackMsg
       });
     }
   });

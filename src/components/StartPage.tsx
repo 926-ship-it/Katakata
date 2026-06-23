@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
 import { BookOpen, Sparkles, Trophy, Settings, HelpCircle, Flame, Keyboard, BarChart2, Calendar, Award, Clock, ArrowRight, RotateCw, Play, BookOpenCheck } from "lucide-react";
-import { DICTIONARY, DictionaryItem } from "../data/dictionary";
+import { DICTIONARY, DictionaryItem, getDictionary } from "../data/dictionary";
+import { uiTranslate, LANG_MAPPING } from "../utils/lang";
 
 interface StartPageProps {
   onStartTraining: (items: DictionaryItem[], durationMs: number) => void;
@@ -10,6 +11,7 @@ interface StartPageProps {
   practiceTimes: Record<string, number>;
   practiceMode: "typing" | "handwriting";
   setPracticeMode: (mode: "typing" | "handwriting") => void;
+  isEnglishMode?: boolean;
 }
 
 export const StartPage: React.FC<StartPageProps> = ({
@@ -19,7 +21,10 @@ export const StartPage: React.FC<StartPageProps> = ({
   practiceTimes = {},
   practiceMode,
   setPracticeMode,
+  isEnglishMode = false,
 }) => {
+  const activeDict = getDictionary(isEnglishMode);
+
   // Strongly-typed practice stats calculation
   const practiceValues = Object.values(practiceTimes) as number[];
   const totalRounds = practiceValues.reduce((accum, val) => accum + Number(val || 0), 0);
@@ -35,7 +40,7 @@ export const StartPage: React.FC<StartPageProps> = ({
   const [activeTab, setActiveTab ] = useState<"intro" | "rules">("intro");
 
   // Filter dictionary based on unlocked status or category
-  const filteredDict = DICTIONARY.filter((item) => {
+  const filteredDict = activeDict.filter((item) => {
     if (selectedCategory === "all") return true;
     if (selectedCategory === "locked") return !collectedIds.includes(item.id);
     if (selectedCategory === "unlocked") return collectedIds.includes(item.id);
@@ -82,7 +87,7 @@ export const StartPage: React.FC<StartPageProps> = ({
 
   const handleStartGroupTraining = () => {
     const selectedItems = selectedCardIds
-      .map((id) => DICTIONARY.find((item) => item.id === id))
+      .map((id) => activeDict.find((item) => item.id === id))
       .filter((it): it is DictionaryItem => !!it);
 
     if (selectedItems.length === 0) return;
@@ -93,8 +98,8 @@ export const StartPage: React.FC<StartPageProps> = ({
       if (!isNaN(parsed) && parsed > 0) {
         finalMinutes = parsed;
       } else {
-        alert("请输入有效的自定义训练时间（分钟）！");
-        return;
+        // Fallback to elegant default of 3 minutes
+        finalMinutes = 3;
       }
     }
     onStartTraining(selectedItems, finalMinutes * 60 * 1000);
@@ -108,8 +113,8 @@ export const StartPage: React.FC<StartPageProps> = ({
       if (!isNaN(parsed) && parsed > 0) {
         finalMinutes = parsed;
       } else {
-        alert("请输入有效的自定义训练时间（分钟）！");
-        return;
+        // Fallback to elegant default of 3 minutes
+        finalMinutes = 3;
       }
     }
     onStartTraining([item], finalMinutes * 60 * 1000);
@@ -117,15 +122,15 @@ export const StartPage: React.FC<StartPageProps> = ({
 
   const handleRandomDraw = () => {
     // Pick from locked first to encourage collecting, or any if all are collected
-    const lockedList = DICTIONARY.filter(item => !collectedIds.includes(item.id));
-    const targetPool = lockedList.length > 0 ? lockedList : DICTIONARY;
+    const lockedList = activeDict.filter(item => !collectedIds.includes(item.id));
+    const targetPool = lockedList.length > 0 ? lockedList : activeDict;
     const randomIndex = Math.floor(Math.random() * targetPool.length);
     handleSelectCardForTraining(targetPool[randomIndex]);
   };
 
   const currentProgressPercent = Math.min(
     100,
-    Math.round((collectedIds.length / DICTIONARY.length) * 100)
+    Math.round((collectedIds.length / activeDict.length) * 100)
   );
 
   return (
@@ -157,13 +162,9 @@ export const StartPage: React.FC<StartPageProps> = ({
             <span className="inline-block w-3.5 h-10 md:h-12 bg-amber-500 animate-[pulse_1s_infinite] ml-1 shrink-0" title="Cursor" />
           </h1>
           <div className="text-lg md:text-xl font-serif font-bold text-stone-700 tracking-wider">
-            五十音集卡练习 / 假名打字图鉴
+            {uiTranslate("五十音集卡练习 / 假名打字图鉴", isEnglishMode, "五十音集卡练习 / 假名打字图鉴")}
           </div>
         </div>
-
-        <p className="text-stone-600 max-w-xl mx-auto text-xs md:text-sm leading-relaxed font-sans border-t border-stone-200/60 pt-3 mt-2">
-          🌸 <strong className="text-stone-800">名之由来：</strong>「カタカタ」（Katakata）是日语中敲击键盘、打字机发出的“咔哒咔哒”清脆拟声词。每一次的键入与对答，都伴随着指尖的触觉与回响，带您在典雅温润的墨香与卡牌收集之中开启五十音探寻之路。
-        </p>
       </div>
 
       {/* Progress Cards Row */}
@@ -176,7 +177,7 @@ export const StartPage: React.FC<StartPageProps> = ({
           <div className="flex-1 min-w-0">
             <div className="text-xs text-stone-500 font-mono">BINDER COLLECTION PROGRESS</div>
             <div className="text-2xl font-black text-stone-800 font-serif">
-              {collectedIds.length} <span className="text-sm text-stone-400 font-sans">/ {DICTIONARY.length} 卡片</span>
+              {collectedIds.length} <span className="text-sm text-stone-400 font-sans">/ {activeDict.length} {isEnglishMode ? "Cards" : "卡片"}</span>
             </div>
             <div className="w-full bg-stone-100 rounded-full h-1.5 mt-1 overflow-hidden">
               <div 
@@ -195,22 +196,22 @@ export const StartPage: React.FC<StartPageProps> = ({
           <div className="flex-1 min-w-0">
             <div className="text-xs text-stone-500 font-mono">TODAY UNLOCKED LIMIT</div>
             <div className="text-xl font-bold text-stone-800">
-              目标: <span className="text-rose-600 font-serif font-black">{sessionLimit}</span> 位姓名
+              {isEnglishMode ? "Target:" : "目标:"} <span className="text-rose-600 font-serif font-black">{sessionLimit}</span> {isEnglishMode ? "Cards" : "位姓名"}
             </div>
             <div className="text-xs text-stone-400 mt-1">
-              由你每日自行选定，稳扎稳打
+              {isEnglishMode ? "Custom session volume selection" : "由你每日自行选定，稳扎稳打"}
             </div>
           </div>
           <div className="flex flex-col gap-1">
             <button 
               onClick={() => setSessionLimit(prev => Math.max(1, prev - 1))}
-              className="px-1.5 py-0.5 rounded border border-stone-200 text-xs bg-stone-50 hover:bg-stone-100 text-stone-700"
+              className="px-1.5 py-0.5 rounded border border-stone-200 text-xs bg-stone-50 hover:bg-stone-100 text-stone-700 font-bold"
             >
               -
             </button>
             <button 
               onClick={() => setSessionLimit(prev => Math.min(10, prev + 1))}
-              className="px-1.5 py-0.5 rounded border border-stone-200 text-xs bg-stone-50 hover:bg-stone-100 text-stone-700"
+              className="px-1.5 py-0.5 rounded border border-stone-200 text-xs bg-stone-50 hover:bg-stone-100 text-stone-700 font-bold"
             >
               +
             </button>
@@ -227,8 +228,8 @@ export const StartPage: React.FC<StartPageProps> = ({
           </div>
           <div className="flex-1">
             <div className="text-xs text-stone-500 font-mono">MEMORIES & FOLKLORES</div>
-            <p className="text-base font-black text-amber-900 font-serif">个人收藏卡牌库</p>
-            <p className="text-xs text-amber-700 mt-0.5">翻阅已收集卡片，查阅AI文化解析 →</p>
+            <p className="text-base font-black text-amber-900 font-serif">{isEnglishMode ? "Card Ledger Library" : "个人收藏卡牌库"}</p>
+            <p className="text-xs text-amber-700 mt-0.5">{isEnglishMode ? "Browse unlocked cards & folklore analysis →" : "翻阅已收集卡片，查阅AI文化解析 →"}</p>
           </div>
         </button>
       </div>
@@ -249,11 +250,11 @@ export const StartPage: React.FC<StartPageProps> = ({
             </span>
             <h2 className="text-xl font-black text-stone-900 font-serif flex items-center gap-1.5">
               <BarChart2 className="w-5 h-5 text-amber-600" />
-              <span>练习数据仪表盘 & 每日回顾温故</span>
+              <span>{uiTranslate("练习数据仪表盘 & 每日回顾温故", isEnglishMode, "练习数据仪表盘 & 每日回顾温故")}</span>
             </h2>
           </div>
           <p className="text-xs text-stone-500 font-mono text-left sm:text-right">
-            当前熟力值 : <span className="text-amber-800 font-bold">{totalRounds}</span> 圈大熟化
+            {uiTranslate("当前熟力值", isEnglishMode, "当前熟力值")} : <span className="text-amber-800 font-bold">{totalRounds}</span> {isEnglishMode ? "Rounds Finished" : "圈大熟化"}
           </p>
         </div>
 
@@ -263,45 +264,53 @@ export const StartPage: React.FC<StartPageProps> = ({
             <div className="p-4 rounded-xl border border-stone-300/80 bg-white shadow-inner grid grid-cols-3 gap-3">
               {/* Level progressive badge */}
               <div className="text-center border-r border-stone-200 pr-1 flex flex-col justify-between">
-                <span className="text-[9px] font-mono text-stone-400 block">练力称号</span>
+                <span className="text-[9px] font-mono text-stone-400 block">{uiTranslate("练力称号", isEnglishMode, "练力称号")}</span>
                 <div className="my-1.5 flex flex-col items-center justify-center">
                   <Award className="w-7 h-7 text-amber-600 animate-pulse" />
                   <span className="text-xs font-serif font-black text-stone-800 mt-1 block leading-tight">
                     {(() => {
-                      if (totalRounds < 3) return "🌱 初心侍";
-                      if (totalRounds < 10) return "⚔️ 研墨侍";
-                      if (totalRounds < 25) return "🎭 吟牌使";
-                      if (totalRounds < 50) return "🏔️ 富士客";
-                      return "👑 大御所";
+                      if (isEnglishMode) {
+                        if (totalRounds < 3) return "Beginner";
+                        if (totalRounds < 10) return "Novice";
+                        if (totalRounds < 25) return "Intermediate";
+                        if (totalRounds < 50) return "Advanced";
+                        return "Master";
+                      } else {
+                        if (totalRounds < 3) return "初学者";
+                        if (totalRounds < 10) return "入门者";
+                        if (totalRounds < 25) return "熟练者";
+                        if (totalRounds < 50) return "精通者";
+                        return "大师";
+                      }
                     })()}
                   </span>
                 </div>
-                <span className="text-[8px] font-mono text-stone-400 block scale-90">连续打卡动力</span>
+                <span className="text-[8px] font-mono text-stone-400 block scale-90">{uiTranslate("连续打卡动力", isEnglishMode, "连续打卡动力")}</span>
               </div>
 
               {/* Unlocked cards percent */}
               <div className="text-center border-r border-stone-200 px-1 flex flex-col justify-between">
-                <span className="text-[9px] font-mono text-stone-400 block">收集比例</span>
+                <span className="text-[9px] font-mono text-stone-400 block">{uiTranslate("收集比例", isEnglishMode, "收集比例")}</span>
                 <span className="text-2xl font-black text-stone-900 font-serif block my-1">
-                  {Math.round((collectedIds.length / DICTIONARY.length) * 100)}%
+                  {Math.round((collectedIds.length / activeDict.length) * 100)}%
                 </span>
                 <span className="text-[8px] font-mono text-stone-400 block scale-90">
-                  {collectedIds.length}张 / {DICTIONARY.length}张
+                  {collectedIds.length}{isEnglishMode ? " / " : "张 / "}{activeDict.length}{isEnglishMode ? " Cards" : "张"}
                 </span>
               </div>
 
               {/* estimated keystrokes */}
               <div className="text-center pl-1 flex flex-col justify-between">
-                <span className="text-[9px] font-mono text-stone-400 block">指尖压键数</span>
+                <span className="text-[9px] font-mono text-stone-400 block">{uiTranslate("指尖压键数", isEnglishMode, "指尖压键数")}</span>
                 <span className="text-2xl font-black text-amber-800 font-serif block my-1 animate-pulse">
                   {Object.entries(practiceTimes).reduce((accum: number, [cardId, rounds]) => {
-                    const item = DICTIONARY.find(x => x.id === cardId);
+                    const item = activeDict.find(x => x.id === cardId);
                     const cost = item ? item.segments.length : 3;
                     const roundsNum = Number(rounds || 0);
                     return accum + (roundsNum * cost * 3); // Average keystrokes per session rounds due to error reset overhead
                   }, 0)}+
                 </span>
-                <span className="text-[8px] font-mono text-stone-400 block scale-90">估计打字功力</span>
+                <span className="text-[8px] font-mono text-stone-400 block scale-90">{isEnglishMode ? "Fingers Heat" : "估计打字功力"}</span>
               </div>
             </div>
 
@@ -312,12 +321,12 @@ export const StartPage: React.FC<StartPageProps> = ({
               </span>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { id: "name", name: "🇯🇵 人名册", color: "bg-slate-450", border: "border-slate-350" },
-                  { id: "nature", name: "🌸 自然物", color: "bg-pink-400", border: "border-pink-300" },
-                  { id: "culture", name: "🎭 民俗祭", color: "bg-purple-500", border: "border-purple-300" },
-                  { id: "food", name: "🍡 和美味", color: "bg-rose-450", border: "border-rose-450" },
+                  { id: "name", name: isEnglishMode ? "Japanese Names" : "人名册", color: "bg-slate-450", border: "border-slate-350" },
+                  { id: "nature", name: isEnglishMode ? "Nature & Scenery" : "自然物", color: "bg-pink-400", border: "border-pink-300" },
+                  { id: "culture", name: isEnglishMode ? "Tradition & Folklore" : "民俗祭", color: "bg-purple-500", border: "border-purple-300" },
+                  { id: "food", name: isEnglishMode ? "Cuisine & Food" : "和美味", color: "bg-rose-450", border: "border-rose-450" },
                 ].map(cat => {
-                  const catItems = DICTIONARY.filter(x => x.category === cat.id);
+                  const catItems = activeDict.filter(x => x.category === cat.id);
                   const catUnlocked = catItems.filter(x => collectedIds.includes(x.id));
                   const percent = catItems.length > 0 ? Math.round((catUnlocked.length / catItems.length) * 100) : 0;
                   return (
@@ -341,18 +350,20 @@ export const StartPage: React.FC<StartPageProps> = ({
             <div className="space-y-1">
               <span className="text-[10px] font-mono text-rose-700 font-black uppercase tracking-wider flex items-center gap-1">
                 <Clock className="w-3 h-3 text-rose-600 animate-spin-slow" />
-                <span>艾宾浩斯防忘曲轨推荐</span>
+                <span>{isEnglishMode ? "Ebbinghaus Revision Helper" : "艾宾浩斯防忘曲轨推荐"}</span>
               </span>
               <h3 className="text-sm font-black font-serif text-stone-850">
-                每日防遗温故循环 Daily Review
+                {isEnglishMode ? "Daily Core Retention Loop" : "每日防遗温故循环 Daily Review"}
               </h3>
               <p className="text-[11px] text-stone-500 leading-relaxed">
-                以下3个你已解锁的历史老卡，练力次数最少点，已被定为今日必练的温顾循环词条：
+                {isEnglishMode 
+                  ? "Based on past practice volume, these 3 unlocked cards are prioritized for daily review:" 
+                  : "以下3个你已解锁的历史老卡，练力次数最少点，已被定为今日必练的温顾循环词条："}
               </p>
             </div>
 
             {(() => {
-              const unlockedItems = DICTIONARY.filter(item => collectedIds.includes(item.id));
+              const unlockedItems = activeDict.filter(item => collectedIds.includes(item.id));
               const sortedUnlocked = [...unlockedItems].sort((a, b) => (practiceTimes[a.id] || 0) - (practiceTimes[b.id] || 0));
               const reviewCards = sortedUnlocked.slice(0, 3);
 
@@ -360,9 +371,11 @@ export const StartPage: React.FC<StartPageProps> = ({
                 return (
                   <div className="flex-1 p-4 rounded-xl border border-dashed border-stone-300 flex flex-col items-center justify-center text-center space-y-1.5 bg-white">
                     <BookOpenCheck className="w-7 h-7 text-stone-350" />
-                    <p className="text-[11px] font-bold text-stone-600">拼写待解卡推荐</p>
+                    <p className="text-[11px] font-bold text-stone-600">{isEnglishMode ? "Review Stream Recommendations" : "拼写待解卡推荐"}</p>
                     <p className="text-[10px] text-stone-400 max-w-xs">
-                      目前你还没有收集到任何卡牌。在下方词库列表点击【拼写熟化】一轮，即可开启每日温顾智能引擎！
+                      {isEnglishMode 
+                        ? "No cards unlocked yet. Practice and complete at least one card below to trigger this daily engine!" 
+                        : "目前你还没有收集到任何卡牌。在下方词库列表点击【拼写熟化】一轮，即可开启每日温顾智能引擎！"}
                     </p>
                   </div>
                 );
@@ -374,11 +387,15 @@ export const StartPage: React.FC<StartPageProps> = ({
                     {reviewCards.map(item => (
                       <div key={item.id} className="p-1.5 px-2.5 rounded-lg bg-white border border-stone-250 flex items-center justify-between gap-2 shadow-sm">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-serif font-black text-stone-900 text-sm">{item.kanji}</span>
-                          <span className="text-[10px] text-stone-450 font-mono">({item.kanaStr})</span>
+                          <span className="font-serif font-black text-stone-900 text-sm">
+                            {isEnglishMode ? (LANG_MAPPING[item.id]?.title || item.kanji) : item.kanji}
+                          </span>
+                          <span className="text-[10px] text-stone-450 font-mono">
+                            {isEnglishMode ? `(${item.kanji} • ${item.kanaStr})` : `(${item.kanaStr})`}
+                          </span>
                         </div>
                         <span className="text-[9px] font-mono text-amber-800 bg-amber-500/10 px-1.5 rounded font-black border border-amber-500/20">
-                          已练 {practiceTimes[item.id] || 0} 轮
+                          {isEnglishMode ? `Practiced ${practiceTimes[item.id] || 0} times` : `已练 ${practiceTimes[item.id] || 0} 轮`}
                         </span>
                       </div>
                     ))}
@@ -392,7 +409,7 @@ export const StartPage: React.FC<StartPageProps> = ({
                     className="w-full py-2.5 rounded-xl bg-stone-900 border border-stone-850 hover:bg-amber-600 text-stone-50 hover:text-stone-950 font-black text-[11px] flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
                   >
                     <Play className="w-3.5 h-3.5" />
-                    <span>温故知新：一键拼通今日老卡 (3分钟) ＞</span>
+                    <span>{isEnglishMode ? "Review All: Direct Spell Legacy Deck (3m) ＞" : "温故知新：一键拼通今日老卡 (3分钟) ＞"}</span>
                   </button>
                 </div>
               );
@@ -404,11 +421,11 @@ export const StartPage: React.FC<StartPageProps> = ({
         <div className="pt-3 border-t border-stone-200/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-stone-500 text-xs">
           <div className="flex items-center gap-1.5">
             <Calendar className="w-4 h-4 text-stone-450" />
-            <span className="font-serif font-bold text-stone-750">七日功勋印社（假名打卡大连契）:</span>
+            <span className="font-serif font-bold text-stone-750">{isEnglishMode ? "7-Day Streak & Core Progress Ledger:" : "七日功勋印社（假名打卡大连契）:"}</span>
           </div>
 
           <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold">
-            {["月", "火", "水", "木", "金", "土", "日"].map((day, idx) => {
+            {(isEnglishMode ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] : ["月", "火", "水", "木", "金", "土", "日"]).map((day, idx) => {
               // Simulate day highlights based on user practicing active rounds
               const isActive = totalRounds > 0 && (idx === 0 || idx === 1 || (totalRounds >= 4 && idx === 2) || (totalRounds >= 10 && idx === 4) || (totalRounds >= 20 && idx === 6));
               return (
@@ -420,9 +437,9 @@ export const StartPage: React.FC<StartPageProps> = ({
                         ? "bg-amber-500/20 border-amber-500 text-amber-900 font-black animate-pulse shadow-md" 
                         : "bg-white border-stone-250 text-stone-350"
                     }`}
-                    title={isActive ? "已熟健敲印" : "待指打契印"}
+                    title={isActive ? "Completed" : "Pending"}
                   >
-                    {isActive ? "印" : "默"}
+                    {isActive ? (isEnglishMode ? "O" : "印") : (isEnglishMode ? "X" : "默")}
                   </div>
                 </div>
               );
@@ -436,7 +453,7 @@ export const StartPage: React.FC<StartPageProps> = ({
         <div>
           <h2 className="text-2xl font-black text-stone-950 font-serif flex items-center gap-2">
             <Settings className="w-5.5 h-5.5 text-amber-600" />
-            第一步：设定本次循环的时长
+            {isEnglishMode ? "Step 1: Set Practices Duration Limit" : "第一步：设定本次循环的时长"}
           </h2>
           <p className="text-xs text-stone-500 font-mono mt-1">THE TRAINING TIME ENGINE CONFIGURATION</p>
         </div>
@@ -450,24 +467,26 @@ export const StartPage: React.FC<StartPageProps> = ({
                 setDurationMinutes(mins);
                 setShowCustomTime(false);
               }}
-              className={`py-3 px-4 rounded-xl border-2 text-sm font-mono font-bold transition-all duration-200 ${
+              className={`py-3 px-4 rounded-xl border-2 text-sm font-mono font-bold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
                 durationMinutes === mins && !showCustomTime
                   ? "border-stone-900 bg-stone-900 text-stone-50 shadow-inner"
                   : "border-stone-300 bg-white text-stone-700 hover:border-stone-500 hover:bg-stone-100"
               }`}
             >
-              ⏱ {mins} 分钟
+              <Clock className="w-4 h-4" />
+              <span>{mins} {isEnglishMode ? "Mins" : "分钟"}</span>
             </button>
           ))}
           <button
             onClick={() => setShowCustomTime(true)}
-            className={`py-3 px-4 rounded-xl border-2 text-xs font-bold transition-all duration-200 ${
+            className={`py-3 px-4 rounded-xl border-2 text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
               showCustomTime
                 ? "border-amber-600 bg-amber-50 text-amber-900"
                 : "border-stone-300 bg-white text-stone-700 hover:border-stone-500 hover:bg-stone-100"
             }`}
           >
-            ✏ 其它自定义
+            <Settings className="w-3.5 h-3.5" />
+            <span>{isEnglishMode ? "Custom Duration" : "其它自定义"}</span>
           </button>
         </div>
 
@@ -479,7 +498,7 @@ export const StartPage: React.FC<StartPageProps> = ({
             className="p-4 rounded-xl border border-dashed border-amber-300 bg-amber-50/50 flex flex-col sm:flex-row items-start sm:items-center gap-3 overflow-hidden"
           >
             <div className="text-xs text-amber-800 font-medium">
-              请输入您的自定义计时长度（分钟）:
+              {isEnglishMode ? "Please enter your custom timer duration (minutes):" : "请输入您的自定义计时长度（分钟）:"}
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <input
@@ -488,13 +507,15 @@ export const StartPage: React.FC<StartPageProps> = ({
                 max="120"
                 value={customMinutesText}
                 onChange={(e) => setCustomMinutesText(e.target.value)}
-                placeholder="例如: 8"
+                placeholder={isEnglishMode ? "e.g. 8" : "例如: 8"}
                 className="w-24 px-3 py-1.5 rounded border border-stone-300 bg-white font-mono text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
-              <span className="text-xs text-stone-600 font-sans">分钟</span>
+              <span className="text-xs text-stone-600 font-sans">{isEnglishMode ? "min" : "分钟"}</span>
             </div>
             <div className="text-[11px] text-amber-700 italic">
-              （训练将在极短时间内产生肌肉习惯，建议设定 3 至 10 分钟）
+              {isEnglishMode 
+                ? "(Highly recommended to set 3 to 10 minutes to maintain optimal cognitive concentration)" 
+                : "（训练将在极短时间内产生肌肉习惯，建议设定 3 至 10 分钟）"}
             </div>
           </motion.div>
         )}
@@ -505,7 +526,7 @@ export const StartPage: React.FC<StartPageProps> = ({
         <div>
           <h2 className="text-2xl font-black text-stone-950 font-serif flex items-center gap-2">
             <Settings className="w-5.5 h-5.5 text-amber-600" />
-            第二步：选择练习模式
+            {isEnglishMode ? "Step 2: Choose Practice Mode" : "第二步：选择练习模式"}
           </h2>
           <p className="text-xs text-stone-500 font-mono mt-1">SELECT PREFERRED INTERACTION SYSTEM MODE</p>
         </div>
@@ -516,16 +537,18 @@ export const StartPage: React.FC<StartPageProps> = ({
             className={`p-4 rounded-xl border-2 text-left transition-all duration-200 cursor-pointer flex items-start gap-3 ${
               practiceMode === "typing"
                 ? "border-stone-900 bg-stone-900 text-stone-50 shadow-md"
-                : "border-stone-300 bg-white text-stone-700 hover:border-stone-500 hover:bg-stone-50"
+                : "border-stone-300 bg-white text-stone-700 hover:border-stone-500 hover:bg-stone-55"
             }`}
           >
             <div className={`p-2.5 rounded-lg shrink-0 ${practiceMode === "typing" ? "bg-amber-500 text-stone-950" : "bg-stone-100 text-stone-600"}`}>
               <Keyboard className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-bold text-sm">⌨️ 打字练习模式</div>
+              <div className="font-bold text-sm">{isEnglishMode ? "Typing Practice Mode" : "打字练习模式"}</div>
               <p className={`text-[11px] mt-1 leading-normal ${practiceMode === "typing" ? "text-stone-300" : "text-stone-500"}`}>
-                敲击键盘物理键位或虚拟输入。以罗马音（Romaji）进行高速拼写验证，在规定循环内牢固肌肉敲击神经直觉。
+                {isEnglishMode 
+                  ? "Type using physically attached or virtual keypads. Romaji typing matches and logs accuracy directly to foster keyboard muscle memory." 
+                  : "敲击键盘物理键位或虚拟输入。以罗马音（Romaji）进行高速拼写验证，在规定循环内牢固肌肉敲击神经直觉。"}
               </p>
             </div>
           </button>
@@ -542,9 +565,11 @@ export const StartPage: React.FC<StartPageProps> = ({
               <BookOpenCheck className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-bold text-sm">✍️ 手写描红模式</div>
+              <div className="font-bold text-sm">{isEnglishMode ? "Stroke Handwriting Mode" : "手写描红模式"}</div>
               <p className={`text-[11px] mt-1 leading-normal ${practiceMode === "handwriting" ? "text-stone-300" : "text-stone-500"}`}>
-                在格内进行指尖或手写笔划描红临摹。AI 智能审查笔锋契合度与溢出率，契合物理触觉，快速掌握假名风骨结构。
+                {isEnglishMode 
+                  ? "Practice hand strokes drawing directly on grid boards. Get precision ratings and muscle sensory flow for authentic Japanese handwriting style." 
+                  : "在格内进行指尖或手写笔划描红临摹。AI 智能审查笔锋契合度与溢出率，契合物理触觉，快速掌握假名风骨结构。"}
               </p>
             </div>
           </button>
@@ -558,7 +583,7 @@ export const StartPage: React.FC<StartPageProps> = ({
             <div>
               <h2 className="text-2xl font-black text-stone-950 font-serif flex items-center gap-2">
                 <Sparkles className="w-5.5 h-5.5 text-amber-600" />
-                第三步：选择目标人名 / 词汇组合进行熟化
+                {isEnglishMode ? "Step 3: Select Name/Vocabulary Packs to Practice" : "第三步：选择目标人名 / 词汇组合进行熟化"}
               </h2>
               <p className="text-xs text-stone-500 font-mono mt-1">CHOOSE TARGET CARDS ACCORDING TO DEEPEST TYPING ENZYME LIMIT</p>
             </div>
@@ -566,20 +591,20 @@ export const StartPage: React.FC<StartPageProps> = ({
               onClick={handleRandomDraw}
               className="px-4 py-2 rounded-xl bg-orange-600 text-stone-50 hover:bg-orange-700 font-bold text-sm shadow-sm hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <span>🎲 随机大密抽卡</span>
+              <span>{isEnglishMode ? "Random Draw" : "随机大密抽卡"}</span>
             </button>
           </div>
 
           {/* Dictionary Filtering Controls */}
           <div className="flex flex-wrap items-center gap-1.5 mt-4 border-b border-stone-200 pb-3">
             {[
-              { id: "all", label: "全部词库" },
-              { id: "locked", label: "🔒 尚未解锁" },
-              { id: "unlocked", label: "🔓 已经收集" },
-              { id: "name", label: "🇯🇵 日本常见人名" },
-              { id: "nature", label: "🌸 四季自然" },
-              { id: "culture", label: "🎭 民俗祭典" },
-              { id: "food", label: "🍡 和食美味" },
+              { id: "all", label: isEnglishMode ? "All Packs" : "全部词库" },
+              { id: "locked", label: isEnglishMode ? "Locked Only" : "尚未解锁" },
+              { id: "unlocked", label: isEnglishMode ? "Collected Only" : "已经收集" },
+              { id: "name", label: isEnglishMode ? "Japanese Names" : "日本常见人名" },
+              { id: "nature", label: isEnglishMode ? "Seasonal Nature" : "四季自然" },
+              { id: "culture", label: isEnglishMode ? "Folklore Festivals" : "民俗祭典" },
+              { id: "food", label: isEnglishMode ? "Washoku Cuisine" : "和食美味" },
             ].map((cat) => (
               <button
                 key={cat.id}
@@ -603,16 +628,19 @@ export const StartPage: React.FC<StartPageProps> = ({
                   ACTIVE COMBINATION LIST MATCHING TARGET SIZE ({selectedCardIds.length}/{sessionLimit})
                 </div>
                 <div className="text-sm font-bold">
-                  已在下方勾选{" "}
+                  {isEnglishMode ? "Selected " : "已在下方勾选 "}
                   <span className="bg-stone-900 font-mono font-black text-rose-50 px-2 py-0.5 rounded text-xs select-all">
                     {selectedCardIds.length}
                   </span>{" "}
-                  位人名词条：
+                  {isEnglishMode ? "cards for practice: " : "位人名词条："}
                   <span className="ml-1 font-serif font-black underline decoration-stone-900 decoration-wavy underline-offset-4">
                     {selectedCardIds
-                      .map((id) => DICTIONARY.find((item) => item.id === id)?.kanji || "")
+                      .map((id) => {
+                        const item = activeDict.find((it) => it.id === id);
+                        return item?.kanji || "";
+                      })
                       .filter(Boolean)
-                      .join("、")}
+                      .join(isEnglishMode ? ", " : "、")}
                   </span>
                 </div>
               </div>
@@ -621,7 +649,7 @@ export const StartPage: React.FC<StartPageProps> = ({
                 className="w-full sm:w-auto px-5 py-3 bg-stone-900 hover:bg-stone-850 text-stone-50 hover:text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
               >
                 <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-                <span>开启 {selectedCardIds.length} 字连环拼音熟化 ＞</span>
+                <span>{isEnglishMode ? `Start ${selectedCardIds.length}-Card Joined Practice ＞` : `开启 ${selectedCardIds.length} 字连环拼音熟化 ＞`}</span>
               </button>
             </div>
           )}
@@ -722,19 +750,21 @@ export const StartPage: React.FC<StartPageProps> = ({
 
                   <div className="space-y-1 pl-6 pt-2">
                     <div className="text-[10px] font-mono text-stone-400 font-bold tracking-widest select-none uppercase">
-                      {item.categoryName}
+                      {isEnglishMode ? (LANG_MAPPING[item.id]?.categoryName || uiTranslate(item.categoryName, isEnglishMode, item.categoryName)) : item.categoryName}
                     </div>
-                    <div className="flex items-baseline gap-1.5">
+                    <div className="flex items-baseline gap-1.5 flex-wrap">
                       <span 
                         className="text-2xl font-black text-stone-900 font-serif"
                         style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
                       >
-                        {item.kanji}
+                        {isEnglishMode ? (LANG_MAPPING[item.id]?.title || item.kanji) : item.kanji}
                       </span>
-                      <span className="text-xs text-stone-400 font-mono font-bold">({item.kanaStr})</span>
+                      <span className="text-xs text-stone-400 font-mono font-bold">
+                        {isEnglishMode ? `(${item.kanji} • ${item.kanaStr})` : `(${item.kanaStr})`}
+                      </span>
                     </div>
                     <p className="text-stone-500 text-[11px] leading-relaxed line-clamp-3 pt-1 font-sans">
-                      {item.meaning}
+                      {isEnglishMode ? (LANG_MAPPING[item.id]?.meaning || item.meaning) : item.meaning}
                     </p>
                   </div>
 

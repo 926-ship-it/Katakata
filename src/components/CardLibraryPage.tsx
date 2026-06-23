@@ -1,16 +1,18 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { BookOpen, Sparkles, Calendar, RotateCw, ArrowLeft, Lightbulb, Hourglass, HelpCircle, Activity, Volume2, PenTool, Download, Upload } from "lucide-react";
-import { DICTIONARY, DictionaryItem } from "../data/dictionary";
+import { DICTIONARY, DictionaryItem, getDictionary } from "../data/dictionary";
 import { audioSynth } from "../utils/audio";
 import { CalligraphyCanvas } from "./CalligraphyCanvas";
 import { CardIllustration } from "./CardIllustration";
+import { uiTranslate, LANG_MAPPING } from "../utils/lang";
 
 interface CardLibraryPageProps {
   collectedIds: string[];
   practiceTimes: Record<string, number>; // Maps cardId to total completed practice rounds
   onGoBack: () => void;
   onImportData: (unlockedCards: string[], ptTimes: Record<string, number>, settings?: any) => void;
+  isEnglishMode?: boolean;
 }
 
 export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
@@ -18,12 +20,17 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
   practiceTimes,
   onGoBack,
   onImportData,
+  isEnglishMode = false,
 }) => {
+  const activeDict = getDictionary(isEnglishMode);
   const [selectedCard, setSelectedCard] = useState<DictionaryItem | null>(null);
   const [aiStory, setAiStory] = useState<string>("");
   const [loadingAi, setLoadingAi] = useState<boolean>(false);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [activeDetailTab, setActiveDetailTab] = useState<"story" | "drawing">("story");
+
+  const [customNotification, setCustomNotification] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
+  const [customConfirm, setCustomConfirm] = useState<{ text: string; onConfirm: () => void } | null>(null);
 
   const [isStorageAvailable] = useState<boolean>(() => {
     try {
@@ -40,7 +47,10 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
 
   const handleExportBackup = () => {
     if (!isStorageAvailable) {
-      alert("⚠️ 当前浏览器限制了本地存储，导出存档功能不可用。");
+      setCustomNotification({
+        type: "error",
+        text: isEnglishMode ? "⚠️ Local storage is restricted by your browser. Export backup is unavailable." : "⚠️ 当前浏览器限制了本地存储，导出存档功能不可用。"
+      });
       return;
     }
     try {
@@ -79,15 +89,25 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
       URL.revokeObjectURL(url);
       
       audioSynth.playCarriageReturn();
+      setCustomNotification({
+        type: "success",
+        text: isEnglishMode ? "🎉 Backup exported successfully! Keep this file safe." : "🎉 存档成功导出！请妥善保存该 JSON 备份文件。"
+      });
     } catch (error) {
       console.error("Export save error", error);
-      alert("😰 导出存档失败，请检查浏览器限制设置。");
+      setCustomNotification({
+        type: "error",
+        text: isEnglishMode ? "😰 Export failed. Please check browser privacy/storage constraints." : "😰 导出存档失败，请检查浏览器限制设置。"
+      });
     }
   };
 
   const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!isStorageAvailable) {
-      alert("⚠️ 当前浏览器限制了本地存储，导入存档功能不可用。");
+      setCustomNotification({
+        type: "error",
+        text: isEnglishMode ? "⚠️ Local storage is restricted. Import is unavailable." : "⚠️ 当前浏览器限制了本地存储，导入存档功能不可用。"
+      });
       return;
     }
     const file = e.target.files?.[0];
@@ -100,46 +120,61 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
         const parsed = JSON.parse(dataStr);
         
         if (parsed.app !== "katakata" || !parsed.payload) {
-          throw new Error("格式不正确：未能识别有效的 Katakata 存档。");
+          throw new Error(isEnglishMode ? "Incorrect backup format: Unable to identify a valid Katakata save file." : "格式不正确：未能识别有效的 Katakata 存档。");
         }
 
-        const confirmProceed = window.confirm("💡 导入将覆盖当前所有数据，是否继续？");
-        if (!confirmProceed) {
-          e.target.value = "";
-          return;
-        }
+        const performImport = () => {
+          try {
+            const payload = parsed.payload;
+            
+            const keysToWrite = Object.keys(payload);
+            keysToWrite.forEach(key => {
+              const val = payload[key];
+              if (val !== null && val !== undefined) {
+                localStorage.setItem(key, val);
+              }
+            });
 
-        const payload = parsed.payload;
-        
-        const keysToWrite = Object.keys(payload);
-        keysToWrite.forEach(key => {
-          const val = payload[key];
-          if (val !== null && val !== undefined) {
-            localStorage.setItem(key, val);
+            const unlockedListRaw = payload["fifty_sound_unlocked_cards"];
+            const practiceTimesRaw = payload["fifty_sound_practice_times"];
+            
+            const unlockedCards = unlockedListRaw ? JSON.parse(unlockedListRaw) : [];
+            const ptTimes = practiceTimesRaw ? JSON.parse(practiceTimesRaw) : {};
+            
+            const settings = {
+              muted: payload["fifty_sound_muted"] === "true",
+              bgm: payload["fifty_sound_bgm"] === "true",
+              voiceType: payload["fifty_sound_voice_type"] || "female",
+              showMascot: payload["fifty_sound_show_mascot"] !== "false"
+            };
+
+            onImportData(unlockedCards, ptTimes, settings);
+
+            audioSynth.playFanfare();
+            setCustomNotification({
+              type: "success",
+              text: isEnglishMode ? "🎉 Backup imported successfully! Your unlocked decks and milestones have synced." : "🎉 存档导入成功！您的练习卡库、记录和音像效果已完全同步加载。"
+            });
+          } catch (importErr: any) {
+            console.error(importErr);
+            setCustomNotification({
+              type: "error",
+              text: isEnglishMode ? `❌ Import failed: ${importErr?.message || "Invalid payload contents"}` : `❌ 导入失败: ${importErr?.message || "内容不正确"}`
+            });
           }
-        });
-
-        const unlockedListRaw = payload["fifty_sound_unlocked_cards"];
-        const practiceTimesRaw = payload["fifty_sound_practice_times"];
-        
-        const unlockedCards = unlockedListRaw ? JSON.parse(unlockedListRaw) : [];
-        const ptTimes = practiceTimesRaw ? JSON.parse(practiceTimesRaw) : {};
-        
-        const settings = {
-          muted: payload["fifty_sound_muted"] === "true",
-          bgm: payload["fifty_sound_bgm"] === "true",
-          voiceType: payload["fifty_sound_voice_type"] || "female",
-          showMascot: payload["fifty_sound_show_mascot"] !== "false"
         };
 
-        onImportData(unlockedCards, ptTimes, settings);
-
-        audioSynth.playFanfare();
-        alert("🎉 存档导入成功！您的练习卡库、记录和音像效果已完全同步加载。");
+        setCustomConfirm({
+          text: isEnglishMode ? "💡 Importing will overwrite all current progress. Do you wish to continue?" : "💡 导入将覆盖当前所有数据，是否继续？",
+          onConfirm: performImport
+        });
 
       } catch (err: any) {
         console.error(err);
-        alert(`❌ 导入失败: ${err?.message || "JSON 损坏或不合规"}`);
+        setCustomNotification({
+          type: "error",
+          text: isEnglishMode ? `❌ Import failed: ${err?.message || "JSON corrupt or invalid"}` : `❌ 导入失败: ${err?.message || "JSON 损坏或不合规"}`
+        });
       } finally {
         e.target.value = "";
       }
@@ -159,10 +194,11 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: item.kanji,
+          name: isEnglishMode ? (LANG_MAPPING[item.id]?.title || item.kanji) : item.kanji,
           kana: item.kanaStr,
           romaji: item.segments.map(s => s.displayRomaji).join(""),
-          meaning: item.meaning,
+          meaning: isEnglishMode ? (LANG_MAPPING[item.id]?.meaning || item.meaning) : item.meaning,
+          isEnglish: isEnglishMode,
         }),
       });
 
@@ -170,19 +206,21 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
       if (res.ok && data.story) {
         setAiStory(data.story);
       } else {
-        setAiStory(data.error || "获取民俗文化简介失败，外部网络未响应，请稍后再试。");
+        setAiStory(data.error || (isEnglishMode ? "Failed to get core cultural description. Please try again later." : "获取民俗文化简介失败，外部网络未响应，请稍后再试。"));
       }
     } catch (err: any) {
       console.error(err);
-      setAiStory("连接服务器时出错，请确认您的网络设置。");
+      setAiStory(isEnglishMode ? "Failed to connect to server. Please try again later." : "连接服务器时出错，请稍后重试。");
     } finally {
       setLoadingAi(false);
     }
   };
 
-  const filteredCollection = DICTIONARY.filter(item => {
+  // Categories select tabs filter calculation
+  const filteredCollection = activeDict.filter(item => {
+    // Category filter logic
     if (categoryFilter === "all") return true;
-    if (categoryFilter === "collected") return collectedIds.includes(item.id);
+    if (categoryFilter === "unlocked" || categoryFilter === "collected") return collectedIds.includes(item.id);
     if (categoryFilter === "locked") return !collectedIds.includes(item.id);
     return item.category === categoryFilter;
   });
@@ -196,27 +234,28 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
           className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-stone-300 text-stone-600 bg-white hover:bg-stone-50 hover:text-stone-900 text-xs font-bold transition-all cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>返回首页</span>
+          <span>{isEnglishMode ? "Back to Hub" : "返回首页"}</span>
         </button>
 
         <div className="text-right">
           <span className="text-xs text-stone-500 font-mono">COLLECTION RATIO</span>
           <p className="text-xs font-bold font-mono text-stone-750">
-            已收集 : {collectedIds.length} / {DICTIONARY.length}张 (
-            {Math.round((collectedIds.length / DICTIONARY.length) * 100)}%)
+            {isEnglishMode ? "Collected" : "已收集"} : {collectedIds.length} / {activeDict.length} {isEnglishMode ? "Cards" : "张"} (
+            {Math.round((collectedIds.length / activeDict.length) * 100)}%)
           </p>
         </div>
       </div>
 
       <div className="space-y-2">
         <h1 
-          className="text-3xl font-black text-stone-900 font-serif"
+          className="text-3xl font-black text-stone-900 font-serif flex items-center gap-2"
           style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
         >
-          🗃️ Katakata「カタカタ」闪卡收藏室
+          <BookOpen className="w-7 h-7 text-amber-700" />
+          <span>{isEnglishMode ? "Katakata Flashcard Collection Binder" : "Katakata「カタカタ」闪卡收藏室"}</span>
         </h1>
         <p className="text-xs text-stone-500 font-mono uppercase tracking-wider">
-          THE JAPANESE NOMINAL CARD BINDER LIBRARY & REVISION ROOM
+          {isEnglishMode ? "THE JAPANESE TYPING NOMINAL CARD BINDER LIBRARY & REVISION ROOM" : "THE JAPANESE NOMINAL CARD BINDER LIBRARY & REVISION ROOM"}
         </p>
       </div>
 
@@ -230,11 +269,11 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
               <h3 className="font-mono font-bold text-stone-800 text-xs tracking-wide">
-                KATAKATA SYSTEM ARCHIVE HUB 【打字集卡机存档中心】
+                {isEnglishMode ? "KATAKATA SYSTEM ARCHIVE HUB" : "KATAKATA SYSTEM ARCHIVE HUB 【打字集卡机存档中心】"}
               </h3>
             </div>
             <p className="text-[12px] text-stone-550 leading-relaxed font-sans max-w-xl">
-              💡 <span className="font-semibold text-stone-700">说明：</span>卡牌保存在本浏览器中,清除浏览器数据会导致丢失,建议定期导出备份。
+              💡 <span className="font-semibold text-stone-700">{isEnglishMode ? "Guide: " : "说明："}</span>{isEnglishMode ? "All collection progress is saved in this local browser. Clear browsing cookies might wipe progress, so export backups regularly." : "卡牌保存在本浏览器中,清除浏览器数据会导致丢失,建议定期导出备份。"}
             </p>
           </div>
 
@@ -259,10 +298,10 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   ? "bg-white border-stone-300 text-stone-600 hover:bg-stone-50 hover:text-stone-900 active:scale-95"
                   : "bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed opacity-50"
               }`}
-              title="导出当前集卡进度与统计到本地文件"
+              title={isEnglishMode ? "Export current collect progress to JSON file" : "导出当前集卡进度与统计到本地文件"}
             >
               <Download className="w-3.5 h-3.5 text-amber-700" />
-              <span>导出存档</span>
+              <span>{isEnglishMode ? "Export progress" : "导出存档"}</span>
             </button>
 
             <button
@@ -276,10 +315,10 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   ? "bg-stone-900 border-transparent text-stone-50 hover:bg-stone-800 hover:text-white active:scale-95"
                   : "bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed opacity-50"
               }`}
-              title="选择一份历史 Katakata JSON 存档进行恢复"
+              title={isEnglishMode ? "Load past JSON archive file" : "选择一份历史 Katakata JSON 存档进行恢复"}
             >
               <Upload className="w-3.5 h-3.5 text-amber-400" />
-              <span>导入存档</span>
+              <span>{isEnglishMode ? "Import backup" : "导入存档"}</span>
             </button>
           </div>
         </div>
@@ -288,7 +327,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
         {!isStorageAvailable && (
           <div className="bg-red-50 border border-red-200 text-red-700 p-2.5 rounded-xl text-xs font-sans flex items-center gap-2 animate-bounce">
             <span className="text-sm">⚠️</span>
-            <span>当前浏览器限制了本地存储，存档功能不可用。请确认您未开启极限无痕/隐私保护或禁用了本地 LocalStorage 功能。</span>
+            <span>{isEnglishMode ? "Browser local storage is limited. Save functions are disabled." : "当前浏览器限制了本地存储，存档功能不可用。请确认您未开启极限无痕/隐私保护或禁用了本地 LocalStorage 功能。"}</span>
           </div>
         )}
       </div>
@@ -296,18 +335,18 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
       {/* Categories select tabs */}
       <div className="flex flex-wrap items-center gap-1.5 border-b border-stone-200 pb-3">
         {[
-          { id: "all", label: "全部图鉴" },
-          { id: "collected", label: "★ 已收集闪卡" },
-          { id: "locked", label: "🔒 未解锁图纸" },
-          { id: "name", label: "日本人名" },
-          { id: "nature", label: "自然风物" },
-          { id: "culture", label: "民俗文化" },
-          { id: "food", label: "日本美味" },
+          { id: "all", label: isEnglishMode ? "All Cards" : "全部图鉴" },
+          { id: "collected", label: isEnglishMode ? "Collected Cards" : "已收集闪卡" },
+          { id: "locked", label: isEnglishMode ? "Locked Cards" : "未解锁图纸" },
+          { id: "name", label: isEnglishMode ? "Names / Kanji" : "日本人名" },
+          { id: "nature", label: isEnglishMode ? "Nature & Seasons" : "自然风物" },
+          { id: "culture", label: isEnglishMode ? "Traditions" : "民俗文化" },
+          { id: "food", label: isEnglishMode ? "Washoku Cuisine" : "日本美味" },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setCategoryFilter(tab.id)}
-            className={`py-1 right-2 px-3 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+            className={`py-1 px-3 rounded-full text-xs font-medium cursor-pointer transition-colors ${
               categoryFilter === tab.id
                 ? "bg-amber-800 text-stone-50"
                 : "bg-stone-200 text-stone-600 hover:bg-stone-300"
@@ -380,11 +419,11 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                 </span>
                 {isCollected ? (
                   <span className="text-[8px] bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded font-black border border-emerald-200">
-                    ★ 已收藏
+                    {isEnglishMode ? "★ Collected" : "★ 已收藏"}
                   </span>
                 ) : (
                   <span className="text-[8px] bg-stone-200/80 text-stone-500 px-1.5 rounded font-bold">
-                    🔒 未完成
+                    {isEnglishMode ? "🔒 Locked" : "🔒 未完成"}
                   </span>
                 )}
               </div>
@@ -395,7 +434,9 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   <div className={`w-8 h-8 rounded-full border-2 border-solid flex items-center justify-center font-serif text-[9px] font-bold ${
                     item.rarity === "SSR" ? "border-red-600 text-red-600" : "border-amber-700 text-amber-700"
                   }`}>
-                    {item.rarity === "SSR" ? "神珍" : item.rarity === "SR" ? "极品" : "珍藏"}
+                    {isEnglishMode 
+                      ? (item.rarity === "SSR" ? "SSR" : item.rarity === "SR" ? "SR" : "R")
+                      : (item.rarity === "SSR" ? "神珍" : item.rarity === "SR" ? "极品" : "珍藏")}
                   </div>
                 </div>
               )}
@@ -417,9 +458,11 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                       className="text-2xl font-extrabold text-stone-950 font-serif drop-shadow-sm select-none tracking-wide"
                       style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
                     >
-                      {item.kanji}
+                      {isEnglishMode ? (LANG_MAPPING[item.id]?.title || item.kanji) : item.kanji}
                     </h3>
-                    <p className="text-[10px] font-mono text-stone-500 font-bold italic">({item.kanaStr})</p>
+                    <p className="text-[10px] font-mono text-stone-500 font-bold italic">
+                      {isEnglishMode ? `(${item.kanji} • ${item.kanaStr})` : `(${item.kanaStr})`}
+                    </p>
                   </>
                 ) : (
                   <>
@@ -429,7 +472,9 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                     >
                       {item.segments.map(s => s.kana).join("")}
                     </span>
-                    <p className="text-[9px] font-mono text-stone-400">未解锁隐藏词条</p>
+                    <p className="text-[9px] font-mono text-stone-400">
+                      {isEnglishMode ? "Practice to unlock" : "未解锁隐藏词条"}
+                    </p>
                   </>
                 )}
               </div>
@@ -437,12 +482,12 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
               {/* Footer: Rarity & Practice Count statistics */}
               <div className="pt-2 border-t border-dashed border-stone-800/10 flex items-center justify-between z-10">
                 <span className="text-[9px] font-mono text-stone-450 font-bold">
-                  {item.categoryName}
+                  {uiTranslate(item.categoryName, isEnglishMode, item.categoryName)}
                 </span>
                 {isCollected && (
                   <span className="text-[9px] font-mono text-stone-500 flex items-center gap-0.5 font-bold">
                     <RotateCw className="w-2.5 h-2.5 text-stone-400" />
-                    {practiceRounds}轮连练
+                    {isEnglishMode ? `${practiceRounds} Rounds` : `${practiceRounds}轮连练`}
                   </span>
                 )}
               </div>
@@ -471,7 +516,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
               <button
                 onClick={() => setSelectedCard(null)}
                 className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-stone-200 text-stone-600 transition-colors"
-                title="关闭"
+                title={isEnglishMode ? "Close" : "关闭"}
               >
                 ✕
               </button>
@@ -499,29 +544,33 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   className="text-4xl font-black text-stone-950 font-serif"
                   style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
                 >
-                  {selectedCard.kanji}
+                  {isEnglishMode ? (LANG_MAPPING[selectedCard.id]?.title || selectedCard.kanji) : selectedCard.kanji}
                 </h2>
                 
                 <div className="flex justify-center gap-3">
-                  <span className="text-sm font-mono text-stone-600">假名: <b>{selectedCard.kanaStr}</b></span>
+                  <span className="text-sm font-mono text-stone-600">
+                    {isEnglishMode ? "Original: " : "假名: "}<b>{isEnglishMode ? `${selectedCard.kanji} (${selectedCard.kanaStr})` : selectedCard.kanaStr}</b>
+                  </span>
                   <span className="text-stone-300">|</span>
-                  <span className="text-sm font-mono text-stone-600">罗马音: <b>{selectedCard.segments.map(s => s.displayRomaji).join("")}</b></span>
+                  <span className="text-sm font-mono text-stone-600">
+                    {isEnglishMode ? "Romaji: " : "罗马音: "}<b>{selectedCard.segments.map(s => s.displayRomaji).join("")}</b>
+                  </span>
                 </div>
 
                 <div className="flex justify-center pt-0.5">
                   <button
                     onClick={() => audioSynth.speakJapanese(selectedCard.kanaStr)}
-                    className="px-3 py-1 rounded-full bg-stone-900/10 hover:bg-stone-900/20 text-stone-850 transition-all text-[11px] font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
+                    className="px-3 py-1 rounded-full bg-stone-900/10 hover:bg-stone-900/20 text-stone-850 transition-all text-[11px] font-bold flex items-center gap-1.5 cursor-pointer shadow-sm animate-pulse"
                   >
                     <Volume2 className="w-3 h-3 text-stone-700" />
-                    <span>原声播音</span>
+                    <span>{isEnglishMode ? "Pronounce" : "原声播音"}</span>
                   </button>
                 </div>
 
                 <div className="flex gap-2 justify-center pt-2">
                   {selectedCard.segments.map((s, idx) => (
                     <div key={idx} className="bg-stone-900/5 px-2 py-1 rounded text-xs">
-                      <span className="font-serif font-black pr-1">{s.kana}</span>
+                      <span className="font-serif font-black pr-1">{s.text || s.kana}</span>
                       <span className="font-mono text-[9px] text-stone-500">{s.displayRomaji}</span>
                     </div>
                   ))}
@@ -538,7 +587,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                       : "border-transparent text-stone-400 hover:text-stone-700"
                   }`}
                 >
-                  🔮 文化历史释义
+                  {isEnglishMode ? "🔮 Cultural Lore" : "🔮 文化历史释义"}
                 </button>
                 <button
                   onClick={() => {
@@ -551,7 +600,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   }`}
                 >
                   <PenTool className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
-                  <span>✍️ 手写描红临摹</span>
+                  <span>{isEnglishMode ? "✍️ Stroke Calligraphy" : "✍️ 手写描红临摹"}</span>
                 </button>
               </div>
 
@@ -561,14 +610,14 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   <div className="space-y-2 bg-white p-4 rounded-xl border border-stone-200">
                     <div className="text-xs text-stone-400 font-mono">STANDARD LEXICON MEANING</div>
                     <p className="text-xs leading-relaxed text-stone-600 font-sans">
-                      {selectedCard.meaning}
+                      {isEnglishMode ? (LANG_MAPPING[selectedCard.id]?.meaning || selectedCard.meaning) : selectedCard.meaning}
                     </p>
                     <div className="pt-2 border-t border-stone-100 flex justify-between text-[11px] font-mono text-stone-500">
                       <span className="flex items-center gap-1">
                         <Activity className="w-3.5 h-3.5 text-amber-600" />
-                        累积熟练轮次: <b>{practiceTimes[selectedCard.id] || 0} 轮</b>
+                        {isEnglishMode ? "Practiced Runs: " : "累积熟练轮次: "}<b>{practiceTimes[selectedCard.id] || 0} {isEnglishMode ? "Rounds" : "轮"}</b>
                       </span>
-                      <span>类别: {selectedCard.categoryName}</span>
+                      <span>{isEnglishMode ? "Category: " : "类别: "}{uiTranslate(selectedCard.categoryName, isEnglishMode, selectedCard.categoryName)}</span>
                     </div>
                   </div>
 
@@ -577,14 +626,14 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <Sparkles className="w-4 h-4 text-rose-500" />
-                        <span className="text-xs font-mono font-bold text-stone-800">GEMINI AI 文化起源大百科</span>
+                        <span className="text-xs font-mono font-bold text-stone-800">{isEnglishMode ? "GEMINI AI CULTURAL CHRONICLES" : "GEMINI AI 文化起源大百科"}</span>
                       </div>
                       {!aiStory && !loadingAi && (
                         <button
                           onClick={() => handleFetchAiStory(selectedCard)}
                           className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-stone-50 font-bold text-xs flex items-center gap-1 cursor-pointer shadow-sm animate-bounce"
                         >
-                          🔮 探索文化轶事故事
+                          🔮 {isEnglishMode ? "Reveal Folklore" : "探索文化轶事故事"}
                         </button>
                       )}
                     </div>
@@ -599,7 +648,9 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                           />
                         </div>
                         <span className="text-xs font-mono text-stone-500 animate-pulse">
-                          Gemini 正在根据本姓氏检索历史编年志与民俗起源，请稍候...
+                          {isEnglishMode 
+                            ? "Gemini is searching history archives and folk etymologies, please wait..." 
+                            : "Gemini 正在根据本姓氏检索历史编年志与民俗起源，请稍候..."}
                         </span>
                       </div>
                     )}
@@ -619,13 +670,13 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                         </p>
                         <div className="mt-3 pt-2 border-t border-rose-100/50 flex justify-between items-center">
                           <span className="text-[10px] text-rose-500 font-mono italic">
-                            ★ 由 Google Gemini 3.5 AI 倾情提供
+                            ★ {isEnglishMode ? "Powered by Google Gemini 3.5 AI" : "由 Google Gemini 3.5 AI 倾情提供"}
                           </span>
                           <button
                             onClick={() => handleFetchAiStory(selectedCard)}
                             className="text-[10px] text-stone-500 hover:text-stone-800 font-mono font-bold underline"
                           >
-                            重新解释 ↻
+                            {isEnglishMode ? "Regenerate ↻" : "重新解释 ↻"}
                           </button>
                         </div>
                       </motion.div>
@@ -645,7 +696,86 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   onClick={() => setSelectedCard(null)}
                   className="w-full py-2.5 rounded-xl border border-stone-300 hover:bg-stone-100 text-stone-800 font-bold text-xs transition-colors cursor-pointer"
                 >
-                  合上相册
+                  {isEnglishMode ? "Close Album" : "合上相册"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Styled Overlay Toast / Alert Notifications */}
+      <AnimatePresence>
+        {customNotification && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-stone-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]"
+            onClick={() => setCustomNotification(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="max-w-md w-full bg-white border-2 border-stone-800 rounded-2xl p-6 shadow-2xl relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="space-y-4 text-center">
+                <div className="text-3xl">
+                  {customNotification.type === "success" ? "🎉" : customNotification.type === "error" ? "⚠️" : "💡"}
+                </div>
+                <p className="text-stone-800 text-sm font-sans leading-relaxed">
+                  {customNotification.text}
+                </p>
+                <button
+                  onClick={() => setCustomNotification(null)}
+                  className="px-6 py-2 bg-stone-900 text-stone-50 hover:bg-stone-800 text-xs font-bold rounded-lg cursor-pointer"
+                >
+                  {isEnglishMode ? "Okay" : "知道了"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Styled Confirm Dialog overlay */}
+      <AnimatePresence>
+        {customConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-stone-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="max-w-md w-full bg-white border-2 border-amber-600 rounded-2xl p-6 shadow-2xl space-y-4"
+            >
+              <div className="text-center space-y-2">
+                <div className="text-3xl">❓</div>
+                <p className="text-stone-800 text-sm font-semibold font-sans leading-relaxed">
+                  {customConfirm.text}
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  onClick={() => setCustomConfirm(null)}
+                  className="px-5 py-2 border border-stone-300 hover:bg-stone-50 text-stone-700 text-xs font-bold rounded-lg cursor-pointer"
+                >
+                  {isEnglishMode ? "Cancel" : "取消"}
+                </button>
+                <button
+                  onClick={() => {
+                    customConfirm.onConfirm();
+                    setCustomConfirm(null);
+                  }}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg cursor-pointer"
+                >
+                  {isEnglishMode ? "Confirm" : "确认导入"}
                 </button>
               </div>
             </motion.div>
@@ -660,8 +790,12 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
     return (
       <div className="p-8 text-center border-2 border-dashed border-stone-300 rounded-2xl bg-stone-50 text-stone-400 font-serif">
         <BookOpen className="w-12 h-12 text-stone-300 mx-auto mb-2" />
-        <p className="text-sm">暂无符合当前过滤条件的名人闪卡。</p>
-        <p className="text-xs text-stone-400 mt-1 font-sans">开启拼写训练来解锁属于你的五十音大图鉴吧！</p>
+        <p className="text-sm">
+          {isEnglishMode ? "No cards matching the selected filters found." : "暂无符合当前过滤条件的名人闪卡。"}
+        </p>
+        <p className="text-xs text-stone-400 mt-1 font-sans">
+          {isEnglishMode ? "Go back and select typing or calligraphy practices to unlock cards!" : "开启拼写训练来解锁属于你的五十音大图鉴吧！"}
+        </p>
       </div>
     );
   }

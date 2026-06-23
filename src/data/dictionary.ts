@@ -928,3 +928,293 @@ export const DICTIONARY: DictionaryItem[] = [
     ]
   }
 ];
+
+export interface EnglishOverlay {
+  word: string;
+  categoryName: string;
+  meaning: string;
+}
+
+export const ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
+  sato: {
+    word: "Richard",
+    categoryName: "English Names",
+    meaning: "A classic Germanic name meaning 'brave ruler' or 'powerful leader'. It has been popular for centuries."
+  },
+  suzuki: {
+    word: "William",
+    categoryName: "English Names",
+    meaning: "A timeless English name of Germanic origin, meaning 'strong-willed warrior' or 'resolute protector'."
+  },
+  kimura: {
+    word: "Chloe",
+    categoryName: "English Names",
+    meaning: "Of Greek origin meaning 'blooming' or 'young green shoot'. It represents fertility, youth, and freshness."
+  },
+  tanaka: {
+    word: "Jones",
+    categoryName: "English Names",
+    meaning: "A common and highly respected patronymic surname meaning 'son of John' or 'God is gracious'."
+  },
+  yamada: {
+    word: "Olivia",
+    categoryName: "English Names",
+    meaning: "A beautiful Latin name meaning 'olive tree', representing peace, fruitfulness, and classic dignity."
+  },
+  oda: {
+    word: "Elizabeth",
+    categoryName: "English Names",
+    meaning: "A noble Hebrew name meaning 'My God is an oath', held by legendary queens and historic rule makers."
+  },
+  sakura: {
+    word: "Strawberry",
+    categoryName: "Nature & Animals",
+    meaning: "A sweet, bright-red heart-shaped summer fruit, widely enjoyed fresh and in delicious desserts."
+  },
+  fuji: {
+    word: "Mountain Peak",
+    categoryName: "Nature & Animals",
+    meaning: "The majestic peak of high ranges, symbolizing strength, endurance, adventure, and panoramic heights."
+  },
+  aozora: {
+    word: "Blue Sky",
+    categoryName: "Nature & Animals",
+    meaning: "The clear azure sky above, conveying a sense of limitless freedom, joy, and sunny optimism."
+  },
+  asagao: {
+    word: "Morning Glory",
+    categoryName: "Nature & Animals",
+    meaning: "A gorgeous twining flower that blooms beautifully at dawn, symbol of seasonal rhythms."
+  },
+  kotone: {
+    word: "Melody",
+    categoryName: "English Names",
+    meaning: "A sweet and pleasing sequence of musical notes that carries deep emotion and creative harmony."
+  },
+  shiki: {
+    word: "Seasons",
+    categoryName: "Nature & Animals",
+    meaning: "The wonderful annual sequence of spring, summer, autumn, and winter showing nature's life cycle."
+  },
+  dango: {
+    word: "Sweet Cake",
+    categoryName: "English Delicacies",
+    meaning: "A delicious confection crafted with sugar, flour, and icing, shared at warm birthday gatherings."
+  },
+  momiji: {
+    word: "Maple Leaf",
+    categoryName: "Nature & Animals",
+    meaning: "The elegant star-shaped autumn leaf colored of brilliant crimson, symbol of fall nature trails."
+  },
+  daruma: {
+    word: "Tumbling Toy",
+    categoryName: "Objects & Concepts",
+    meaning: "A classic weighted nesting toy that wobbles but never falls down, representing resilience."
+  },
+  heiwa: {
+    word: "Harmony",
+    categoryName: "Objects & Concepts",
+    meaning: "A serene state of balance, unity, and peaceful cooperation within communities and inner self."
+  },
+  kabuki: {
+    word: "Broadway",
+    categoryName: "Objects & Concepts",
+    meaning: "A major hub of theatrical excellence, showcasing iconic musical dramas and stellar live acting."
+  },
+  toyotomi: {
+    word: "James",
+    categoryName: "English Names",
+    meaning: "A popular English name meaning 'supplanter', worn by kings, explorers, and modern achievers."
+  },
+  tokugawa: {
+    word: "Robert",
+    categoryName: "English Names",
+    meaning: "A classic name of Germanic origin, meaning 'bright fame' or 'shining with glorious reputation'."
+  },
+  kawabata: {
+    word: "Arthur",
+    categoryName: "English Names",
+    meaning: "An ancient Celtic name meaning 'bear hero' or 'noble stone', associated with the legendary King Arthur."
+  },
+  miyazaki: {
+    word: "Director",
+    categoryName: "Objects & Concepts",
+    meaning: "The creative mastermind behind films, orchestrating visual flows, character growth, and deep plots."
+  },
+  sushi: {
+    word: "Sushi Rice",
+    categoryName: "English Delicacies",
+    meaning: "Lightly seasoned gourmet short-grain rice paired with ocean delicacies for a fresh, healthy bite."
+  },
+  matcha: {
+    word: "Green Tea",
+    categoryName: "English Delicacies",
+    meaning: "A refreshing antioxidant-rich green herbal brew, loved for its calming focus and earthy notes."
+  },
+  ramen: {
+    word: "Spicy Noodles",
+    categoryName: "English Delicacies",
+    meaning: "Delectable wheat noodles served in steaming aromatic savory broth, topped with tasty seasonings."
+  },
+  wagashi: {
+    word: "Cheesecake",
+    categoryName: "English Delicacies",
+    meaning: "A rich, creamy, and velvety dessert built over a sweet graham cracker crust, a true favorite."
+  },
+  sake: {
+    word: "bottled water",
+    categoryName: "Objects & Concepts",
+    meaning: "Pure, filtered fresh drinking water sealed in convenient portable bottles to keep you active and healthy."
+  },
+  jinja: {
+    word: "Cathedral",
+    categoryName: "Objects & Concepts",
+    meaning: "An architectural masterpiece of sacred gatherings, distinguished by tall arches and stained glass."
+  },
+  ninja: {
+    word: "Shadow Agent",
+    categoryName: "Objects & Concepts",
+    meaning: "A stealthy special operations agent, known for unparalleled agility, intelligence, and secrecy."
+  },
+  bushi: {
+    word: "Knight",
+    categoryName: "Objects & Concepts",
+    meaning: "A high-ranking armored warrior of medieval history, bound by strict vows of chivalry and courage."
+  },
+  bento: {
+    word: "Lunch Box",
+    categoryName: "Objects & Concepts",
+    meaning: "A neatly organized portable container housing multiple partitions of delicious home-cooked meals."
+  },
+  onsen: {
+    word: "Hot Spring",
+    categoryName: "Nature & Animals",
+    meaning: "A warm, geothermal spring rich in soothing minerals, perfect for outdoor muscular relaxation."
+  },
+  hotaru: {
+    word: "Firefly",
+    categoryName: "Nature & Animals",
+    meaning: "A tiny soft-bodied beetle that flashes beautiful yellow-green bioluminescent signals in summer nights."
+  },
+  semi: {
+    word: "Cicada",
+    categoryName: "Nature & Animals",
+    meaning: "A high-pitched summer insect that sings vibrant songs from tall outdoor trees during peak seasons."
+  },
+  haiku: {
+    word: "Poetry",
+    categoryName: "Objects & Concepts",
+    meaning: "An expressive artistic arrange of words, rhythm, and rich metaphors to evoke emotions."
+  },
+  torii: {
+    word: "Gateway",
+    categoryName: "Objects & Concepts",
+    meaning: "An entrance frame separating different areas, welcoming tourists and visitors to beautiful parks."
+  },
+  hanabi: {
+    word: "Fireworks",
+    categoryName: "Nature & Animals",
+    meaning: "Visual aerial displays of colors and thunders launched to celebrate holidays and summer festivals."
+  },
+  soba: {
+    word: "Buckwheat",
+    categoryName: "English Delicacies",
+    meaning: "A highly nutritious grain used to make delicious breakfast foods and traditional noodles."
+  },
+  tempura: {
+    word: "Fried Shrimp",
+    categoryName: "English Delicacies",
+    meaning: "Crispy, golden-panko coated jumbo shrimp, fried to perfect tender crunchiness."
+  },
+  takoyaki: {
+    word: "Octopus Ball",
+    categoryName: "English Delicacies",
+    meaning: "A savory sphere of wheat batter featuring a tender piece of saltwater octopus, baked on hot pans."
+  },
+  mochi: {
+    word: "Rice Cake",
+    categoryName: "English Delicacies",
+    meaning: "A delightfully chewy, sweet, and soft steamed flour treat, usually filled with sweet paste."
+  },
+  gohan: {
+    word: "Steamed Rice",
+    categoryName: "English Delicacies",
+    meaning: "The fundamental standard grain cooked with hot steam, soft, fluffy, and perfect with any dish."
+  },
+  yukata: {
+    word: "Summer Dress",
+    categoryName: "Objects & Concepts",
+    meaning: "A light, breezy cotton garment worn during sunny outdoor leisure activities and warm picnics."
+  },
+  matsuri: {
+    word: "Carnival",
+    categoryName: "Objects & Concepts",
+    meaning: "A lively, energetic outdoor fair featuring musical bands, giant rides, games, and candy floss."
+  },
+  geisha: {
+    word: "Dancer",
+    categoryName: "Objects & Concepts",
+    meaning: "A performing artist who tells powerful historical stories through stylized, expressive bodily motions."
+  },
+  origami: {
+    word: "Paper Craft",
+    categoryName: "Objects & Concepts",
+    meaning: "The creative, calming craft of folding colored square papers into birds, stars, and shapes."
+  },
+  kimono: {
+    word: "Silk Gown",
+    categoryName: "Objects & Concepts",
+    meaning: "A luxurious ceremonial robe crafted from premium silk fabrics, worn on highly formal stages."
+  },
+  tsuki: {
+    word: "Silver Moon",
+    categoryName: "Nature & Animals",
+    meaning: "The glowing celestial sphere that brightens the dark night sky, inspiring bedtime dreamers."
+  },
+  yuki: {
+    word: "Snowflake",
+    categoryName: "Nature & Animals",
+    meaning: "A single, exquisitely symmetric ice crystal falling silently from grey clouds in beautiful winters."
+  },
+  kaze: {
+    word: "Gentle Breeze",
+    categoryName: "Nature & Animals",
+    meaning: "A cool, light movement of air that softly rustles the green forest leaves on warm afternoons."
+  },
+  shiba: {
+    word: "Puppy Dog",
+    categoryName: "Nature & Animals",
+    meaning: "A loyal, energetic, and highly playful companion with furry ears and a wagging tail."
+  }
+};
+
+export function getDictionary(isEnglishMode: boolean): DictionaryItem[] {
+  if (!isEnglishMode) {
+    return DICTIONARY;
+  }
+  
+  return DICTIONARY.map(item => {
+    const overlay = ENGLISH_OVERLAYS[item.id];
+    if (!overlay) return item;
+    
+    // Split the English word into segments of individual characters
+    const segments = overlay.word.split("").map((char) => {
+      const isSpace = char === " ";
+      return {
+        kana: char,
+        romaji: isSpace ? [" "] : [char.toLowerCase()],
+        displayRomaji: char,
+      };
+    });
+    
+    return {
+      ...item,
+      kanji: overlay.word,
+      kanaStr: overlay.word,
+      categoryName: overlay.categoryName,
+      meaning: overlay.meaning,
+      segments: segments,
+    };
+  });
+}
+

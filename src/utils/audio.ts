@@ -42,7 +42,7 @@ class RetroAudioSynth {
     return this.voiceType;
   }
 
-  // Speaks Japanese syllable or full word using SpeechSynthesis API
+  // Speaks Japanese syllable or full word using SpeechSynthesis API (with automatic English detection for English Mode)
   speakJapanese(text: string, cancelActive: boolean = true) {
     if (this.isMuted) return;
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -52,12 +52,13 @@ class RetroAudioSynth {
         }
 
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = "ja-JP";
+        const isEnglish = /^[a-zA-Z\s\.\-\'\,\!\?\(\)]+$/.test(text);
+        utterance.lang = isEnglish ? "en-US" : "ja-JP";
         
         // Custom pitch/rate based on selected speaker gender/type
         if (this.voiceType === "male") {
-          utterance.rate = 0.80; // slightly slower, authoritative cadence
-          utterance.pitch = 0.76; // deeper masculine register
+          utterance.rate = isEnglish ? 0.90 : 0.80; // slightly slower, authoritative cadence
+          utterance.pitch = isEnglish ? 0.90 : 0.76; // deeper masculine register
         } else if (this.voiceType === "child") {
           utterance.rate = 1.05; // bouncy and energetic
           utterance.pitch = 1.42; // high-pitched cute anime guide
@@ -69,62 +70,83 @@ class RetroAudioSynth {
           utterance.pitch = 0.55; // deep, weathered hoarse quality
         } else {
           // female (default)
-          utterance.rate = 0.88; // gentle, elegant instructional pace
-          utterance.pitch = 1.05; // bright, high contrast clarity
+          utterance.rate = isEnglish ? 0.95 : 0.88; // gentle, elegant instructional pace
+          utterance.pitch = isEnglish ? 1.00 : 1.05; // bright, high contrast clarity
         }
 
-        // Try selecting a Japanese-specific voice package if available
+        // Try selecting a specific voice package if available
         const voices = window.speechSynthesis.getVoices();
-        let jaVoice = null;
+        let targetVoice = null;
 
-        if (this.voiceType === "male") {
-          // Look for male Japanese voices
-          jaVoice = voices.find((v) => {
-            const name = v.name.toLowerCase();
-            const lang = v.lang.toLowerCase();
-            return (lang === "ja-jp" || lang.startsWith("ja")) &&
-              (name.includes("ichiro") || name.includes("otoya") || name.includes("male") || name.includes("man") || name.includes("guy"));
-          });
-        } else if (this.voiceType === "child") {
-          // Look for cute / young sounding voices or standard female
-          jaVoice = voices.find((v) => {
-            const name = v.name.toLowerCase();
-            const lang = v.lang.toLowerCase();
-            return (lang === "ja-jp" || lang.startsWith("ja")) &&
-              (name.includes("ayumi") || name.includes("haruka") || name.includes("sakura") || name.includes("child") || name.includes("xiaoxiao"));
-          });
-        } else if (this.voiceType === "alien") {
-          // Cosmic / Google-synthesized robotic character voice
-          jaVoice = voices.find((v) => {
-            const name = v.name.toLowerCase();
-            const lang = v.lang.toLowerCase();
-            return (lang === "ja-jp" || lang.startsWith("ja")) && (name.includes("google") || name.includes("natural"));
-          });
-        } else if (this.voiceType === "elderly") {
-          // Elderly can try to find a deep male voice (e.g. Ichiro / Otoya)
-          jaVoice = voices.find((v) => {
-            const name = v.name.toLowerCase();
-            const lang = v.lang.toLowerCase();
-            return (lang === "ja-jp" || lang.startsWith("ja")) &&
-              (name.includes("ichiro") || name.includes("otoya") || name.includes("male") || name.includes("keiji"));
-          });
+        if (isEnglish) {
+          if (this.voiceType === "male" || this.voiceType === "elderly") {
+            targetVoice = voices.find((v) => {
+              const name = v.name.toLowerCase();
+              const lang = v.lang.toLowerCase();
+              return (lang === "en-us" || lang.startsWith("en")) &&
+                (name.includes("male") || name.includes("man") || name.includes("guy") || name.includes("david") || name.includes("mark"));
+            });
+          } else {
+            targetVoice = voices.find((v) => {
+              const name = v.name.toLowerCase();
+              const lang = v.lang.toLowerCase();
+              return (lang === "en-us" || lang.startsWith("en")) &&
+                (name.includes("female") || name.includes("woman") || name.includes("girl") || name.includes("zira") || name.includes("samantha"));
+            });
+          }
+          if (!targetVoice) {
+            targetVoice = voices.find((v) => v.lang.toLowerCase().startsWith("en"));
+          }
         } else {
-          // Look for elegant female voices
-          jaVoice = voices.find((v) => {
-            const name = v.name.toLowerCase();
-            const lang = v.lang.toLowerCase();
-            return (lang === "ja-jp" || lang.startsWith("ja")) &&
-              (name.includes("kyoko") || name.includes("nanami") || name.includes("female") || name.includes("woman") || name.includes("ayumi"));
-          });
+          if (this.voiceType === "male") {
+            // Look for male Japanese voices
+            targetVoice = voices.find((v) => {
+              const name = v.name.toLowerCase();
+              const lang = v.lang.toLowerCase();
+              return (lang === "ja-jp" || lang.startsWith("ja")) &&
+                (name.includes("ichiro") || name.includes("otoya") || name.includes("male") || name.includes("man") || name.includes("guy"));
+            });
+          } else if (this.voiceType === "child") {
+            // Look for cute / young sounding voices or standard female
+            targetVoice = voices.find((v) => {
+              const name = v.name.toLowerCase();
+              const lang = v.lang.toLowerCase();
+              return (lang === "ja-jp" || lang.startsWith("ja")) &&
+                (name.includes("ayumi") || name.includes("haruka") || name.includes("sakura") || name.includes("child") || name.includes("xiaoxiao"));
+            });
+          } else if (this.voiceType === "alien") {
+            // Cosmic / Google-synthesized robotic character voice
+            targetVoice = voices.find((v) => {
+              const name = v.name.toLowerCase();
+              const lang = v.lang.toLowerCase();
+              return (lang === "ja-jp" || lang.startsWith("ja")) && (name.includes("google") || name.includes("natural"));
+            });
+          } else if (this.voiceType === "elderly") {
+            // Elderly can try to find a deep male voice (e.g. Ichiro / Otoya)
+            targetVoice = voices.find((v) => {
+              const name = v.name.toLowerCase();
+              const lang = v.lang.toLowerCase();
+              return (lang === "ja-jp" || lang.startsWith("ja")) &&
+                (name.includes("ichiro") || name.includes("otoya") || name.includes("male") || name.includes("keiji"));
+            });
+          } else {
+            // Look for elegant female voices
+            targetVoice = voices.find((v) => {
+              const name = v.name.toLowerCase();
+              const lang = v.lang.toLowerCase();
+              return (lang === "ja-jp" || lang.startsWith("ja")) &&
+                (name.includes("kyoko") || name.includes("nanami") || name.includes("female") || name.includes("woman") || name.includes("ayumi"));
+            });
+          }
+
+          // Fallback to generic Japanese speakers if the customized searches yielded nothing
+          if (!targetVoice) {
+            targetVoice = voices.find((v) => v.lang === "ja-JP" || v.lang.toLowerCase().startsWith("ja"));
+          }
         }
 
-        // Fallback to generic Japanese speakers if the customized searches yielded nothing
-        if (!jaVoice) {
-          jaVoice = voices.find((v) => v.lang === "ja-JP" || v.lang.toLowerCase().startsWith("ja"));
-        }
-
-        if (jaVoice) {
-          utterance.voice = jaVoice;
+        if (targetVoice) {
+          utterance.voice = targetVoice;
         }
 
         if (cancelActive && window.speechSynthesis.speaking) {
@@ -153,66 +175,88 @@ class RetroAudioSynth {
     try {
       const now = this.ctx.currentTime;
       
-      // 1. Bass "Thump" - key bottoming out
-      const thudOsc = this.ctx.createOscillator();
-      const thudGain = this.ctx.createGain();
-      thudOsc.type = "sine";
-      thudOsc.frequency.setValueAtTime(140, now);
-      thudOsc.frequency.exponentialRampToValueAtTime(70, now + 0.04);
-      thudGain.gain.setValueAtTime(0.12, now);
-      thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
-      thudOsc.connect(thudGain);
-      thudGain.connect(this.ctx.destination);
-      thudOsc.start(now);
-      thudOsc.stop(now + 0.05);
+      const playSingleClick = (timeOffset: number, isSecondary: boolean) => {
+        if (!this.ctx) return;
+        const clickTime = now + timeOffset;
+        const volumeMultiplier = isSecondary ? 0.75 : 1.0;
+        const pitchMultiplier = isSecondary ? 1.15 : 1.0;
 
-      // 2. High-frequency Metal "Click"
-      const clickOsc = this.ctx.createOscillator();
-      const clickGain = this.ctx.createGain();
-      clickOsc.type = "triangle";
-      clickOsc.frequency.setValueAtTime(1800, now);
-      clickOsc.frequency.exponentialRampToValueAtTime(300, now + 0.03);
-      clickGain.gain.setValueAtTime(0.07, now);
-      clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
-      clickOsc.connect(clickGain);
-      clickGain.connect(this.ctx.destination);
-      clickOsc.start(now);
-      clickOsc.stop(now + 0.04);
+        // 1. Bottom-out mechanical thud (the "clack" base)
+        const thudOsc = this.ctx.createOscillator();
+        const thudGain = this.ctx.createGain();
+        thudOsc.type = "sine";
+        thudOsc.frequency.setValueAtTime(160 * pitchMultiplier, clickTime);
+        thudOsc.frequency.exponentialRampToValueAtTime(75, clickTime + 0.035);
+        thudGain.gain.setValueAtTime(0.14 * volumeMultiplier, clickTime);
+        thudGain.gain.exponentialRampToValueAtTime(0.001, clickTime + 0.035);
+        
+        thudOsc.connect(thudGain);
+        thudGain.connect(this.ctx.destination);
+        thudOsc.start(clickTime);
+        thudOsc.stop(clickTime + 0.04);
 
-      // 3. Subtle noise burst for physical friction click
-      const bufferSize = this.ctx.sampleRate * 0.02; // 20ms burst
-      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-      }
-      const noiseNode = this.ctx.createBufferSource();
-      noiseNode.buffer = buffer;
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = "bandpass";
-      filter.frequency.value = 2400; // high frequency metallic clack
-      filter.Q.value = 3.0;
+        // 2. Sharp mechanical metal contact click
+        const clickOsc = this.ctx.createOscillator();
+        const clickGain = this.ctx.createGain();
+        clickOsc.type = "triangle";
+        // Mechanical switch click frequency is usually around 2000-3000 Hz, decaying extremely fast (10-15ms)
+        clickOsc.frequency.setValueAtTime(2500 * pitchMultiplier, clickTime);
+        clickOsc.frequency.exponentialRampToValueAtTime(600, clickTime + 0.015);
+        
+        clickGain.gain.setValueAtTime(0.18 * volumeMultiplier, clickTime);
+        clickGain.gain.exponentialRampToValueAtTime(0.001, clickTime + 0.015);
+        
+        clickOsc.connect(clickGain);
+        clickGain.connect(this.ctx.destination);
+        clickOsc.start(clickTime);
+        clickOsc.stop(clickTime + 0.02);
 
-      const noiseGain = this.ctx.createGain();
-      noiseGain.gain.setValueAtTime(0.06, now);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.018);
+        // 3. Resonant spring metallic noise burst
+        const bufferSize = this.ctx.sampleRate * 0.015; // 15ms burst
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+        
+        const noiseNode = this.ctx.createBufferSource();
+        noiseNode.buffer = buffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.value = isSecondary ? 4200 : 3600; // High frequency metallic resonance
+        filter.Q.value = 6.0; // Sharp filter Q for high click resonance
 
-      noiseNode.connect(filter);
-      filter.connect(noiseGain);
-      noiseGain.connect(this.ctx.destination);
-      noiseNode.start(now);
-      noiseNode.stop(now + 0.02);
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.09 * volumeMultiplier, clickTime);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, clickTime + 0.012);
+
+        noiseNode.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(this.ctx.destination);
+        
+        noiseNode.start(clickTime);
+        noiseNode.stop(clickTime + 0.015);
+      };
+
+      // Play the "Ka" (咔)
+      playSingleClick(0, false);
+      
+      // Play the "Ta" (哒) with a very slight delay (22ms) to emulate mechanical typewriter rebound friction
+      playSingleClick(0.022, true);
+
     } catch (e) {
       // Fallback simple beep to guarantee no crashes
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.frequency.setValueAtTime(800, this.ctx.currentTime);
-      gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.06);
+      try {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.frequency.setValueAtTime(750, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.06);
+      } catch (err) {}
     }
   }
 

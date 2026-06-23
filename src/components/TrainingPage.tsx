@@ -6,6 +6,7 @@ import { TracingKana } from "./TracingKana";
 import { audioSynth } from "../utils/audio";
 import { CardIllustration } from "./CardIllustration";
 import { CalligraphyCanvas } from "./CalligraphyCanvas";
+import { uiTranslate, LANG_MAPPING } from "../utils/lang";
 
 interface TrainingPageProps {
   items: DictionaryItem[];
@@ -14,6 +15,7 @@ interface TrainingPageProps {
   onQuit: () => void;
   practiceMode?: "typing" | "handwriting";
   onKeyStrike?: (action: "correct" | "error" | "complete") => void;
+  isEnglishMode?: boolean;
 }
 
 export const TrainingPage: React.FC<TrainingPageProps> = ({
@@ -23,6 +25,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   onQuit,
   practiceMode = "typing",
   onKeyStrike,
+  isEnglishMode = false,
 }) => {
   // Loop sequential indices
   const [currentItemIdx, setCurrentItemIdx] = useState<number>(0);
@@ -126,11 +129,12 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       if (practiceMode === "handwriting") return;
       if (isPaused || timerFinished || wordCorrect) return;
 
-      const key = e.key.toLowerCase();
-      // Only listen to standard alphabetic keys
-      if (!/^[a-z]$/.test(key)) return;
+      const key = e.key === " " ? " " : e.key.toLowerCase();
+      // Only listen to standard alphabetic keys or space if in English Mode
+      const isValidKey = /^[a-z]$/.test(key) || (isEnglishMode && key === " ");
+      if (!isValidKey) return;
 
-      setPressedKey(key.toUpperCase());
+      setPressedKey(key === " " ? "SPACE" : key.toUpperCase());
       setTimeout(() => setPressedKey(null), 150);
 
       const segment = item.segments[currentSegmentIdx];
@@ -198,7 +202,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
     return () => {
       window.removeEventListener("keydown", handleKeyPress);
     };
-  }, [currentSegmentIdx, romajiProgress, item, isPaused, timerFinished, wordCorrect, onKeyStrike]);
+  }, [currentSegmentIdx, romajiProgress, item, isPaused, timerFinished, wordCorrect, onKeyStrike, isEnglishMode]);
 
   // Formatter for time display
   const formatTime = (ms: number) => {
@@ -212,12 +216,18 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
   // Helper to determine active alphabet guidelines
   const getExpectedPrefixHelp = () => {
-    if (wordCorrect) return "全部拼对，正在进行假名描红！";
-    if (isPaused) return "训练暂停中，按下 [暂停/继续] 或空格继续";
+    if (wordCorrect) {
+      return isEnglishMode ? "All spelled correctly!" : "全部拼对，正在进行假名描红！";
+    }
+    if (isPaused) {
+      return isEnglishMode ? "Practice paused. Press Space or [Resume] to continue." : "训练暂停中，按下 [暂停/继续] 或空格继续";
+    }
     
     // Provide neat prompt of expected correct letter keys to tap
     const currentExpecteds = currentSegment.romaji.map(r => r.substring(romajiProgress.length));
-    return `当前假名拼写预期: ${currentExpecteds.map(x => `[${x[0] || ""}]`).join(" 或 ")}`;
+    return isEnglishMode 
+      ? `Press: ${currentExpecteds.map(x => `[${x[0] === " " ? "SPACE" : (x[0] || "").toUpperCase()}]`).join(" or ")}`
+      : `当前假名拼写预期: ${currentExpecteds.map(x => `[${x[0] || ""}]`).join(" 或 ")}`;
   };
 
   // Triggers final wrap-up and submits the score to claim the card
@@ -294,7 +304,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         {items.length > 1 && (
           <div className="flex flex-wrap items-center justify-center gap-2 pb-4 pt-4 border-b border-stone-200 select-none">
             <span className="text-[9px] font-mono font-bold text-stone-400 uppercase tracking-widest mr-1">
-              联训序列:
+              {isEnglishMode ? "DECK QUEUE:" : "联训序列:"}
             </span>
             {items.map((it, idx) => {
               const isActive = idx === currentItemIdx;
@@ -307,7 +317,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                       : "bg-stone-200 text-stone-500 border border-stone-300 opacity-60"
                   }`}
                 >
-                  {it.kanji}
+                  {isEnglishMode ? (LANG_MAPPING[it.id]?.title || it.kanji) : it.kanji}
                 </div>
               );
             })}
@@ -353,10 +363,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
               >
                 <div className="text-center">
                   <span className="text-[10px] text-amber-800 font-mono tracking-wider font-bold uppercase bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">
-                    {item.categoryName} ・ {item.rarity} 稀有度
+                    {isEnglishMode ? (LANG_MAPPING[item.id]?.categoryName || uiTranslate(item.categoryName, isEnglishMode, item.categoryName)) : item.categoryName} ・ {item.rarity} {isEnglishMode ? "Rarity" : "稀有度"}
                   </span>
                   <h3 className="text-stone-750 font-medium font-serif text-sm mt-1.5 opacity-90 leading-relaxed max-w-lg mx-auto">
-                    {item.meaning}
+                    {isEnglishMode ? (LANG_MAPPING[item.id]?.meaning || item.meaning) : item.meaning}
                   </h3>
                 </div>
 
@@ -424,6 +434,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                             romajiProgress={currentTypingProgress}
                             isCorrect={isCorrectSegment}
                             active={isActiveSegment}
+                            isEnglishMode={isEnglishMode}
                           />
                         );
                       })}
@@ -507,6 +518,26 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                   })}
                 </div>
               ))}
+
+              {isEnglishMode && (
+                <div className="flex justify-center mt-1">
+                  <motion.div
+                    animate={{
+                      scale: pressedKey === "SPACE" ? 0.95 : 1,
+                      y: pressedKey === "SPACE" ? 2 : 0,
+                    }}
+                    className={`w-40 h-7 flex items-center justify-center rounded text-[10px] font-mono font-bold uppercase transition-all select-none border ${
+                      pressedKey === "SPACE"
+                        ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"
+                        : (!isPaused && !timerFinished && !wordCorrect && currentSegment.romaji.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === " "))
+                        ? "bg-emerald-950 text-emerald-400 border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)]"
+                        : "bg-stone-800 text-stone-300 border-stone-700"
+                    }`}
+                  >
+                    Space
+                  </motion.div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -538,20 +569,35 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                   className="text-3xl font-black text-stone-950 font-serif"
                   style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
                 >
-                  ⏳ 训练时间达成！
+                  {isEnglishMode ? "⏳ Practice Time Complete!" : "⏳ 训练时间达成！"}
                 </h2>
                 <p className="text-xs font-mono text-stone-400">SESSION TIME CYCLE ELAPSED</p>
-                <p className="text-stone-600 text-sm">
-                  你对{items.length > 1 ? "人名组合" : "人名"}{" "}
-                  <span className="font-bold text-stone-900 font-serif">
-                    “{items.length > 1 ? items.map((it) => it.kanji).join("、") : item.kanji}”
-                  </span>{" "}
-                  完成了连续{" "}
-                  <span className="font-mono text-lg font-black text-amber-600">
-                    {completedRounds}
-                  </span>{" "}
-                  轮极致熟化拼写！
-                </p>
+                <div className="text-stone-600 text-sm">
+                  {isEnglishMode ? (
+                    <p>
+                      You completed{" "}
+                      <span className="font-mono text-lg font-black text-amber-600">
+                        {completedRounds}
+                      </span>{" "}
+                      continuous practice rounds for{" "}
+                      <span className="font-bold text-stone-900 font-serif">
+                        "{items.length > 1 ? items.map((it) => LANG_MAPPING[it.id]?.title || it.kanji).join(", ") : (LANG_MAPPING[item.id]?.title || item.kanji)}"
+                      </span>!
+                    </p>
+                  ) : (
+                    <p>
+                      你对{items.length > 1 ? "人名组合" : "人名"}{" "}
+                      <span className="font-bold text-stone-900 font-serif">
+                        “{items.length > 1 ? items.map((it) => it.kanji).join("、") : item.kanji}”
+                      </span>{" "}
+                      完成了连续{" "}
+                      <span className="font-mono text-lg font-black text-amber-600">
+                        {completedRounds}
+                      </span>{" "}
+                      轮极致熟化拼写！
+                    </p>
+                  )}
+                </div>
               </div>
 
               {completedRounds >= 3 ? (
@@ -561,7 +607,15 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     <span>CONGRATULATIONS: CARD UNLOCKED!</span>
                   </div>
                   <p className="text-stone-600 text-xs leading-relaxed">
-                    由于你的辛勤练习，你的手指已经记住了这个名字。你成功得到了专属卡牌！你可以随时通过收藏馆查看它，并能请求 <b>Gemini AI 分解它的独特文化轶事</b>。
+                    {isEnglishMode ? (
+                      <>
+                        Thanks to your dedicated practice, your fingers have memorized these words. You successfully unlocked the card! You can view it in the Card Ledger anytime and prompt <b>Gemini AI to analyze its unique cultural origin</b>.
+                      </>
+                    ) : (
+                      <>
+                        由于你的辛勤练习，你的手指已经记住了这个名字。你成功得到了专属卡牌！你可以随时通过收藏馆查看它，并能请求 <b>Gemini AI 分解它的独特文化轶事</b>。
+                      </>
+                    )}
                   </p>
                 </div>
               ) : (
@@ -571,7 +625,15 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     <span>练习轮数偏少 UNLOCKED CRITERIA ALERT</span>
                   </div>
                   <p className="text-stone-600 text-xs leading-relaxed">
-                    本词最少需要成功输入 <b>3</b> 轮（当前完成：{completedRounds} 轮），才能够成功解锁。不要气馁，建议再次开启一个短训练周期，深度扎实练习！
+                    {isEnglishMode ? (
+                      <>
+                        This card requires at least <b>3</b> completed rounds to unlock (current: {completedRounds} rounds). Don't give up! We recommend starting another quick training round to build solid muscle memory!
+                      </>
+                    ) : (
+                      <>
+                        本词最少需要成功输入 <b>3</b> 轮（当前完成：{completedRounds} 轮），才能够成功解锁。不要气馁，建议再次开启一个短训练周期，深度扎实练习！
+                      </>
+                    )}
                   </p>
                 </div>
               )}
@@ -583,7 +645,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                       onClick={onQuit}
                       className="flex-1 py-3 px-4 rounded-xl border border-stone-300 bg-white hover:bg-stone-50 text-stone-700 font-bold text-sm transition-all cursor-pointer"
                     >
-                      返回首页
+                      {isEnglishMode ? "Dashboard" : "返回首页"}
                     </button>
                     <button
                       onClick={() => {
@@ -597,28 +659,29 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                       className="flex-1 py-3 px-4 rounded-xl bg-stone-900 hover:bg-stone-850 text-stone-100 font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-1"
                     >
                       <RefreshCw className="w-4 h-4" />
-                      <span>重新开始</span>
+                      <span>{isEnglishMode ? "Restart" : "重新开始"}</span>
                     </button>
                   </>
                 ) : (
                   <button
                     onClick={handleClaimCard}
-                    className="w-full py-3.5 px-4 rounded-xl bg-stone-900 hover:bg-amber-600 hover:text-stone-950 text-stone-50 font-black text-sm transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer cursor-custom"
+                    className="w-full py-3.5 px-4 rounded-xl bg-stone-900 hover:bg-amber-600 hover:text-stone-950 text-stone-50 font-black text-sm transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer cursor-custom select-none"
                   >
-                    <span>🎁 翻开并永久收录此闪卡</span>
+                    <span>{isEnglishMode ? "🎁 Claim & Permanently Reveal Card" : "🎁 翻开并永久收录此闪卡"}</span>
                   </button>
                 )}
               </div>
             </motion.div>
           </motion.div>
         )}
+
         {/* Custom styled Confirmation dialog for exiting training session */}
         {showQuitConfirm && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/80 backdrop-blur-sm"
+            className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-stone-950/80 backdrop-blur-sm"
           >
             <motion.div
               initial={{ scale: 0.9, y: 15 }}
@@ -630,11 +693,21 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-xl font-black text-stone-950 font-serif">确定要作废本次练习并退出吗？</h3>
+                <h3 className="text-xl font-black text-stone-950 font-serif">
+                  {isEnglishMode ? "Are you sure you want to quit and discard progress?" : "确定要作废本次练习并退出吗？"}
+                </h3>
                 <p className="text-xs font-mono text-stone-400">ABORT AND TERMINATE PRACTICE CURRENT CYCLE</p>
-                <p className="text-xs text-stone-600 leading-normal">
-                  中途退出后，本次已拼写了 <span className="font-bold font-mono text-amber-600 text-sm">{completedRounds}</span> 轮，但由于未到计时结束无法存留成绩。本次练习将会作废，且无法获得该卡牌！
-                </p>
+                <div className="text-xs text-stone-600 leading-normal">
+                  {isEnglishMode ? (
+                    <p>
+                      If you exit mid-session, your <span className="font-bold font-mono text-amber-600 text-sm">{completedRounds}</span> practiced rounds in this cycle will be discarded. You will not save any progress or unlock this card!
+                    </p>
+                  ) : (
+                    <p>
+                      中途退出后，本次已拼写了 <span className="font-bold font-mono text-amber-600 text-sm">{completedRounds}</span> 轮，但由于未到计时结束无法存留成绩。本次练习将会作废，且无法获得该卡牌！
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-3 pt-2">
@@ -644,15 +717,15 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     setEndTime(Date.now() + timeLeftMs);
                     setShowQuitConfirm(false);
                   }}
-                  className="flex-1 py-3 px-4 rounded-xl border border-stone-300 bg-stone-100 hover:bg-stone-200 text-stone-850 font-bold text-xs font-sans transition-all cursor-pointer"
+                  className="flex-1 py-3 px-4 rounded-xl border border-stone-300 bg-stone-100 hover:bg-stone-205 text-stone-850 font-bold text-xs font-sans transition-all cursor-pointer select-none"
                 >
-                  🛡️ 留在这里，继续拼写
+                  {isEnglishMode ? "🛡️ Stay & Continue" : "🛡️ 留在这里，继续拼写"}
                 </button>
                 <button
                   onClick={onQuit}
-                  className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs font-sans transition-all cursor-pointer"
+                  className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs font-sans transition-all cursor-pointer select-none"
                 >
-                  🚪 意已决，狠心退出
+                  {isEnglishMode ? "🚪 Discard & Exit" : "🚪 意已决，狠心退出"}
                 </button>
               </div>
             </motion.div>

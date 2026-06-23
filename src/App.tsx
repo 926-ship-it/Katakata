@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Sparkles, Trophy, BookOpen, Volume2, VolumeX, Key, HelpCircle, Gamepad2, Info, ChevronLeft, ChevronRight, Music, Smile, Mic } from "lucide-react";
+import { Sparkles, Trophy, BookOpen, Volume2, VolumeX, Key, HelpCircle, Gamepad2, Info, ChevronLeft, ChevronRight, Music, Smile, Mic, Home } from "lucide-react";
 import { StartPage } from "./components/StartPage";
 import { TrainingPage } from "./components/TrainingPage";
 import { CardLibraryPage } from "./components/CardLibraryPage";
 import { MascotComponent } from "./components/MascotComponent";
 import { DictionaryItem } from "./data/dictionary";
 import { audioSynth } from "./utils/audio";
+import { uiTranslate } from "./utils/lang";
 
 type ScreenState = "start" | "training" | "library" | "unlocked_ceremony";
 
@@ -46,6 +47,13 @@ export default function App() {
   });
   const [lastAction, setLastAction] = useState<"correct" | "error" | "complete" | "">("");
   const [practiceMode, setPracticeMode] = useState<"typing" | "handwriting">("typing");
+  const [isEnglishMode, setIsEnglishMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("fifty_sound_english_mode") === "true";
+    } catch (_) {
+      return false;
+    }
+  });
 
   // Selection for active training
   const [activeCards, setActiveCards] = useState<DictionaryItem[]>([]);
@@ -58,6 +66,14 @@ export default function App() {
   const [slideDirection, setSlideDirection] = useState<number>(1);
 
   // Synchronize state preferences
+  useEffect(() => {
+    try {
+      localStorage.setItem("fifty_sound_english_mode", String(isEnglishMode));
+    } catch (e) {
+      console.warn("localStorage restricted", e);
+    }
+  }, [isEnglishMode]);
+
   useEffect(() => {
     audioSynth.setMute(isMuted);
     try {
@@ -423,10 +439,10 @@ export default function App() {
     <div className="min-h-screen bg-stone-100 text-stone-800 font-sans pb-12 transition-colors">
       {/* Upper Navigation Header */}
       <header className="bg-white border-b border-stone-200 sticky top-0 z-40 select-none">
-        <div className="max-w-4xl mx-auto px-4 py-3.5 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-3 md:gap-0">
           <div 
             onClick={() => { if (currentPage !== "training") setCurrentPage("start"); }} 
-            className="flex items-center gap-2 cursor-pointer"
+            className="flex items-center gap-2 cursor-pointer shrink-0"
           >
             <div className="w-8 h-8 rounded-lg bg-stone-900 border border-stone-800 flex items-center justify-center text-stone-100 text-sm font-serif font-black">
               カ
@@ -438,7 +454,7 @@ export default function App() {
           </div>
 
           {/* Controls Hub for Audio Synth, Ambient BGM, and Mascot Companion */}
-          <div className="flex items-center gap-1.5 border-l border-r border-stone-200 px-3 mx-2">
+          <div className="flex items-center gap-1.5 border-t border-b md:border-t-0 md:border-b-0 border-r-0 border-l-0 md:border-l md:border-r border-stone-200 py-1.5 md:py-0 md:px-3 mx-2 shrink-0 flex-wrap justify-center">
             {/* Master Silence Switch */}
             <button
               onClick={() => {
@@ -515,29 +531,30 @@ export default function App() {
                   }, 120);
                 }}
                 className="text-[10px] font-mono font-bold text-stone-700 bg-transparent outline-none border-none py-0.5 cursor-pointer max-w-[90px] sm:max-w-none"
-                title="选择五十音导师朗读发音类型"
+                title={isEnglishMode ? "Select Japanese pronunciation presenter voice type" : "选择五十音导师朗读发音类型"}
               >
-                <option value="female">👩‍💼 女声导师</option>
-                <option value="male">👨‍💼 男声导师</option>
-                <option value="child">🦊 童声伴读</option>
-                <option value="alien">👽 外星人声</option>
-                <option value="elderly">👴 智慧老人</option>
+                <option value="female">{isEnglishMode ? "Female Voice" : "女声导师"}</option>
+                <option value="male">{isEnglishMode ? "Male Voice" : "男声导师"}</option>
+                <option value="child">{isEnglishMode ? "Child Companion" : "童声伴读"}</option>
+                <option value="alien">{isEnglishMode ? "Alien Echo" : "外星人声"}</option>
+                <option value="elderly">{isEnglishMode ? "Elderly Wisdom" : "智慧老人"}</option>
               </select>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {currentPage !== "training" && (
               <>
                 <button
                   onClick={() => setCurrentPage("start")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
                     currentPage === "start" 
                       ? "bg-stone-900 text-stone-50" 
                       : "text-stone-600 hover:bg-stone-100"
                   }`}
                 >
-                  🏫 练习大厅
+                  <Home className="w-3.5 h-3.5" />
+                  <span>{uiTranslate("🏫 练习大厅", isEnglishMode, "练习大厅")}</span>
                 </button>
                 <button
                   onClick={() => setCurrentPage("library")}
@@ -548,13 +565,14 @@ export default function App() {
                   }`}
                 >
                   <BookOpen className="w-3.5 h-3.5 text-amber-600" />
-                  <span>个人收藏馆</span>
+                  <span>{uiTranslate("个人收藏馆", isEnglishMode, "个人收藏馆")}</span>
                 </button>
               </>
             )}
             {currentPage === "training" && (
               <div className="px-3 py-1 bg-amber-50 border border-amber-300 rounded-lg text-xs font-mono font-bold text-amber-700 flex items-center gap-1 animate-pulse">
-                <span>⚡️ 锁定深度熟化练习中...</span>
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>{isEnglishMode ? "Deep Practice Active..." : "锁定深度熟化练习中..."}</span>
               </div>
             )}
           </div>
@@ -579,6 +597,7 @@ export default function App() {
                 practiceTimes={practiceTimes}
                 practiceMode={practiceMode}
                 setPracticeMode={setPracticeMode}
+                isEnglishMode={isEnglishMode}
               />
             </motion.div>
           )}
@@ -605,6 +624,7 @@ export default function App() {
                   setCurrentPage("start");
                   setActiveCards([]);
                 }}
+                isEnglishMode={isEnglishMode}
               />
             </motion.div>
           )}
@@ -622,6 +642,7 @@ export default function App() {
                 practiceTimes={practiceTimes}
                 onGoBack={() => setCurrentPage("start")}
                 onImportData={handleImportData}
+                isEnglishMode={isEnglishMode}
               />
             </motion.div>
           )}
@@ -642,7 +663,14 @@ export default function App() {
 
       {/* Mascot Companion rendered conditionally with state bindings */}
       {showMascot && (
-        <MascotComponent currentPage={currentPage} lastAction={lastAction} voiceType={voiceType} />
+        <MascotComponent 
+          currentPage={currentPage} 
+          lastAction={lastAction} 
+          voiceType={voiceType} 
+          isEnglishMode={isEnglishMode}
+          onToggleEnglishMode={() => setIsEnglishMode(p => !p)}
+          practiceMode={practiceMode}
+        />
       )}
 
       {/* Footer information bar */}

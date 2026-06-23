@@ -7,6 +7,7 @@ interface TracingKanaProps {
   active: boolean;
   displayRomaji: string;
   romajiProgress: string; // what the user has currently typed for this kana (e.g., "s" for "sa")
+  isEnglishMode?: boolean;
 }
 
 export const TracingKana: React.FC<TracingKanaProps> = ({
@@ -15,6 +16,7 @@ export const TracingKana: React.FC<TracingKanaProps> = ({
   active,
   displayRomaji,
   romajiProgress,
+  isEnglishMode = false,
 }) => {
   // Let's create a beautiful traditional Japanese gridded paper (田字格)
   return (
@@ -35,19 +37,19 @@ export const TracingKana: React.FC<TracingKanaProps> = ({
 
       {/* Rarity/Progress indicator inside grid corner */}
       <div className="absolute top-1 right-2 text-[10px] font-mono text-stone-400 select-none">
-        {displayRomaji.toUpperCase()}
+        {displayRomaji === " " ? "SPACE" : displayRomaji.toUpperCase()}
       </div>
 
       {/* Main Calligraphic Character */}
       <div className="relative select-none text-center">
         {/* Underlay character - grayed out or placeholder */}
         <span
-          className={`text-5xl md:text-6xl font-serif font-semibold tracking-normal transition-colors duration-300 ${
+          className={`text-5xl md:text-6xl font-bold tracking-normal transition-colors duration-300 ${
             isCorrect ? "text-stone-300/40" : active ? "text-stone-800" : "text-stone-400"
           }`}
-          style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
+          style={{ fontFamily: isEnglishMode ? 'ui-sans-serif, system-ui, sans-serif' : '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
         >
-          {kana}
+          {kana === " " ? "␣" : kana}
         </span>
 
         {/* Animated Red-Ink Calligraphy Tracing Overlay (描红效果) */}
@@ -60,13 +62,13 @@ export const TracingKana: React.FC<TracingKanaProps> = ({
                 opacity: [0.3, 1, 0.95],
               }}
               transition={{ duration: 0.75, ease: "easeInOut" }}
-              className="absolute inset-0 text-5xl md:text-6xl font-serif text-rose-600 font-bold drop-shadow-[0_0_8px_rgba(225,29,72,0.6)]"
+              className="absolute inset-0 text-5xl md:text-6xl text-rose-600 font-bold drop-shadow-[0_0_8px_rgba(225,29,72,0.6)]"
               style={{
-                fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif',
-                WebkitTextStroke: "1.5px #e11d48",
+                fontFamily: isEnglishMode ? 'ui-sans-serif, system-ui, sans-serif' : '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif',
+                WebkitTextStroke: isEnglishMode ? "0px" : "1.5px #e11d48",
               }}
             >
-              {kana}
+              {kana === " " ? "␣" : kana}
             </motion.span>
           )}
         </AnimatePresence>
@@ -76,20 +78,20 @@ export const TracingKana: React.FC<TracingKanaProps> = ({
       <div className="absolute bottom-1 w-full text-center">
         {isCorrect ? (
           <span className="text-xs font-semibold text-rose-600 font-mono flex items-center justify-center gap-0.5">
-            ✓ {displayRomaji}
+            ✓ {displayRomaji === " " ? "SPACE" : displayRomaji}
           </span>
         ) : active ? (
           <div className="flex justify-center items-center font-mono text-xs">
             <span className="text-amber-600 font-bold underline bg-amber-50 px-1 rounded">
-              {romajiProgress || "..."}
+              {romajiProgress === " " ? "SPACE" : (romajiProgress || "...")}
             </span>
             <span className="text-stone-300">
-              {displayRomaji.substring(romajiProgress.length)}
+              {(displayRomaji === " " ? " " : displayRomaji).substring(romajiProgress.length)}
             </span>
           </div>
         ) : (
           <span className="text-xs text-stone-400 font-mono tracking-wider">
-            {displayRomaji}
+            {displayRomaji === " " ? "SPACE" : displayRomaji}
           </span>
         )}
       </div>
