@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { BookOpen, Sparkles, Calendar, RotateCw, ArrowLeft, Lightbulb, Hourglass, HelpCircle, Activity, Volume2, PenTool, Download, Upload } from "lucide-react";
+import { BookOpen, Sparkles, Calendar, RotateCw, ArrowLeft, Lightbulb, Hourglass, HelpCircle, Activity, Volume2, PenTool, Download, Upload, MessageSquare, Send, Bot, User, Trash2 } from "lucide-react";
 import { DICTIONARY, DictionaryItem, getDictionary } from "../data/dictionary";
 import { audioSynth } from "../utils/audio";
 import { CalligraphyCanvas } from "./CalligraphyCanvas";
@@ -13,6 +13,8 @@ interface CardLibraryPageProps {
   onGoBack: () => void;
   onImportData: (unlockedCards: string[], ptTimes: Record<string, number>, settings?: any) => void;
   isEnglishMode?: boolean;
+  customCards?: DictionaryItem[];
+  setCustomCards?: React.Dispatch<React.SetStateAction<DictionaryItem[]>>;
 }
 
 export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
@@ -21,13 +23,161 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
   onGoBack,
   onImportData,
   isEnglishMode = false,
+  customCards = [],
+  setCustomCards,
 }) => {
-  const activeDict = getDictionary(isEnglishMode);
+  const activeDict = React.useMemo(() => {
+    return [...getDictionary(isEnglishMode), ...customCards];
+  }, [isEnglishMode, customCards]);
   const [selectedCard, setSelectedCard] = useState<DictionaryItem | null>(null);
   const [aiStory, setAiStory] = useState<string>("");
   const [loadingAi, setLoadingAi] = useState<boolean>(false);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [activeDetailTab, setActiveDetailTab] = useState<"story" | "drawing">("story");
+  const [activeDetailTab, setActiveDetailTab] = useState<"story" | "drawing" | "chat">("story");
+
+  // Persistent Card Live Chat History State
+  const [chatHistories, setChatHistories] = useState<Record<string, { role: "user" | "model"; content: string }[]>>(() => {
+    try {
+      const stored = localStorage.getItem("fifty_sound_chat_histories");
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [chatInput, setChatInput] = useState<string>("");
+  const [loadingChat, setLoadingChat] = useState<boolean>(false);
+
+  // Triggered dynamically when user switches to chat tab
+  const getInitialChatGreeting = async (card: DictionaryItem) => {
+    const cardId = card.id;
+    if (chatHistories[cardId] && chatHistories[cardId].length > 0) return;
+
+    setLoadingChat(true);
+    try {
+      const res = await fetch("/api/card-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: card.kanji,
+          meaning: card.meaning,
+          isEnglish: isEnglishMode,
+          messages: [
+            { role: "user", content: isEnglishMode ? "Hello! Wake up and introduce yourself!" : "你好！请唤醒你的卡牌灵魂并作个自我介绍吧！" }
+          ]
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.reply) {
+        const initialMsgs = [
+          { role: "model" as const, content: data.reply }
+        ];
+        const nextHist = { ...chatHistories, [cardId]: initialMsgs };
+        setChatHistories(nextHist);
+        localStorage.setItem("fifty_sound_chat_histories", JSON.stringify(nextHist));
+      } else {
+        const fallback = isEnglishMode 
+          ? `Hello there! I am the card soul of "${card.kanji}". Thank you for bringing me to life through your perfect spelling! How can I help you explore my culture today? 🔮`
+          : `你好呀！我是“${card.kanji}”的卡牌之魂。感谢你用指尖完美的敲击将我唤醒！今天想和我聊点什么呢？ 🔮`;
+        const initialMsgs = [{ role: "model" as const, content: fallback }];
+        const nextHist = { ...chatHistories, [cardId]: initialMsgs };
+        setChatHistories(nextHist);
+        localStorage.setItem("fifty_sound_chat_histories", JSON.stringify(nextHist));
+      }
+    } catch (err) {
+      console.error(err);
+      const fallback = isEnglishMode 
+        ? `Hello there! I am the card soul of "${card.kanji}". Thank you for bringing me to life through your perfect spelling! How can I help you explore my culture today? 🔮`
+        : `你好呀！我是“${card.kanji}”的卡牌之魂。感谢你用指尖完美的敲击将我唤醒！今天想和我聊点什么呢？ 🔮`;
+      const initialMsgs = [{ role: "model" as const, content: fallback }];
+      const nextHist = { ...chatHistories, [cardId]: initialMsgs };
+      setChatHistories(nextHist);
+      localStorage.setItem("fifty_sound_chat_histories", JSON.stringify(nextHist));
+    } finally {
+      setLoadingChat(false);
+    }
+  };
+
+  // Trigger initial chat greeting on-demand
+  React.useEffect(() => {
+    if (activeDetailTab === "chat" && selectedCard) {
+      getInitialChatGreeting(selectedCard);
+    }
+  }, [activeDetailTab, selectedCard]);
+
+  const handleSendChatMessage = async () => {
+    if (!selectedCard || !chatInput.trim() || loadingChat) return;
+
+    const userMsg = chatInput.trim();
+    setChatInput("");
+    audioSynth.playTyping();
+
+    const cardId = selectedCard.id;
+    const currentHistory = chatHistories[cardId] || [];
+    const updatedHistoryWithUser = [
+      ...currentHistory,
+      { role: "user" as const, content: userMsg }
+    ];
+
+    const nextHistUser = { ...chatHistories, [cardId]: updatedHistoryWithUser };
+    setChatHistories(nextHistUser);
+    localStorage.setItem("fifty_sound_chat_histories", JSON.stringify(nextHistUser));
+
+    setLoadingChat(true);
+
+    try {
+      const res = await fetch("/api/card-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: selectedCard.kanji,
+          meaning: selectedCard.meaning,
+          isEnglish: isEnglishMode,
+          messages: updatedHistoryWithUser
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.reply) {
+        const finalHistory = [
+          ...updatedHistoryWithUser,
+          { role: "model" as const, content: data.reply }
+        ];
+        const nextHistModel = { ...chatHistories, [cardId]: finalHistory };
+        setChatHistories(nextHistModel);
+        localStorage.setItem("fifty_sound_chat_histories", JSON.stringify(nextHistModel));
+        audioSynth.playTypewriterBell();
+      } else {
+        const finalHistory = [
+          ...updatedHistoryWithUser,
+          { role: "model" as const, content: data.error || (isEnglishMode ? "My soul is floating away... Please try talking to me again." : "我的卡牌灵魂有些飘忽，没能听清你的话语。请再说一次吧！") }
+        ];
+        const nextHistModel = { ...chatHistories, [cardId]: finalHistory };
+        setChatHistories(nextHistModel);
+        localStorage.setItem("fifty_sound_chat_histories", JSON.stringify(nextHistModel));
+        audioSynth.playError();
+      }
+    } catch (err) {
+      console.error(err);
+      const finalHistory = [
+        ...updatedHistoryWithUser,
+        { role: "model" as const, content: isEnglishMode ? "Failed to connect to the cosmos... Try again." : "无法连接到宇宙奥秘，请稍后重试。" }
+      ];
+      const nextHistModel = { ...chatHistories, [cardId]: finalHistory };
+      setChatHistories(nextHistModel);
+      localStorage.setItem("fifty_sound_chat_histories", JSON.stringify(nextHistModel));
+      audioSynth.playError();
+    } finally {
+      setLoadingChat(false);
+    }
+  };
+
+  const handleClearChatHistory = (cardId: string) => {
+    const nextHist = { ...chatHistories };
+    delete nextHist[cardId];
+    setChatHistories(nextHist);
+    localStorage.setItem("fifty_sound_chat_histories", JSON.stringify(nextHist));
+    audioSynth.playCarriageReturn();
+  };
 
   const [customNotification, setCustomNotification] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
   const [customConfirm, setCustomConfirm] = useState<{ text: string; onConfirm: () => void } | null>(null);
@@ -194,10 +344,10 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: isEnglishMode ? (LANG_MAPPING[item.id]?.title || item.kanji) : item.kanji,
+          name: item.kanji,
           kana: item.kanaStr,
           romaji: item.segments.map(s => s.displayRomaji).join(""),
-          meaning: isEnglishMode ? (LANG_MAPPING[item.id]?.meaning || item.meaning) : item.meaning,
+          meaning: item.meaning,
           isEnglish: isEnglishMode,
         }),
       });
@@ -220,8 +370,8 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
   const filteredCollection = activeDict.filter(item => {
     // Category filter logic
     if (categoryFilter === "all") return true;
-    if (categoryFilter === "unlocked" || categoryFilter === "collected") return collectedIds.includes(item.id);
-    if (categoryFilter === "locked") return !collectedIds.includes(item.id);
+    if (categoryFilter === "unlocked" || categoryFilter === "collected") return collectedIds.includes(item.id) || item.category === "custom";
+    if (categoryFilter === "locked") return !collectedIds.includes(item.id) && item.category !== "custom";
     return item.category === categoryFilter;
   });
 
@@ -269,11 +419,11 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
               <h3 className="font-mono font-bold text-stone-800 text-xs tracking-wide">
-                {isEnglishMode ? "KATAKATA SYSTEM ARCHIVE HUB" : "KATAKATA SYSTEM ARCHIVE HUB 【打字集卡机存档中心】"}
+                KATAKATA SYSTEM ARCHIVE HUB 【打字集卡机存档中心】
               </h3>
             </div>
             <p className="text-[12px] text-stone-550 leading-relaxed font-sans max-w-xl">
-              💡 <span className="font-semibold text-stone-700">{isEnglishMode ? "Guide: " : "说明："}</span>{isEnglishMode ? "All collection progress is saved in this local browser. Clear browsing cookies might wipe progress, so export backups regularly." : "卡牌保存在本浏览器中,清除浏览器数据会导致丢失,建议定期导出备份。"}
+              💡 <span className="font-semibold text-stone-700">说明：</span>卡牌与练习记录均保存在当前浏览器本地。若清除浏览器缓存数据可能会导致丢失，建议您定期导出 JSON 格式备份文件。
             </p>
           </div>
 
@@ -298,10 +448,10 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   ? "bg-white border-stone-300 text-stone-600 hover:bg-stone-50 hover:text-stone-900 active:scale-95"
                   : "bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed opacity-50"
               }`}
-              title={isEnglishMode ? "Export current collect progress to JSON file" : "导出当前集卡进度与统计到本地文件"}
+              title="导出当前集卡进度与统计到本地文件"
             >
               <Download className="w-3.5 h-3.5 text-amber-700" />
-              <span>{isEnglishMode ? "Export progress" : "导出存档"}</span>
+              <span>导出存档</span>
             </button>
 
             <button
@@ -315,10 +465,10 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   ? "bg-stone-900 border-transparent text-stone-50 hover:bg-stone-800 hover:text-white active:scale-95"
                   : "bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed opacity-50"
               }`}
-              title={isEnglishMode ? "Load past JSON archive file" : "选择一份历史 Katakata JSON 存档进行恢复"}
+              title="选择一份历史 Katakata JSON 存档进行恢复"
             >
               <Upload className="w-3.5 h-3.5 text-amber-400" />
-              <span>{isEnglishMode ? "Import backup" : "导入存档"}</span>
+              <span>导入存档</span>
             </button>
           </div>
         </div>
@@ -342,6 +492,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
           { id: "nature", label: isEnglishMode ? "自然与动物" : "自然风物" },
           { id: "culture", label: isEnglishMode ? "物品与概念" : "民俗文化" },
           { id: "food", label: isEnglishMode ? "西餐美味" : "日本美味" },
+          { id: "custom", label: isEnglishMode ? "Custom Docs" : "自定义词组" },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -360,7 +511,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
       {/* Collection Binder Array */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {filteredCollection.map((item) => {
-          const isCollected = collectedIds.includes(item.id);
+          const isCollected = collectedIds.includes(item.id) || item.category === "custom";
           const practiceRounds = practiceTimes[item.id] || 0;
 
           // Custom exquisite visual styling depending on rarity & collected states
@@ -419,11 +570,11 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                 </span>
                 {isCollected ? (
                   <span className="text-[8px] bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded font-black border border-emerald-200">
-                    {isEnglishMode ? "★ Collected" : "★ 已收藏"}
+                    ★ 已收藏
                   </span>
                 ) : (
                   <span className="text-[8px] bg-stone-200/80 text-stone-500 px-1.5 rounded font-bold">
-                    {isEnglishMode ? "🔒 Locked" : "🔒 未完成"}
+                    🔒 未解锁
                   </span>
                 )}
               </div>
@@ -434,9 +585,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   <div className={`w-8 h-8 rounded-full border-2 border-solid flex items-center justify-center font-serif text-[9px] font-bold ${
                     item.rarity === "SSR" ? "border-red-600 text-red-600" : "border-amber-700 text-amber-700"
                   }`}>
-                    {isEnglishMode 
-                      ? (item.rarity === "SSR" ? "SSR" : item.rarity === "SR" ? "SR" : "R")
-                      : (item.rarity === "SSR" ? "神珍" : item.rarity === "SR" ? "极品" : "珍藏")}
+                    {item.rarity === "SSR" ? "神珍" : item.rarity === "SR" ? "极品" : "珍藏"}
                   </div>
                 </div>
               )}
@@ -458,10 +607,10 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                       className="text-2xl font-extrabold text-stone-950 font-serif drop-shadow-sm select-none tracking-wide"
                       style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
                     >
-                      {isEnglishMode ? (LANG_MAPPING[item.id]?.title || item.kanji) : item.kanji}
+                      {item.kanji}
                     </h3>
                     <p className="text-[10px] font-mono text-stone-500 font-bold italic">
-                      {isEnglishMode ? `(${item.kanji} • ${item.kanaStr})` : `(${item.kanaStr})`}
+                      {isEnglishMode ? "" : `(${item.kanaStr})`}
                     </p>
                   </>
                 ) : (
@@ -473,7 +622,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                       {item.segments.map(s => s.kana).join("")}
                     </span>
                     <p className="text-[9px] font-mono text-stone-400">
-                      {isEnglishMode ? "Practice to unlock" : "未解锁隐藏词条"}
+                      未解锁隐藏词条
                     </p>
                   </>
                 )}
@@ -487,7 +636,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                 {isCollected && (
                   <span className="text-[9px] font-mono text-stone-500 flex items-center gap-0.5 font-bold">
                     <RotateCw className="w-2.5 h-2.5 text-stone-400" />
-                    {isEnglishMode ? `${practiceRounds} Rounds` : `${practiceRounds}轮连练`}
+                    {practiceRounds}轮温故
                   </span>
                 )}
               </div>
@@ -602,6 +751,19 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   <PenTool className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
                   <span>手写描红临摹</span>
                 </button>
+                <button
+                  onClick={() => {
+                    setActiveDetailTab("chat");
+                  }}
+                  className={`flex-1 pb-2 text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-1 ${
+                    activeDetailTab === "chat"
+                      ? "border-amber-500 text-stone-950 font-black"
+                      : "border-transparent text-stone-400 hover:text-stone-700"
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-sky-500" />
+                  <span>💬 角色宿命私聊</span>
+                </button>
               </div>
 
               {activeDetailTab === "story" && (
@@ -688,6 +850,126 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
               {activeDetailTab === "drawing" && (
                 <div className="space-y-4 animate-fadeIn">
                   <CalligraphyCanvas segments={selectedCard.segments} />
+                </div>
+              )}
+
+              {activeDetailTab === "chat" && (
+                <div className="space-y-3 flex flex-col h-[350px] bg-stone-50 border border-stone-200 rounded-xl p-3 relative overflow-hidden animate-fadeIn select-text">
+                  {/* Header/Controls inside chat panel */}
+                  <div className="flex items-center justify-between border-b border-stone-200 pb-2 bg-stone-50 z-10 select-none">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                      <span className="text-[11px] font-mono font-bold text-stone-600 uppercase">
+                        {isEnglishMode ? "Card Spirit Chat Link" : "卡牌元魂私教联结"}
+                      </span>
+                    </div>
+                    {(chatHistories[selectedCard.id] || []).length > 0 && (
+                      <button
+                        onClick={() => handleClearChatHistory(selectedCard.id)}
+                        className="text-[10px] text-rose-600 hover:text-rose-800 flex items-center gap-1 transition-all font-mono font-bold cursor-pointer hover:underline"
+                        title={isEnglishMode ? "Clear chat memory" : "清除对话记忆"}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>{isEnglishMode ? "Clear" : "洗脑清空"}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Messages Area */}
+                  <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 pb-2 scroll-smooth">
+                    {(() => {
+                      const messages = chatHistories[selectedCard.id] || [];
+                      
+                      if (messages.length === 0 && loadingChat) {
+                        return (
+                          <div className="h-full flex flex-col items-center justify-center space-y-2 text-center text-stone-400 select-none">
+                            <motion.div
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                              className="w-5 h-5 rounded-full border border-stone-400 border-t-transparent"
+                            />
+                            <span className="text-xs font-mono">{isEnglishMode ? "Waking up the Card's Soul..." : "正在唤醒卡牌之魂..."}</span>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <>
+                          {messages.map((msg, idx) => {
+                            const isUser = msg.role === "user";
+                            return (
+                              <div
+                                key={idx}
+                                className={`flex items-start gap-2 ${isUser ? "justify-end" : "justify-start"}`}
+                              >
+                                {!isUser && (
+                                  <div className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
+                                    <Bot className="w-3.5 h-3.5 text-amber-600" />
+                                  </div>
+                                )}
+                                <div
+                                  className={`p-2.5 max-w-[82%] text-xs leading-relaxed rounded-2xl ${
+                                    isUser
+                                      ? "bg-stone-900 text-stone-50 rounded-tr-none shadow-sm font-sans"
+                                      : "bg-white border border-stone-250 text-stone-850 rounded-tl-none shadow-xs font-sans"
+                                  }`}
+                                >
+                                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                                </div>
+                                {isUser && (
+                                  <div className="w-6 h-6 rounded-lg bg-stone-900/10 border border-stone-900/20 flex items-center justify-center shrink-0">
+                                    <User className="w-3.5 h-3.5 text-stone-700" />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+
+                          {loadingChat && messages.length > 0 && (
+                            <div className="flex items-start gap-2 justify-start">
+                              <div className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
+                                <Bot className="w-3.5 h-3.5 text-amber-600" />
+                              </div>
+                              <div className="bg-white border border-stone-250 p-2.5 rounded-2xl rounded-tl-none flex items-center gap-1">
+                                <motion.div animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6 }} className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                                <motion.div animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.15 }} className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                                <motion.div animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.3 }} className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Input Form Area */}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSendChatMessage();
+                    }}
+                    className="flex gap-1.5 border-t border-stone-200 pt-2 bg-stone-50 z-10 select-none"
+                  >
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder={
+                        isEnglishMode
+                          ? "Type to chat with this card..."
+                          : "用中文输入你想和它说的话..."
+                      }
+                      disabled={loadingChat || !selectedCard}
+                      className="flex-1 px-3 py-2 rounded-lg text-xs bg-white border border-stone-300 focus:outline-hidden focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+                    />
+                    <button
+                      type="submit"
+                      disabled={loadingChat || !chatInput.trim() || !selectedCard}
+                      className="p-2 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:bg-stone-200 text-stone-950 disabled:text-stone-400 transition-colors cursor-pointer"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                    </button>
+                  </form>
                 </div>
               )}
 
@@ -791,10 +1073,10 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
       <div className="p-8 text-center border-2 border-dashed border-stone-300 rounded-2xl bg-stone-50 text-stone-400 font-serif">
         <BookOpen className="w-12 h-12 text-stone-300 mx-auto mb-2" />
         <p className="text-sm">
-          暂无符合当前过滤条件的名人闪卡。
+          {isEnglishMode ? "暂无符合当前过滤条件的英语词汇闪卡。" : "暂无符合当前过滤条件的名人闪卡。"}
         </p>
         <p className="text-xs text-stone-400 mt-1 font-sans">
-          开启拼写训练来解锁属于你的五十音大图鉴吧！
+          {isEnglishMode ? "开启拼写训练来解锁属于你的英语单词大图鉴吧！" : "开启拼写训练来解锁属于你的五十音大图鉴吧！"}
         </p>
       </div>
     );

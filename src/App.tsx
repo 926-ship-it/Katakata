@@ -58,6 +58,25 @@ export default function App() {
   // Selection for active training
   const [activeCards, setActiveCards] = useState<DictionaryItem[]>([]);
   const [activeDurationMs, setActiveDurationMs] = useState<number>(3 * 60 * 1000);
+
+  // Custom uploaded/pasted user dictionary cards
+  const [customCards, setCustomCards] = useState<DictionaryItem[]>(() => {
+    try {
+      const stored = localStorage.getItem("fifty_sound_custom_cards");
+      return stored ? JSON.parse(stored) : [];
+    } catch (_) {
+      return [];
+    }
+  });
+
+  // Sync custom cards
+  useEffect(() => {
+    try {
+      localStorage.setItem("fifty_sound_custom_cards", JSON.stringify(customCards));
+    } catch (e) {
+      console.warn("localStorage restricted", e);
+    }
+  }, [customCards]);
   
   // Last newly unlocked cards representation for ceremony modal
   const [ceremonyCards, setCeremonyCards] = useState<DictionaryItem[]>([]);
@@ -177,7 +196,7 @@ export default function App() {
   }, [currentPage, ceremonyCards, activeCeremonyIdx]);
 
   // Handler on training cycle finish
-  const handleTrainingFinished = (rounds: number) => {
+  const handleTrainingFinished = (rounds: number, kpm?: number, accuracy?: number, xpGained?: number) => {
     if (activeCards.length === 0) return;
 
     // Update practice times
@@ -190,6 +209,26 @@ export default function App() {
       localStorage.setItem("fifty_sound_practice_times", JSON.stringify(nextPractices));
     } catch (e) {
       console.warn("localStorage restricted", e);
+    }
+
+    // Save session logs for dynamic analytics trend visualization
+    if (kpm !== undefined && accuracy !== undefined) {
+      try {
+        const storedLogs = localStorage.getItem("fifty_sound_session_log");
+        const logs = storedLogs ? JSON.parse(storedLogs) : [];
+        const newLog = {
+          date: new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+          kpm: kpm,
+          accuracy: accuracy,
+          xpGained: xpGained || 0,
+          timestamp: Date.now()
+        };
+        // Keep last 15 sessions for the chart
+        const updatedLogs = [...logs, newLog].slice(-15);
+        localStorage.setItem("fifty_sound_session_log", JSON.stringify(updatedLogs));
+      } catch (e) {
+        console.warn("localStorage log write failed", e);
+      }
     }
 
     // Handle card unlock criteria (needs at least 3 correct spellings)
@@ -598,6 +637,8 @@ export default function App() {
                 practiceMode={practiceMode}
                 setPracticeMode={setPracticeMode}
                 isEnglishMode={isEnglishMode}
+                customCards={customCards}
+                setCustomCards={setCustomCards}
               />
             </motion.div>
           )}
@@ -643,6 +684,8 @@ export default function App() {
                 onGoBack={() => setCurrentPage("start")}
                 onImportData={handleImportData}
                 isEnglishMode={isEnglishMode}
+                customCards={customCards}
+                setCustomCards={setCustomCards}
               />
             </motion.div>
           )}

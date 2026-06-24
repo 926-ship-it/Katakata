@@ -11,7 +11,7 @@ import { uiTranslate, LANG_MAPPING } from "../utils/lang";
 interface TrainingPageProps {
   items: DictionaryItem[];
   durationMs: number;
-  onFinished: (rounds: number) => void;
+  onFinished: (rounds: number, kpm?: number, accuracy?: number, xpGained?: number) => void;
   onQuit: () => void;
   practiceMode?: "typing" | "handwriting";
   onKeyStrike?: (action: "correct" | "error" | "complete") => void;
@@ -52,6 +52,42 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   const [errorFlash, setErrorFlash] = useState<boolean>(false);
   const [handwritingPassed, setHandwritingPassed] = useState<boolean>(false);
 
+  // Game/RPG Arcade States
+  const [combo, setCombo] = useState<number>(0);
+  const [maxCombo, setMaxCombo] = useState<number>(0);
+  const [correctCount, setCorrectCount] = useState<number>(0);
+  const [errorCount, setErrorCount] = useState<number>(0);
+  const [sessionXpEarned, setSessionXpEarned] = useState<number>(0);
+  const [xpPopups, setXpPopups] = useState<{ id: number; text: string; x: number; y: number }[]>([]);
+  const startTimeRef = useRef<number>(Date.now());
+
+  const [xp, setXp] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem("fifty_sound_xp") || "0");
+    } catch {
+      return 0;
+    }
+  });
+
+  const triggerXpGain = (points: number, label: string = "XP") => {
+    const nextXp = xp + points;
+    setXp(nextXp);
+    setSessionXpEarned(prev => prev + points);
+    try {
+      localStorage.setItem("fifty_sound_xp", String(nextXp));
+    } catch (e) {
+      console.warn(e);
+    }
+    
+    const newPopup = {
+      id: Date.now() + Math.random(),
+      text: `+${points} ${label}`,
+      x: Math.random() * 80 - 40,
+      y: Math.random() * -60 - 30,
+    };
+    setXpPopups(prev => [...prev, newPopup]);
+  };
+
   useEffect(() => {
     setHandwritingPassed(false);
   }, [currentItemIdx]);
@@ -67,6 +103,17 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   showQuitConfirmRef.current = showQuitConfirm;
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const lastProcessedKeyRef = useRef<{ key: string; time: number } | null>(null);
+
+  // Automatically keep the keyboard focused on load / item changes for mobile typing comfort.
+  // On desktop, focusing a hidden input is unnecessary and can cause double-triggering or focus conflicts with extensions.
+  useEffect(() => {
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+    if (isMobileDevice && practiceMode !== "handwriting" && !isPaused && !timerFinished && !showQuitConfirm) {
+      inputRef.current?.focus();
+    }
+  }, [currentItemIdx, isPaused, timerFinished, showQuitConfirm, practiceMode]);
 
   // Background and minimization resilience:
   // Instead of subtracting 1 second progressively, we compute the delta against endTime.
@@ -132,6 +179,15 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
     const isValidKey = /^[a-z]$/.test(key) || (isEnglishMode && key === " ");
     if (!isValidKey) return;
 
+    // De-duplicate rapid duplicate events (e.g. from keydown + onChange firing together within 30ms)
+    const now = Date.now();
+    if (lastProcessedKeyRef.current && 
+        lastProcessedKeyRef.current.key === key && 
+        now - lastProcessedKeyRef.current.time < 30) {
+      return;
+    }
+    lastProcessedKeyRef.current = { key, time: now };
+
     setPressedKey(key === " " ? "SPACE" : key.toUpperCase());
     setTimeout(() => setPressedKey(null), 150);
 
@@ -147,8 +203,21 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       audioSynth.playTyping();
       audioSynth.playTypewriterBell();
       
+      setCorrectCount(prev => prev + 1);
+      const nextCombo = combo + 1;
+      setCombo(nextCombo);
+      if (nextCombo > maxCombo) setMaxCombo(nextCombo);
+
       // Speak the individual syllable completed!
       audioSynth.speakJapanese(segment.kana);
+      
+      // Standard XP reward
+      triggerXpGain(3, "XP");
+      
+      // Extra combo rewards for multiples of 5
+      if (nextCombo >= 5 && nextCombo % 5 === 0) {
+        triggerXpGain(Math.floor(nextCombo / 5) * 2, "Combo! 🔥");
+      }
       
       setRomajiProgress("");
       
@@ -158,6 +227,9 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         setWordCorrect(true);
         audioSynth.playFanfare();
         if (onKeyStrike) onKeyStrike("complete");
+
+        // Reward major word-complete bonus!
+        triggerXpGain(10 + item.segments.length * 2, "Word Mastery ✨");
         
         // Read out the entire name/phrase with a gorgeous micro-delay
         setTimeout(() => {
@@ -182,12 +254,26 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       // Mid-spelling of romaji character (e.g. typed 't' of 'tsu')
       audioSynth.playTyping();
       setRomajiProgress(proposedString);
+      
+      setCorrectCount(prev => prev + 1);
+      const nextCombo = combo + 1;
+      setCombo(nextCombo);
+      if (nextCombo > maxCombo) setMaxCombo(nextCombo);
+
+      triggerXpGain(1, "XP");
+      if (nextCombo >= 5 && nextCombo % 5 === 0) {
+        triggerXpGain(Math.floor(nextCombo / 5) * 2, "Combo! 🔥");
+      }
+
       if (onKeyStrike) onKeyStrike("correct");
     } else {
       // Typing error/deviation! Trigger a warning shake and reset entire word.
       audioSynth.playError();
       setErrorFlash(true);
       setTimeout(() => setErrorFlash(false), 300);
+
+      setErrorCount(prev => prev + 1);
+      setCombo(0);
 
       // Reset to first kana segment on error (forced deep learning reinforcement!)
       setCurrentSegmentIdx(0);
@@ -196,17 +282,29 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
     }
   };
 
+  // Keep processInputKey fresh using a Ref to avoid stale closure issues in the event listener
+  const processInputKeyRef = useRef(processInputKey);
+  useEffect(() => {
+    processInputKeyRef.current = processInputKey;
+  });
+
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
+      // If the user is typing inside an input or textarea element, ignore the window-level keydown 
+      // listener to prevent double-triggering. We use tagNames instead of instanceof to be robust inside iframes/realms.
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
       const key = e.key === " " ? " " : e.key.toLowerCase();
-      processInputKey(key);
+      processInputKeyRef.current(key);
     };
 
     window.addEventListener("keydown", handleKeyPress);
     return () => {
       window.removeEventListener("keydown", handleKeyPress);
     };
-  }, [currentSegmentIdx, romajiProgress, item, isPaused, timerFinished, wordCorrect, onKeyStrike, isEnglishMode, practiceMode, currentItemIdx, items]);
+  }, []);
 
   // Formatter for time display
   const formatTime = (ms: number) => {
@@ -236,11 +334,23 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
   // Triggers final wrap-up and submits the score to claim the card
   const handleClaimCard = () => {
-    onFinished(completedRounds);
+    const minutes = (durationMs - Math.max(0, timeLeftMs)) / 60000 || 0.1;
+    const finalKpm = correctCount > 0 ? Math.round(correctCount / minutes) : 0;
+    const totalKeys = correctCount + errorCount;
+    const finalAccuracy = totalKeys > 0 ? Math.round((correctCount / totalKeys) * 100) : 100;
+
+    onFinished(completedRounds, finalKpm, finalAccuracy, sessionXpEarned);
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 px-2 md:px-0">
+    <div 
+      className="max-w-3xl mx-auto space-y-6 px-2 md:px-0 cursor-pointer"
+      onClick={() => {
+        if (practiceMode !== "handwriting" && !isPaused && !timerFinished && !showQuitConfirm) {
+          inputRef.current?.focus();
+        }
+      }}
+    >
       {/* Upper bar: Quit & Controls */}
       <div className="flex items-center justify-between">
         <button
@@ -308,7 +418,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         {items.length > 1 && (
           <div className="flex flex-wrap items-center justify-center gap-2 pb-4 pt-4 border-b border-stone-200 select-none">
             <span className="text-[9px] font-mono font-bold text-stone-400 uppercase tracking-widest mr-1">
-              {isEnglishMode ? "DECK QUEUE:" : "联训序列:"}
+              联训序列:
             </span>
             {items.map((it, idx) => {
               const isActive = idx === currentItemIdx;
@@ -321,7 +431,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                       : "bg-stone-200 text-stone-500 border border-stone-300 opacity-60"
                   }`}
                 >
-                  {isEnglishMode ? (LANG_MAPPING[it.id]?.title || it.kanji) : it.kanji}
+                  {it.kanji}
                 </div>
               );
             })}
@@ -354,7 +464,27 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
           </button>
 
           {/* Animated Card Body Container */}
-          <div className="flex-1 overflow-hidden py-4 flex justify-center">
+          <div className="flex-1 overflow-hidden py-4 flex justify-center relative">
+            {/* Floating Arcade XP Popups */}
+            <AnimatePresence>
+              {xpPopups.map(popup => (
+                <motion.div
+                  key={popup.id}
+                  initial={{ opacity: 1, scale: 0.8, y: 0 }}
+                  animate={{ opacity: 0, scale: 1.25, y: popup.y, x: popup.x }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.8, ease: "easeOut" }}
+                  onAnimationComplete={() => {
+                    setXpPopups(prev => prev.filter(p => p.id !== popup.id));
+                  }}
+                  className="absolute pointer-events-none text-amber-500 font-mono font-black text-sm z-50 drop-shadow-md select-none"
+                  style={{ top: "45%", left: "50%" }}
+                >
+                  {popup.text}
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
             <AnimatePresence mode="wait" custom={slideDirection}>
               <motion.div
                 key={currentItemIdx}
@@ -367,10 +497,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
               >
                 <div className="text-center">
                   <span className="text-[10px] text-amber-800 font-mono tracking-wider font-bold uppercase bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">
-                    {isEnglishMode ? (LANG_MAPPING[item.id]?.categoryName || uiTranslate(item.categoryName, isEnglishMode, item.categoryName)) : item.categoryName} ・ {item.rarity} {isEnglishMode ? "Rarity" : "稀有度"}
+                    {item.categoryName} ・ {item.rarity} 稀有度
                   </span>
                   <h3 className="text-stone-750 font-medium font-serif text-sm mt-1.5 opacity-90 leading-relaxed max-w-lg mx-auto">
-                    {isEnglishMode ? (LANG_MAPPING[item.id]?.meaning || item.meaning) : item.meaning}
+                    {item.meaning}
                   </h3>
                 </div>
 
@@ -452,6 +582,29 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     }`}>
                       {getExpectedPrefixHelp()}
                     </div>
+
+                    {/* Live Game Combo and XP Info Overlay */}
+                    {practiceMode !== "handwriting" && (
+                      <div className="flex items-center justify-between gap-4 mt-2 px-3 py-1 bg-stone-900/5 rounded-lg border border-stone-200/50 text-xs font-mono select-none">
+                        <div className="flex items-center gap-1.5 text-stone-500">
+                          <span>LEVEL</span>
+                          <span className="font-black text-stone-800">{Math.floor(xp / 250) + 1}</span>
+                          <span className="text-[10px] text-stone-400">({xp % 250}/250 XP)</span>
+                        </div>
+                        
+                        {combo > 0 && (
+                          <motion.div
+                            key={combo}
+                            initial={{ scale: 0.8, rotate: -5 }}
+                            animate={{ scale: [1, 1.25, 1], rotate: [0, 5, 0] }}
+                            className="flex items-center gap-1 font-black text-amber-600 tracking-wider"
+                          >
+                            <span>{combo} COMBO</span>
+                            <span className="animate-pulse">🔥</span>
+                          </motion.div>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
               </motion.div>
@@ -547,6 +700,40 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Hidden Input for Mobile Native Keyboard Triggering */}
+            <div className="flex flex-col items-center justify-center pt-3 gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value=""
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val.length > 0) {
+                    const lastChar = val[val.length - 1];
+                    processInputKey(lastChar.toLowerCase());
+                  }
+                  e.target.value = "";
+                }}
+                className="opacity-0 absolute -z-10 w-1 h-1 pointer-events-none"
+                aria-hidden="true"
+              />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  audioSynth.playCardSlide();
+                  inputRef.current?.focus();
+                }}
+                className="md:hidden px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-95 transition-all"
+              >
+                <Keyboard className="w-4 h-4 text-stone-950" />
+                <span>唤起手机虚拟键盘 / 录入按键</span>
+              </button>
+              <p className="md:hidden text-[9px] text-stone-400 font-mono text-center">
+                (提示: 触摸屏幕任意空白位置，亦可自动触发并激活手机键盘输入)
+              </p>
+            </div>
           </div>
         )}
       </div>
@@ -577,53 +764,62 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                   className="text-3xl font-black text-stone-950 font-serif"
                   style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
                 >
-                  {isEnglishMode ? "⏳ Practice Time Complete!" : "⏳ 训练时间达成！"}
+                  ⏳ 训练时间达成！
                 </h2>
                 <p className="text-xs font-mono text-stone-400">SESSION TIME CYCLE ELAPSED</p>
                 <div className="text-stone-600 text-sm">
-                  {isEnglishMode ? (
-                    <p>
-                      You completed{" "}
-                      <span className="font-mono text-lg font-black text-amber-600">
-                        {completedRounds}
-                      </span>{" "}
-                      continuous practice rounds for{" "}
-                      <span className="font-bold text-stone-900 font-serif">
-                        "{items.length > 1 ? items.map((it) => LANG_MAPPING[it.id]?.title || it.kanji).join(", ") : (LANG_MAPPING[item.id]?.title || item.kanji)}"
-                      </span>!
-                    </p>
-                  ) : (
-                    <p>
-                      你对{items.length > 1 ? "人名组合" : "人名"}{" "}
-                      <span className="font-bold text-stone-900 font-serif">
-                        “{items.length > 1 ? items.map((it) => it.kanji).join("、") : item.kanji}”
-                      </span>{" "}
-                      完成了连续{" "}
-                      <span className="font-mono text-lg font-black text-amber-600">
-                        {completedRounds}
-                      </span>{" "}
-                      轮极致熟化拼写！
-                    </p>
-                  )}
+                  <p>
+                    你对{isEnglishMode ? (items.length > 1 ? "单词组合" : "单词") : (items.length > 1 ? "人名组合" : "人名")}{" "}
+                    <span className="font-bold text-stone-900 font-serif">
+                      “{items.length > 1 ? items.map((it) => it.kanji).join("、") : item.kanji}”
+                    </span>{" "}
+                    完成了连续{" "}
+                    <span className="font-mono text-lg font-black text-amber-600">
+                      {completedRounds}
+                    </span>{" "}
+                    轮极致熟化拼写！
+                  </p>
                 </div>
               </div>
+
+              {/* Dynamic stats overview panel */}
+              {practiceMode !== "handwriting" && (
+                <div className="grid grid-cols-2 gap-3 p-3 bg-stone-100/80 rounded-xl border border-stone-200/60 text-left">
+                  <div>
+                    <span className="text-[10px] font-mono text-stone-400 block uppercase">{isEnglishMode ? "SPEED (KPM)" : "打字速率 (KPM)"}</span>
+                    <span className="text-base font-black text-stone-900 font-mono">
+                      {correctCount > 0 ? Math.round(correctCount / ((durationMs - Math.max(0, timeLeftMs)) / 60000 || 0.1)) : 0} <span className="text-[10px] font-normal text-stone-500">键/分</span>
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono text-stone-400 block uppercase">{isEnglishMode ? "ACCURACY" : "拼写正确率"}</span>
+                    <span className="text-base font-black text-stone-900 font-mono">
+                      {correctCount + errorCount > 0 ? Math.round((correctCount / (correctCount + errorCount)) * 100) : 100}%
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono text-stone-400 block uppercase">{isEnglishMode ? "MAX COMBO" : "最高连击数"}</span>
+                    <span className="text-base font-black text-orange-600 font-mono">
+                      {maxCombo} <span className="text-[10px] font-normal text-stone-500">Hits</span>
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono text-stone-400 block uppercase">{isEnglishMode ? "XP EARNED" : "本轮获得修为"}</span>
+                    <span className="text-base font-black text-amber-600 font-mono">
+                      +{sessionXpEarned} <span className="text-[10px] font-normal text-stone-500">XP</span>
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {completedRounds >= 3 ? (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-left">
                   <div className="flex items-center gap-1.5 text-amber-800 font-bold text-xs font-mono">
                     <AlertCircle className="w-4 h-4 text-amber-600" />
-                    <span>CONGRATULATIONS: CARD UNLOCKED!</span>
+                    <span>恭喜：卡牌已解锁 CONGRATULATIONS: CARD UNLOCKED!</span>
                   </div>
                   <p className="text-stone-600 text-xs leading-relaxed">
-                    {isEnglishMode ? (
-                      <>
-                        Thanks to your dedicated practice, your fingers have memorized these words. You successfully unlocked the card! You can view it in the Card Ledger anytime and prompt <b>Gemini AI to analyze its unique cultural origin</b>.
-                      </>
-                    ) : (
-                      <>
-                        由于你的辛勤练习，你的手指已经记住了这个名字。你成功得到了专属卡牌！你可以随时通过收藏馆查看它，并能请求 <b>Gemini AI 分解它的独特文化轶事</b>。
-                      </>
-                    )}
+                    由于你的辛勤练习，你的手指已经记住了这个{isEnglishMode ? "英文单词" : "名字"}。你成功得到了专属卡牌！你可以随时通过收藏馆查看它，并能请求 <b>Gemini AI 分解它的独特文化轶事</b>。
                   </p>
                 </div>
               ) : (
@@ -633,15 +829,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     <span>练习轮数偏少 UNLOCKED CRITERIA ALERT</span>
                   </div>
                   <p className="text-stone-600 text-xs leading-relaxed">
-                    {isEnglishMode ? (
-                      <>
-                        This card requires at least <b>3</b> completed rounds to unlock (current: {completedRounds} rounds). Don't give up! We recommend starting another quick training round to build solid muscle memory!
-                      </>
-                    ) : (
-                      <>
-                        本词最少需要成功输入 <b>3</b> 轮（当前完成：{completedRounds} 轮），才能够成功解锁。不要气馁，建议再次开启一个短训练周期，深度扎实练习！
-                      </>
-                    )}
+                    本词最少需要成功输入 <b>3</b> 轮（当前完成：{completedRounds} 轮），才能够成功解锁。不要气馁，建议再次开启一个短训练周期，深度扎实练习！
                   </p>
                 </div>
               )}
@@ -653,7 +841,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                       onClick={onQuit}
                       className="flex-1 py-3 px-4 rounded-xl border border-stone-300 bg-white hover:bg-stone-50 text-stone-700 font-bold text-sm transition-all cursor-pointer"
                     >
-                      {isEnglishMode ? "Dashboard" : "返回首页"}
+                      返回首页
                     </button>
                     <button
                       onClick={() => {
@@ -667,7 +855,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                       className="flex-1 py-3 px-4 rounded-xl bg-stone-900 hover:bg-stone-850 text-stone-100 font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-1"
                     >
                       <RefreshCw className="w-4 h-4" />
-                      <span>{isEnglishMode ? "Restart" : "重新开始"}</span>
+                      <span>重新开始</span>
                     </button>
                   </>
                 ) : (
@@ -675,7 +863,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     onClick={handleClaimCard}
                     className="w-full py-3.5 px-4 rounded-xl bg-stone-900 hover:bg-amber-600 hover:text-stone-950 text-stone-50 font-black text-sm transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer cursor-custom select-none"
                   >
-                    <span>{isEnglishMode ? "🎁 Claim & Permanently Reveal Card" : "🎁 翻开并永久收录此闪卡"}</span>
+                    <span>🎁 翻开并永久收录此闪卡</span>
                   </button>
                 )}
               </div>
@@ -702,19 +890,13 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
               <div className="space-y-2">
                 <h3 className="text-xl font-black text-stone-950 font-serif">
-                  {isEnglishMode ? "Are you sure you want to quit and discard progress?" : "确定要作废本次练习并退出吗？"}
+                  确定要作废本次练习并退出吗？
                 </h3>
                 <p className="text-xs font-mono text-stone-400">ABORT AND TERMINATE PRACTICE CURRENT CYCLE</p>
                 <div className="text-xs text-stone-600 leading-normal">
-                  {isEnglishMode ? (
-                    <p>
-                      If you exit mid-session, your <span className="font-bold font-mono text-amber-600 text-sm">{completedRounds}</span> practiced rounds in this cycle will be discarded. You will not save any progress or unlock this card!
-                    </p>
-                  ) : (
-                    <p>
-                      中途退出后，本次已拼写了 <span className="font-bold font-mono text-amber-600 text-sm">{completedRounds}</span> 轮，但由于未到计时结束无法存留成绩。本次练习将会作废，且无法获得该卡牌！
-                    </p>
-                  )}
+                  <p>
+                    中途退出后，本次已拼写了 <span className="font-bold font-mono text-amber-600 text-sm">{completedRounds}</span> 轮，但由于未到计时结束无法存留成绩。本次练习将会作废，且无法获得该卡牌！
+                  </p>
                 </div>
               </div>
 
@@ -727,13 +909,13 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                   }}
                   className="flex-1 py-3 px-4 rounded-xl border border-stone-300 bg-stone-100 hover:bg-stone-205 text-stone-850 font-bold text-xs font-sans transition-all cursor-pointer select-none"
                 >
-                  {isEnglishMode ? "🛡️ Stay & Continue" : "🛡️ 留在这里，继续拼写"}
+                  🛡️ 留在这里，继续拼写
                 </button>
                 <button
                   onClick={onQuit}
                   className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs font-sans transition-all cursor-pointer select-none"
                 >
-                  {isEnglishMode ? "🚪 Discard & Exit" : "🚪 意已决，狠心退出"}
+                  🚪 意已决，狠心退出
                 </button>
               </div>
             </motion.div>

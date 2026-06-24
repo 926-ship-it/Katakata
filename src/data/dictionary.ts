@@ -8,7 +8,7 @@ export interface DictionaryItem {
   id: string;
   kanji: string;
   kanaStr: string;
-  category: "name" | "nature" | "culture" | "food";
+  category: "name" | "nature" | "culture" | "food" | "custom";
   categoryName: string;
   meaning: string;
   rarity: "N" | "R" | "SR" | "SSR";

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
-import { BookOpen, Sparkles, Trophy, Settings, HelpCircle, Flame, Keyboard, BarChart2, Calendar, Award, Clock, ArrowRight, RotateCw, Play, BookOpenCheck } from "lucide-react";
+import { BookOpen, Sparkles, Trophy, Settings, HelpCircle, Flame, Keyboard, BarChart2, Calendar, Award, Clock, ArrowRight, RotateCw, Play, BookOpenCheck, Activity, Plus, FileText, Trash2, CheckCircle, AlertCircle, Upload } from "lucide-react";
 import { DICTIONARY, DictionaryItem, getDictionary } from "../data/dictionary";
 import { uiTranslate, LANG_MAPPING } from "../utils/lang";
 
@@ -12,6 +12,8 @@ interface StartPageProps {
   practiceMode: "typing" | "handwriting";
   setPracticeMode: (mode: "typing" | "handwriting") => void;
   isEnglishMode?: boolean;
+  customCards?: DictionaryItem[];
+  setCustomCards?: React.Dispatch<React.SetStateAction<DictionaryItem[]>>;
 }
 
 export const StartPage: React.FC<StartPageProps> = ({
@@ -22,8 +24,34 @@ export const StartPage: React.FC<StartPageProps> = ({
   practiceMode,
   setPracticeMode,
   isEnglishMode = false,
+  customCards = [],
+  setCustomCards,
 }) => {
-  const activeDict = getDictionary(isEnglishMode);
+  const activeDict = React.useMemo(() => {
+    return [...getDictionary(isEnglishMode), ...customCards];
+  }, [isEnglishMode, customCards]);
+
+  // Read historic session logs and XP points for dynamic dashboards
+  const sessionLogs = React.useMemo(() => {
+    try {
+      const stored = localStorage.getItem("fifty_sound_session_log");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const xp = React.useMemo(() => {
+    try {
+      return Number(localStorage.getItem("fifty_sound_xp") || "0");
+    } catch {
+      return 0;
+    }
+  }, []);
+
+  const currentLevel = Math.floor(xp / 250) + 1;
+  const currentLevelProgress = xp % 250;
+  const progressPercent = Math.min(100, Math.round((currentLevelProgress / 250) * 100));
 
   // Strongly-typed practice stats calculation
   const practiceValues = Object.values(practiceTimes) as number[];
@@ -37,13 +65,225 @@ export const StartPage: React.FC<StartPageProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
 
+  // Custom Document Parser States
+  const [docText, setDocText] = useState<string>("");
+  const [isParsing, setIsParsing] = useState<boolean>(false);
+  const [parseError, setParseError] = useState<string>("");
+  const [parseSuccess, setParseSuccess] = useState<string>("");
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+
+  // Manual Add Form States
+  const [manualKanji, setManualKanji] = useState<string>("");
+  const [manualKana, setManualKana] = useState<string>("");
+  const [manualMeaning, setManualMeaning] = useState<string>("");
+
+  // Kana syllable splitting algorithm for manual addition
+  const splitKanaIntoSyllables = (kana: string) => {
+    const syllables: { kana: string; romaji: string[]; displayRomaji: string }[] = [];
+    const KANA_MAP: Record<string, string> = {
+      "あ": "a", "い": "i", "う": "u", "え": "e", "お": "o",
+      "か": "ka", "き": "ki", "く": "ku", "け": "ke", "こ": "ko",
+      "さ": "sa", "し": "shi", "す": "su", "せ": "se", "そ": "so",
+      "た": "ta", "ち": "chi", "つ": "tsu", "て": "te", "と": "to",
+      "な": "na", "に": "ni", "ぬ": "nu", "ね": "ne", "の": "no",
+      "は": "ha", "ひ": "hi", "ふ": "fu", "へ": "he", "ほ": "ho",
+      "ま": "ma", "み": "mi", "む": "mu", "め": "me", "も": "mo",
+      "や": "ya", "ゆ": "yu", "よ": "yo",
+      "ら": "ra", "り": "ri", "る": "ru", "れ": "re", "ろ": "ro",
+      "わ": "wa", "を": "wo", "ん": "n",
+      "が": "ga", "ぎ": "gi", "ぐ": "gu", "げ": "ge", "ご": "go",
+      "ざ": "za", "じ": "ji", "ず": "zu", "ぜ": "ze", "ぞ": "zo",
+      "だ": "da", "ぢ": "ji", "づ": "zu", "de": "de", "ど": "do",
+      "ば": "ba", "び": "bi", "ぶ": "bu", "べ": "be", "ぼ": "bo",
+      "ぱ": "pa", "ぴ": "pi", "ぷ": "pu", "ぺ": "pe", "ぽ": "po",
+      "きゃ": "kya", "きゅ": "kyu", "きょ": "kyo",
+      "しゃ": "sha", "しゅ": "shu", "しょ": "sho",
+      "ちゃ": "cha", "ちゅ": "chu", "ちょ": "cho",
+      "にゃ": "nya", "niゅ": "nyu", "にょ": "nyo",
+      "ひゃ": "hya", "ひゅ": "hyu", "ひょ": "hyo",
+      "みゃ": "mya", "みゅ": "myu", "みょ": "myo",
+      "りゃ": "rya", "りゅ": "ryu", "りょ": "ryo",
+      "ぎゃ": "gya", "ぎゅ": "gyu", "ぎょ": "gyo",
+      "じゃ": "ja", "じゅ": "ju", "じょ": "jo",
+      "びゃ": "bya", "びゅ": "byu", "びょ": "byo",
+      "ぴゃ": "pya", "ぴゅ": "pyu", "ぴょ": "pyo",
+      "っ": "t", "ー": "-", " ": " "
+    };
+
+    let i = 0;
+    const cleanKana = kana.trim();
+    while (i < cleanKana.length) {
+      const char = cleanKana[i];
+      const nextChar = cleanKana[i + 1] || "";
+      
+      if (["ゃ", "ゅ", "ょ"].includes(nextChar)) {
+        const combined = char + nextChar;
+        const rom = KANA_MAP[combined] || (KANA_MAP[char] ? KANA_MAP[char] + nextChar : combined);
+        syllables.push({
+          kana: combined,
+          romaji: [rom],
+          displayRomaji: rom
+        });
+        i += 2;
+      } else {
+        const rom = KANA_MAP[char] || char;
+        syllables.push({
+          kana: char,
+          romaji: [rom],
+          displayRomaji: rom
+        });
+        i += 1;
+      }
+    }
+    return syllables;
+  };
+
+  // Drag and Drop files
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file && (file.type === "text/plain" || file.name.endsWith(".txt"))) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setDocText(event.target.result as string);
+          setParseSuccess(isEnglishMode ? "Document loaded successfully from file!" : "成功从文件加载文稿！");
+          setParseError("");
+        }
+      };
+      reader.readAsText(file);
+    } else {
+      setParseError(isEnglishMode ? "Only plain text (.txt) files are supported." : "仅支持纯文本 (.txt) 文件类型。");
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setDocText(event.target.result as string);
+          setParseSuccess(isEnglishMode ? "Document loaded successfully!" : "文件读取成功！");
+          setParseError("");
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  // call the /api/parse-document route
+  const handleAiParse = async () => {
+    if (!docText.trim()) {
+      setParseError(isEnglishMode ? "Please enter or upload some text first." : "请先输入或拖入需要解析的文本内容。");
+      return;
+    }
+    setIsParsing(true);
+    setParseError("");
+    setParseSuccess("");
+    try {
+      const res = await fetch("/api/parse-document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: docText, isEnglish: isEnglishMode })
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.items) {
+        if (setCustomCards) {
+          setCustomCards((prev) => {
+            // merge and filter duplicates
+            const existingIds = prev.map((c) => c.id);
+            const newItems = data.items.filter((item: any) => !existingIds.includes(item.id));
+            return [...prev, ...newItems];
+          });
+        }
+        setParseSuccess(isEnglishMode 
+          ? `Successfully parsed and added ${data.items.length} vocab cards with AI!` 
+          : `AI 成功分析并生成了 ${data.items.length} 张词汇熟化卡牌！已自动存入下方列表。`
+        );
+        setDocText("");
+      } else {
+        setParseError(data.error || (isEnglishMode ? "AI parsing failed. Please try again." : "AI 解析失败，请重试。"));
+      }
+    } catch (err: any) {
+      setParseError(err.message || (isEnglishMode ? "Network error during parsing." : "请求解析时发生网络错误。"));
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  const handleManualAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualKanji.trim() || !manualMeaning.trim()) {
+      setParseError(isEnglishMode ? "Word and Meaning are required." : "原词和释义是必填项！");
+      return;
+    }
+
+    const cleanKanji = manualKanji.trim();
+    const cleanKana = isEnglishMode ? cleanKanji.toLowerCase() : (manualKana.trim() || cleanKanji);
+    const cleanMeaning = manualMeaning.trim();
+    const uniqueId = "custom-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
+
+    // generate segments
+    let generatedSegments = [];
+    if (isEnglishMode) {
+      generatedSegments = cleanKanji.split("").map((char) => ({
+        kana: char,
+        romaji: [char.toLowerCase()],
+        displayRomaji: char
+      }));
+    } else {
+      generatedSegments = splitKanaIntoSyllables(cleanKana);
+    }
+
+    if (generatedSegments.length === 0) {
+      setParseError(isEnglishMode ? "Failed to parse characters." : "无法正确解析假名音节，请检查输入。");
+      return;
+    }
+
+    const newItem: DictionaryItem = {
+      id: uniqueId,
+      kanji: cleanKanji,
+      kanaStr: cleanKana,
+      category: "custom",
+      categoryName: "自定义/我的文稿",
+      meaning: cleanMeaning,
+      rarity: "SR",
+      rarityName: isEnglishMode ? "Elite (SR)" : "卓越 (SR)",
+      glowColor: "rgba(245, 158, 11, 0.25)",
+      borderColor: "border-amber-400",
+      bgGradient: "from-amber-50 to-orange-100",
+      segments: generatedSegments
+    };
+
+    if (setCustomCards) {
+      setCustomCards((prev) => [...prev, newItem]);
+    }
+
+    setParseSuccess(isEnglishMode ? "Word added successfully!" : "手动添加自定义卡牌成功！");
+    setParseError("");
+    setManualKanji("");
+    setManualKana("");
+    setManualMeaning("");
+  };
+
   const [activeTab, setActiveTab ] = useState<"intro" | "rules">("intro");
 
   // Filter dictionary based on unlocked status or category
   const filteredDict = activeDict.filter((item) => {
     if (selectedCategory === "all") return true;
-    if (selectedCategory === "locked") return !collectedIds.includes(item.id);
-    if (selectedCategory === "unlocked") return collectedIds.includes(item.id);
+    if (selectedCategory === "locked") return !collectedIds.includes(item.id) && item.category !== "custom";
+    if (selectedCategory === "unlocked") return collectedIds.includes(item.id) || item.category === "custom";
     return item.category === selectedCategory;
   });
 
@@ -264,28 +504,40 @@ export const StartPage: React.FC<StartPageProps> = ({
             <div className="p-4 rounded-xl border border-stone-300/80 bg-white shadow-inner grid grid-cols-3 gap-3">
               {/* Level progressive badge */}
               <div className="text-center border-r border-stone-200 pr-1 flex flex-col justify-between">
-                <span className="text-[9px] font-mono text-stone-400 block">{uiTranslate("练力称号", isEnglishMode, "练力称号")}</span>
-                <div className="my-1.5 flex flex-col items-center justify-center">
+                <span className="text-[9px] font-mono text-stone-400 block">{isEnglishMode ? "SPELLING LEVEL" : "拼写修炼等级"}</span>
+                <div className="my-1 flex flex-col items-center justify-center">
                   <Award className="w-7 h-7 text-amber-600 animate-pulse" />
-                  <span className="text-xs font-serif font-black text-stone-800 mt-1 block leading-tight">
+                  <span className="text-xs font-serif font-black text-stone-850 mt-1 block leading-tight">
+                    {isEnglishMode ? "Level" : "修炼"} {currentLevel}
+                  </span>
+                  <span className="text-[9px] font-mono text-stone-500 scale-95 leading-tight">
                     {(() => {
-                    if (isEnglishMode) {
-                      if (totalRounds < 3) return "拼写新手";
-                      if (totalRounds < 10) return "词汇萌新";
-                      if (totalRounds < 25) return "熟练学者";
-                      if (totalRounds < 50) return "拼写达人";
-                      return "词汇宗师";
-                    } else {
-                      if (totalRounds < 3) return "初学者";
-                      if (totalRounds < 10) return "入门者";
-                      if (totalRounds < 25) return "熟练者";
-                      if (totalRounds < 50) return "精通者";
-                      return "大师";
-                    }
-                  })()}
+                      if (isEnglishMode) {
+                        if (totalRounds < 3) return "Novice";
+                        if (totalRounds < 10) return "Apprentice";
+                        if (totalRounds < 25) return "Expert";
+                        if (totalRounds < 50) return "Master";
+                        return "Grandmaster";
+                      } else {
+                        if (totalRounds < 3) return "无极新星";
+                        if (totalRounds < 10) return "略通笔墨";
+                        if (totalRounds < 25) return "精进笔法";
+                        if (totalRounds < 50) return "翰墨风骨";
+                        return "笔圣至尊";
+                      }
+                    })()}
                   </span>
                 </div>
-                <span className="text-[8px] font-mono text-stone-400 block scale-90">{uiTranslate("连续打卡动力", isEnglishMode, "连续打卡动力")}</span>
+                {/* Micro Level-up Progress Meter */}
+                <div className="w-full space-y-0.5 px-1 pb-1">
+                  <div className="flex justify-between text-[7.5px] text-stone-400 font-mono scale-95 leading-none">
+                    <span>{xp % 250}/250 XP</span>
+                    <span>{progressPercent}%</span>
+                  </div>
+                  <div className="w-full bg-stone-100 h-1 rounded-full overflow-hidden border border-stone-200/50">
+                    <div className="bg-amber-500 h-full rounded-full transition-all" style={{ width: `${progressPercent}%` }} />
+                  </div>
+                </div>
               </div>
 
               {/* Unlocked cards percent */}
@@ -342,6 +594,137 @@ export const StartPage: React.FC<StartPageProps> = ({
                   );
                 })}
               </div>
+            </div>
+
+            {/* Dynamic Typing Speed & Accuracy Line-Chart (Velocity Trends) */}
+            <div className="p-4 rounded-xl border border-stone-250 bg-white shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-stone-450 uppercase tracking-widest font-bold block">
+                  {isEnglishMode ? "🔥 Typing Velocity & Accuracy Trends" : "🔥 指尖速度与准确率演变趋势"}
+                </span>
+                {sessionLogs.length > 0 && (
+                  <span className="text-[9px] font-mono font-bold bg-amber-500/10 text-amber-800 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                    KPM Line Chart
+                  </span>
+                )}
+              </div>
+
+              {sessionLogs.length === 0 ? (
+                <div className="h-28 flex flex-col items-center justify-center border border-dashed border-stone-200 rounded-lg bg-stone-50 text-center p-3 text-stone-405 space-y-1">
+                  <Activity className="w-5 h-5 text-stone-300 animate-pulse" />
+                  <span className="text-xs font-serif font-black text-stone-600">指尖蓄势待发...</span>
+                  <span className="text-[10px] font-mono leading-tight max-w-xs text-stone-450">
+                    {isEnglishMode ? "Complete at least one spelling session to unlock high-fidelity performance metrics!" : "开始进行一次拼写练习，即可在此处激活高精度的KPM速率演变曲线图！"}
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Performance Indicators */}
+                  <div className="grid grid-cols-2 gap-2 text-left bg-stone-50 p-2 rounded-lg border border-stone-150">
+                    <div>
+                      <span className="text-[9px] font-mono text-stone-400 block">{isEnglishMode ? "AVERAGE SPEED" : "平均打字速率"}</span>
+                      <span className="text-sm font-black text-stone-800 font-mono">
+                        {Math.round(sessionLogs.reduce((acc: number, curr: any) => acc + curr.kpm, 0) / sessionLogs.length)} <span className="text-[10px] font-normal text-stone-500">KPM</span>
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-mono text-stone-400 block">{isEnglishMode ? "AVG ACCURACY" : "平均拼写正确率"}</span>
+                      <span className="text-sm font-black text-stone-800 font-mono">
+                        {Math.round(sessionLogs.reduce((acc: number, curr: any) => acc + curr.accuracy, 0) / sessionLogs.length)}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* SVG Chart */}
+                  <div className="relative w-full h-24">
+                    {(() => {
+                      const maxKpm = Math.max(...sessionLogs.map((l: any) => l.kpm), 100);
+                      const width = 400;
+                      const height = 90;
+                      
+                      // Map coordinates
+                      const points = sessionLogs.map((log: any, index: number) => {
+                        const x = sessionLogs.length > 1 ? (index / (sessionLogs.length - 1)) * (width - 40) + 20 : width / 2;
+                        const y = height - ((log.kpm / maxKpm) * (height - 30)) - 10;
+                        return { x, y, kpm: log.kpm, date: log.date };
+                      });
+
+                      const pathD = points.length > 1
+                        ? `M ${points.map(p => `${p.x} ${p.y}`).join(" L ")}`
+                        : "";
+
+                      return (
+                        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
+                          {/* Grid Lines */}
+                          <line x1="10" y1={height - 10} x2={width - 10} y2={height - 10} stroke="#e5e5e5" strokeWidth="1" strokeDasharray="3 3" />
+                          <line x1="10" y1="10" x2={width - 10} y2="10" stroke="#e5e5e5" strokeWidth="1" strokeDasharray="3 3" />
+
+                          {/* Line Path */}
+                          {points.length > 1 && (
+                            <>
+                              {/* Filled Area Gradient */}
+                              <defs>
+                                <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.25" />
+                                  <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.0" />
+                                </linearGradient>
+                              </defs>
+                              <path
+                                d={`${pathD} L ${points[points.length - 1].x} ${height - 10} L ${points[0].x} ${height - 10} Z`}
+                                fill="url(#chartGrad)"
+                              />
+                              {/* Line */}
+                              <path
+                                d={pathD}
+                                fill="none"
+                                stroke="#f59e0b"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </>
+                          )}
+
+                          {/* Data points */}
+                          {points.map((pt, i) => (
+                            <g key={i} className="group">
+                              <circle
+                                cx={pt.x}
+                                cy={pt.y}
+                                r="4"
+                                fill="#ffffff"
+                                stroke="#d97706"
+                                strokeWidth="2"
+                                className="transition-all duration-150 hover:r-6 cursor-pointer"
+                              />
+                              {/* Text tooltip on hover */}
+                              <text
+                                x={pt.x}
+                                y={pt.y - 10}
+                                textAnchor="middle"
+                                className="text-[8px] font-mono font-bold fill-amber-900 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-white px-1"
+                              >
+                                {pt.kpm}
+                              </text>
+                              {/* Date labels */}
+                              {i % Math.max(1, Math.floor(points.length / 4)) === 0 && (
+                                <text
+                                  x={pt.x}
+                                  y={height + 2}
+                                  textAnchor="middle"
+                                  className="text-[7px] font-mono fill-stone-400"
+                                >
+                                  {pt.date}
+                                </text>
+                              )}
+                            </g>
+                          ))}
+                        </svg>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -603,6 +986,7 @@ export const StartPage: React.FC<StartPageProps> = ({
               { id: "nature", label: isEnglishMode ? "自然与动物" : "四季自然" },
               { id: "culture", label: isEnglishMode ? "物品与概念" : "民俗祭典" },
               { id: "food", label: isEnglishMode ? "西餐美味" : "和食美味" },
+              { id: "custom", label: isEnglishMode ? "My Documents" : "我的文稿/自定义" },
             ].map((cat) => (
               <button
                 key={cat.id}
@@ -617,6 +1001,199 @@ export const StartPage: React.FC<StartPageProps> = ({
               </button>
             ))}
           </div>
+
+          {/* Custom Document & Parsing Workspace */}
+          {selectedCategory === "custom" && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-6 p-6 bg-stone-50 border border-stone-200 rounded-2xl shadow-sm space-y-6 text-left"
+            >
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-stone-200">
+                <div>
+                  <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-amber-600" />
+                    <span>{isEnglishMode ? "My Custom Document Workspace" : "我的自定义学习文稿 & 词库工作台"}</span>
+                  </h3>
+                  <p className="text-xs text-stone-500 mt-1">
+                    {isEnglishMode 
+                      ? "Directly paste texts, drag-and-drop .txt files, or add manually. We use Gemini AI to smartly parse vocabulary!" 
+                      : "可直接粘贴文章、拖入.txt文件或手动录入。系统使用 Gemini AI 进行智能分词和音节标注，可用于练习您喜欢的日语歌词、新闻或台词！"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Status / Errors Feedback Banner */}
+              {parseError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{parseError}</span>
+                </div>
+              )}
+              {parseSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 shrink-0" />
+                  <span>{parseSuccess}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left side: AI smart parse */}
+                <div className="space-y-3">
+                  <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-mono">
+                    {isEnglishMode ? "Option A: Paste Document / Drop File" : "方式一：AI 智能解析整篇文稿/歌词"}
+                  </label>
+                  
+                  {/* File drop zone */}
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center transition-all ${
+                      isDragging 
+                        ? "border-amber-500 bg-amber-50" 
+                        : "border-stone-300 hover:border-stone-400 bg-stone-100/50"
+                    }`}
+                  >
+                    <Upload className="w-6 h-6 text-stone-400 mb-2" />
+                    <p className="text-xs text-stone-600 font-medium text-center">
+                      {isEnglishMode 
+                        ? "Drag and drop your .txt file here, or " 
+                        : "拖拽您的 .txt 文本文件至此，或者"}
+                      <label className="text-amber-600 hover:text-amber-700 underline cursor-pointer font-bold ml-1">
+                        {isEnglishMode ? "Browse" : "浏览文件"}
+                        <input
+                          type="file"
+                          accept=".txt"
+                          onChange={handleFileSelect}
+                          className="hidden"
+                        />
+                      </label>
+                    </p>
+                    <p className="text-[10px] text-stone-400 mt-1 font-mono">UTF-8 TXT ONLY</p>
+                  </div>
+
+                  <div className="relative">
+                    <textarea
+                      value={docText}
+                      onChange={(e) => setDocText(e.target.value)}
+                      placeholder={isEnglishMode 
+                        ? "Or paste your custom text paragraphs here..." 
+                        : "或者在此处粘贴您的自定义日语文章、歌词、经典名句段落..."}
+                      className="w-full h-32 px-3.5 py-3 rounded-xl border border-stone-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-xs text-stone-800 placeholder-stone-400 bg-white"
+                    />
+                    {docText && (
+                      <button
+                        onClick={() => setDocText("")}
+                        className="absolute bottom-3 right-3 text-[10px] bg-stone-200 hover:bg-stone-300 text-stone-600 px-2 py-1 rounded cursor-pointer"
+                      >
+                        {isEnglishMode ? "Clear" : "清空输入"}
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleAiParse}
+                    disabled={isParsing || !docText.trim()}
+                    className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer select-none ${
+                      isParsing 
+                        ? "bg-stone-300 text-stone-500 cursor-not-allowed" 
+                        : docText.trim()
+                          ? "bg-amber-500 hover:bg-amber-600 text-stone-950 shadow-sm" 
+                          : "bg-stone-200 text-stone-400 cursor-not-allowed"
+                    }`}
+                  >
+                    {isParsing ? (
+                      <>
+                        <RotateCw className="w-4 h-4 animate-spin text-stone-500" />
+                        <span>{isEnglishMode ? "AI Parsing with Gemini..." : "Gemini AI 正在智能提取并进行声调标记..."}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        <span>{isEnglishMode ? "AI Parse & Generate Cards" : "AI 智能切分单词并发起卡牌转换 ＞"}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Right side: Manual Add */}
+                <form onSubmit={handleManualAdd} className="space-y-3 border-t lg:border-t-0 lg:border-l border-stone-200 pt-6 lg:pt-0 lg:pl-6 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-mono">
+                      {isEnglishMode ? "Option B: Manual Vocabulary Quick-Add" : "方式二：手动快速添加词条"}
+                    </label>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-stone-500 mb-1 text-left">{isEnglishMode ? "Word (Kanji)" : "原词（中文或汉字）"}</label>
+                        <input
+                          type="text"
+                          required
+                          value={manualKanji}
+                          onChange={(e) => setManualKanji(e.target.value)}
+                          placeholder={isEnglishMode ? "e.g., Apple" : "例如：先生、樱花"}
+                          className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-xs text-stone-800 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-stone-500 mb-1 text-left">{isEnglishMode ? "Kana (Pronunciation)" : "全平假名注音"}</label>
+                        <input
+                          type="text"
+                          required={!isEnglishMode}
+                          value={manualKana}
+                          onChange={(e) => setManualKana(e.target.value)}
+                          placeholder={isEnglishMode ? "Auto-derived" : "例如：せんせい、さくら"}
+                          disabled={isEnglishMode}
+                          className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-xs text-stone-800 bg-white disabled:bg-stone-100 disabled:text-stone-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-stone-500 mb-1 text-left">{isEnglishMode ? "Chinese Meaning" : "中文简明释义"}</label>
+                      <input
+                        type="text"
+                        required
+                        value={manualMeaning}
+                        onChange={(e) => setManualMeaning(e.target.value)}
+                        placeholder={isEnglishMode ? "e.g., 苹果" : "例如：老师、日本国花"}
+                        className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-xs text-stone-800 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 mt-4 bg-stone-900 hover:bg-stone-800 text-stone-100 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <Plus className="w-4 h-4 text-amber-400" />
+                    <span>{isEnglishMode ? "Add to Custom Deck" : "手动添加到自定义学习库"}</span>
+                  </button>
+                </form>
+              </div>
+
+              {/* Custom dictionary info status */}
+              <div className="pt-3 border-t border-dashed border-stone-200 flex flex-wrap items-center justify-between text-[11px] text-stone-500 font-mono">
+                <div>{isEnglishMode ? "Local Storage Cache:" : "本地数据缓存状态:"} <span className="text-amber-600 font-bold">{customCards.length}</span> {isEnglishMode ? "cards" : "条自定义词组"}</div>
+                {customCards.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(isEnglishMode ? "Are you sure you want to clear ALL custom cards?" : "您确定要清空所有自定义词组卡牌吗？该操作不可逆。")) {
+                        if (setCustomCards) setCustomCards([]);
+                        setSelectedCardIds([]);
+                        setParseSuccess(isEnglishMode ? "All custom cards cleared." : "已成功清空所有自定义卡牌。");
+                      }
+                    }}
+                    className="text-stone-400 hover:text-red-500 underline cursor-pointer"
+                  >
+                    {isEnglishMode ? "Clear All Custom Cards" : "清空自定义库"}
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
 
           {/* Active selection combination bar */}
           {selectedCardIds.length > 0 && (
@@ -655,7 +1232,7 @@ export const StartPage: React.FC<StartPageProps> = ({
           {/* Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4 max-h-[380px] overflow-y-auto pr-1">
             {filteredDict.map((item) => {
-              const isUnlocked = collectedIds.includes(item.id);
+              const isUnlocked = collectedIds.includes(item.id) || item.category === "custom";
               const isChecked = selectedCardIds.includes(item.id);
               
               // Custom luxurious background styles depending on rarity & unlocked state
@@ -713,7 +1290,23 @@ export const StartPage: React.FC<StartPageProps> = ({
                     />
                   </div>
 
-                  <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                  <div className="absolute top-3 right-3 flex items-center gap-1.5 z-20">
+                    {item.category === "custom" && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (setCustomCards) {
+                            setCustomCards((prev) => prev.filter((it) => it.id !== item.id));
+                            setSelectedCardIds((prev) => prev.filter((id) => id !== item.id));
+                          }
+                        }}
+                        className="p-1 rounded bg-stone-100 hover:bg-red-100 text-stone-500 hover:text-red-600 transition-colors cursor-pointer border border-stone-200"
+                        title={isEnglishMode ? "Delete custom card" : "删除自定义卡牌"}
+                      >
+                        <Trash2 className="w-3 h-3 animate-pulse" />
+                      </button>
+                    )}
                     <span 
                       className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded tracking-wider border"
                       style={{
