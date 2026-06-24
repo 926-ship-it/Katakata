@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Volume2, VolumeX, Sparkles, MessageCircle, Heart } from "lucide-react";
+import { Volume2, VolumeX, Sparkles, MessageCircle, Heart, Minus } from "lucide-react";
 import { audioSynth } from "../utils/audio";
 
 interface MascotComponentProps {
@@ -21,10 +21,11 @@ export const MascotComponent: React.FC<MascotComponentProps> = ({
   practiceMode = "typing"
 }) => {
   const [speech, setSpeech] = useState<string>("");
-  const [expression, setExpression] = useState<"happy" | "determined" | "cheering" | "shocked" | "celebrate">("happy");
-  const [showBubble, setShowBubble] = useState<boolean>(true);
+  const [expression, setExpression] = useState<"happy" | "determined" | "cheering" | "shocked" | "celebrate" >("happy");
+  const [showBubble, setShowBubble] = useState<boolean>(false);
   const [clickCount, setClickCount] = useState<number>(0);
   const [prevVoiceType, setPrevVoiceType] = useState<string>("");
+  const [isMinimized, setIsMinimized] = useState<boolean>(false);
 
   // Combo tap state for English mode toggle
   const [comboCount, setComboCount] = useState<number>(0);
@@ -47,7 +48,6 @@ export const MascotComponent: React.FC<MascotComponentProps> = ({
       return;
     }
     setPrevVoiceType(voiceType);
-    setShowBubble(true);
 
     if (isEnglishMode) {
       if (voiceType === "male") {
@@ -88,7 +88,6 @@ export const MascotComponent: React.FC<MascotComponentProps> = ({
 
   // Dynamic dialogue reactions depending on active page state
   useEffect(() => {
-    setShowBubble(true);
     const bubbleTimeout = setTimeout(() => {
       // Keep bubble visible longer but refresh its contents beautifully
     }, 5000);
@@ -246,6 +245,40 @@ export const MascotComponent: React.FC<MascotComponentProps> = ({
     setExpression("cheering");
     setShowBubble(true);
   };
+
+  if (isMinimized) {
+    return (
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => {
+          setIsMinimized(false);
+          setShowBubble(true);
+          audioSynth.playCardSlide();
+        }}
+        className="fixed bottom-4 right-4 z-[70] flex flex-col items-center gap-1 cursor-pointer select-none pointer-events-auto"
+      >
+        {/* Cute small pulsing floating ball */}
+        <div className="relative w-12 h-12 rounded-full bg-amber-500 border-2 border-stone-800 flex items-center justify-center shadow-lg group hover:scale-105 transition-all">
+          <div className="absolute inset-0 rounded-full bg-amber-400 animate-ping opacity-25" />
+          {/* A tiny mini SVG of Fuli-chan's ears and nose or just a cute fox face */}
+          <svg viewBox="0 0 100 100" className="w-8 h-8 pointer-events-none">
+            <polygon points="20,40 10,15 35,28" fill="#d97706" stroke="#7c2d12" strokeWidth="4" />
+            <polygon points="80,40 90,15 65,28" fill="#d97706" stroke="#7c2d12" strokeWidth="4" />
+            <circle cx="50" cy="60" r="30" fill="#f59e0b" stroke="#7c2d12" strokeWidth="5" />
+            <path d="M 30 60 C 30 70, 40 72, 50 72 C 60 72, 70 70, 70 60" fill="#ffffff" stroke="#7c2d12" strokeWidth="3" />
+            <circle cx="40" cy="55" r="5" fill="#292524" />
+            <circle cx="60" cy="55" r="5" fill="#292524" />
+            <polygon points="48,62 52,62 50,65" fill="#7c2d12" />
+          </svg>
+        </div>
+        <span className="bg-stone-900 text-amber-400 text-[9px] font-black font-mono border border-amber-600 px-1.5 py-0.5 rounded shadow-sm scale-90">
+          {isEnglishMode ? "WAKE UP" : "唤醒福狸"}
+        </span>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div 
@@ -448,10 +481,24 @@ export const MascotComponent: React.FC<MascotComponentProps> = ({
           <circle cx="66" cy="80" r="4.5" fill="#fafaf9" stroke="#7c2d12" strokeWidth="2" />
         </svg>
 
-        {/* Small mascot name tag */}
-        <span className="bg-stone-900 border border-amber-600 text-[9px] font-black font-mono text-amber-400 px-2.5 py-0.5 rounded-full shadow-md mt-1 animate-pulse uppercase tracking-widest scale-90 group-hover:scale-100 transition-all">
-          {isEnglishMode ? "Fuku-chan" : "福狸酱"}
-        </span>
+        {/* Small mascot name tag with minimize option */}
+        <div className="flex items-center gap-1.5 mt-1 select-none">
+          <span className="bg-stone-900 border border-amber-600 text-[9px] font-black font-mono text-amber-400 px-2.5 py-0.5 rounded-full shadow-md animate-pulse uppercase tracking-widest scale-90">
+            {isEnglishMode ? "Fuku-chan" : "福狸酱"}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsMinimized(true);
+              audioSynth.playCardSlide();
+            }}
+            className="p-1 rounded-full bg-stone-100 hover:bg-stone-200 border border-stone-300 text-stone-600 shadow-sm cursor-pointer scale-90 flex items-center justify-center"
+            title={isEnglishMode ? "Minimize Fuku-chan" : "最小化福狸酱"}
+          >
+            <Minus className="w-2.5 h-2.5" />
+          </button>
+        </div>
       </motion.div>
     </motion.div>
   );

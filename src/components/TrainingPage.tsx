@@ -344,10 +344,13 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
   return (
     <div 
-      className="max-w-3xl mx-auto space-y-6 px-2 md:px-0 cursor-pointer"
+      className="max-w-3xl mx-auto space-y-2.5 sm:space-y-6 px-2 md:px-0 cursor-pointer"
       onClick={() => {
         if (practiceMode !== "handwriting" && !isPaused && !timerFinished && !showQuitConfirm) {
-          inputRef.current?.focus();
+          const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+          if (isMobileDevice) {
+            inputRef.current?.focus();
+          }
         }
       }}
     >
@@ -375,18 +378,18 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       </div>
 
       {/* Main retro Terminal casing */}
-      <div className={`p-6 md:p-8 rounded-2xl border-2 transition-all duration-300 relative ${
+      <div className={`p-3 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 relative ${
         errorFlash 
           ? "border-red-600 bg-red-50/20 shadow-[0_0_20px_rgba(239,68,68,0.25)]" 
           : "border-stone-800 bg-stone-50 shadow-md"
       }`}>
         
         {/* Top ribbon: Clock and Score counter */}
-        <div className="grid grid-cols-2 gap-4 pb-4 border-b border-stone-300 items-center">
-          <div className="space-y-1">
-            <div className="text-[10px] font-mono text-stone-500 tracking-wider">RETRO TERMINAL COUNTDOWN</div>
-            <div className="flex items-center gap-3">
-              <span className={`text-3xl md:text-4xl font-mono font-black ${
+        <div className="grid grid-cols-2 gap-2 sm:gap-4 pb-2 sm:pb-4 border-b border-stone-300 items-center">
+          <div className="space-y-0.5 sm:space-y-1">
+            <div className="text-[8px] sm:text-[10px] font-mono text-stone-500 tracking-wider">RETRO TERMINAL COUNTDOWN</div>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className={`text-xl sm:text-3xl md:text-4xl font-mono font-black ${
                 timeLeftMs < 30000 && !isPaused ? "text-red-600 animate-pulse font-extrabold" : "text-stone-900"
               }`}>
                 {formatTime(timeLeftMs)}
@@ -406,18 +409,18 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
             </div>
           </div>
 
-          <div className="text-right space-y-1">
-            <div className="text-[10px] font-mono text-stone-500 tracking-wider">COMPLETED ROUNDS</div>
-            <div className="text-3xl md:text-4xl font-extrabold font-serif text-indigo-900">
-              {completedRounds} <span className="text-sm font-sans font-medium text-stone-500">轮</span>
+          <div className="text-right space-y-0.5 sm:space-y-1">
+            <div className="text-[8px] sm:text-[10px] font-mono text-stone-500 tracking-wider">COMPLETED ROUNDS</div>
+            <div className="text-xl sm:text-3xl md:text-4xl font-extrabold font-serif text-indigo-900">
+              {completedRounds} <span className="text-xs sm:text-sm font-sans font-medium text-stone-500">轮</span>
             </div>
           </div>
         </div>
 
         {/* If group training, show queue progress indicator */}
         {items.length > 1 && (
-          <div className="flex flex-wrap items-center justify-center gap-2 pb-4 pt-4 border-b border-stone-200 select-none">
-            <span className="text-[9px] font-mono font-bold text-stone-400 uppercase tracking-widest mr-1">
+          <div className="flex flex-wrap items-center justify-center gap-1.5 pb-2 sm:pb-4 pt-2 sm:pt-4 border-b border-stone-200 select-none">
+            <span className="text-[8px] sm:text-[9px] font-mono font-bold text-stone-400 uppercase tracking-widest mr-1">
               联训序列:
             </span>
             {items.map((it, idx) => {
@@ -439,7 +442,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         )}
 
         {/* Dynamic Card Slider Carousel Area */}
-        <div className="relative overflow-hidden my-4 min-h-[230px] flex items-center justify-between px-2 sm:px-12 bg-white/40 rounded-2xl border border-stone-200 shadow-inner">
+        <div className="relative overflow-hidden my-2 sm:my-4 min-h-[160px] sm:min-h-[230px] flex items-center justify-between px-1 sm:px-12 bg-white/40 rounded-xl sm:rounded-2xl border border-stone-200 shadow-inner">
           
           {/* Slide Left Button */}
           <button
@@ -493,24 +496,24 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: -slideDirection * 120, scale: 0.96 }}
                 transition={{ type: "spring", damping: 20, stiffness: 140 }}
-                className="w-full flex flex-col items-center justify-center space-y-4"
+                className="w-full flex flex-col items-center justify-center space-y-2.5 sm:space-y-4"
               >
                 <div className="text-center">
-                  <span className="text-[10px] text-amber-800 font-mono tracking-wider font-bold uppercase bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">
+                  <span className="text-[8px] sm:text-[10px] text-amber-800 font-mono tracking-wider font-bold uppercase bg-amber-500/10 border border-amber-500/20 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full">
                     {item.categoryName} ・ {item.rarity} 稀有度
                   </span>
-                  <h3 className="text-stone-750 font-medium font-serif text-sm mt-1.5 opacity-90 leading-relaxed max-w-lg mx-auto">
+                  <h3 className="text-stone-750 font-medium font-serif text-xs sm:text-sm mt-1 sm:mt-1.5 opacity-90 leading-relaxed max-w-lg mx-auto">
                     {item.meaning}
                   </h3>
                 </div>
 
                 {/* Animated Physical Card Illustration */}
-                <div className="p-2.5 bg-gradient-to-b from-stone-50 to-stone-100/50 rounded-2xl border border-stone-200 shadow-sm relative overflow-hidden flex items-center justify-center">
+                <div className="p-1.5 sm:p-2.5 bg-gradient-to-b from-stone-50 to-stone-100/50 rounded-xl sm:rounded-2xl border border-stone-200 shadow-sm relative overflow-hidden flex items-center justify-center">
                   <div className="absolute inset-0 bg-radial-gradient from-white/80 to-transparent pointer-events-none" />
                   <CardIllustration
                     id={item.id}
                     category={item.category}
-                    className="w-14 h-14 pointer-events-none relative z-10 animate-bounce-slow"
+                    className="w-10 h-10 sm:w-14 sm:h-14 pointer-events-none relative z-10 animate-bounce-slow"
                   />
                 </div>
 
@@ -575,7 +578,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     </div>
 
                     {/* Guidelines info label under input block */}
-                    <div className={`text-xs px-3 py-1.5 rounded-lg border transition-all font-mono select-none ${
+                    <div className={`text-[10px] sm:text-xs px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border transition-all font-mono select-none ${
                       wordCorrect 
                         ? "bg-rose-50 border-rose-300 text-rose-700 font-bold shadow-sm" 
                         : "bg-white border-stone-200 text-stone-600 shadow-sm"
@@ -585,7 +588,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
                     {/* Live Game Combo and XP Info Overlay */}
                     {practiceMode !== "handwriting" && (
-                      <div className="flex items-center justify-between gap-4 mt-2 px-3 py-1 bg-stone-900/5 rounded-lg border border-stone-200/50 text-xs font-mono select-none">
+                      <div className="flex items-center justify-between gap-2 sm:gap-4 mt-1 sm:mt-2 px-2 sm:px-3 py-0.5 sm:py-1 bg-stone-900/5 rounded-lg border border-stone-200/50 text-[10px] sm:text-xs font-mono select-none">
                         <div className="flex items-center gap-1.5 text-stone-500">
                           <span>LEVEL</span>
                           <span className="font-black text-stone-800">{Math.floor(xp / 250) + 1}</span>
@@ -636,12 +639,12 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
         {/* The Retro Mechanical Keyboard Emulator */}
         {practiceMode !== "handwriting" && (
-          <div className="mt-4 pt-4 border-t border-stone-300 space-y-2">
-            <div className="text-center text-[10px] font-mono text-stone-400 tracking-wider select-none">
+          <div className="mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-stone-300 space-y-1 sm:space-y-2">
+            <div className="text-center text-[8px] sm:text-[10px] font-mono text-stone-400 tracking-wider select-none">
               VIRTUAL TYPEWRITER PRESSURE PLATES
             </div>
             
-            <div className="flex flex-col gap-1.5 max-w-lg mx-auto bg-stone-900 p-3 rounded-xl border border-stone-700 shadow-inner">
+            <div className="flex flex-col gap-1 sm:gap-1.5 max-w-lg mx-auto bg-stone-900 p-1.5 sm:p-3 rounded-lg sm:rounded-xl border border-stone-700 shadow-inner">
               {KEYBOARD_ROWS.map((row, rowIdx) => (
                 <div key={rowIdx} className="flex justify-center gap-1">
                   {row.map((char) => {
@@ -663,7 +666,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                           y: isPressed ? 2 : 0,
                         }}
                         onClick={() => processInputKey(char.toLowerCase())}
-                        className={`w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded text-xs font-mono font-bold transition-all select-none cursor-pointer ${
+                        className={`w-6 h-6 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center rounded text-[9px] sm:text-xs font-mono font-bold transition-all select-none cursor-pointer ${
                           isPressed
                             ? "bg-amber-500 text-stone-950 shadow-inner"
                             : isGuideKey
@@ -687,7 +690,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                       y: pressedKey === "SPACE" ? 2 : 0,
                     }}
                     onClick={() => processInputKey(" ")}
-                    className={`w-40 h-7 flex items-center justify-center rounded text-[10px] font-mono font-bold uppercase transition-all select-none border cursor-pointer ${
+                    className={`w-28 sm:w-40 h-5.5 sm:h-7 flex items-center justify-center rounded text-[9px] sm:text-[10px] font-mono font-bold uppercase transition-all select-none border cursor-pointer ${
                       pressedKey === "SPACE"
                         ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"
                         : (!isPaused && !timerFinished && !wordCorrect && currentSegment.romaji.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === " "))
@@ -702,7 +705,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
             </div>
 
             {/* Hidden Input for Mobile Native Keyboard Triggering */}
-            <div className="flex flex-col items-center justify-center pt-3 gap-2">
+            <div className="flex flex-col items-center justify-center pt-1.5 sm:pt-3 gap-1 sm:gap-2">
               <input
                 ref={inputRef}
                 type="text"
@@ -717,6 +720,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                 }}
                 className="opacity-0 absolute -z-10 w-1 h-1 pointer-events-none"
                 aria-hidden="true"
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoComplete="off"
+                spellCheck={false}
               />
               <button
                 type="button"
@@ -725,12 +732,12 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                   audioSynth.playCardSlide();
                   inputRef.current?.focus();
                 }}
-                className="md:hidden px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-95 transition-all"
+                className="md:hidden px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-95 transition-all"
               >
-                <Keyboard className="w-4 h-4 text-stone-950" />
+                <Keyboard className="w-3.5 h-3.5 text-stone-950" />
                 <span>唤起手机虚拟键盘 / 录入按键</span>
               </button>
-              <p className="md:hidden text-[9px] text-stone-400 font-mono text-center">
+              <p className="md:hidden text-[8px] sm:text-[9px] text-stone-400 font-mono text-center leading-normal">
                 (提示: 触摸屏幕任意空白位置，亦可自动触发并激活手机键盘输入)
               </p>
             </div>
