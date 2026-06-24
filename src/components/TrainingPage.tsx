@@ -124,85 +124,89 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   ];
 
   // Core spelling engine input validator
+  const processInputKey = (key: string) => {
+    if (practiceMode === "handwriting") return;
+    if (isPaused || timerFinished || wordCorrect) return;
+
+    // Only listen to standard alphabetic keys or space if in English Mode
+    const isValidKey = /^[a-z]$/.test(key) || (isEnglishMode && key === " ");
+    if (!isValidKey) return;
+
+    setPressedKey(key === " " ? "SPACE" : key.toUpperCase());
+    setTimeout(() => setPressedKey(null), 150);
+
+    const segment = item.segments[currentSegmentIdx];
+    const proposedString = romajiProgress + key;
+
+    // Check if proposedString is a prefix match of any acceptable romaji
+    const isPrefixOfAny = segment.romaji.some(r => r.startsWith(proposedString));
+    const isMatchOfAny = segment.romaji.some(r => r === proposedString);
+
+    if (isMatchOfAny) {
+      // Correct character fully completed!
+      audioSynth.playTyping();
+      audioSynth.playTypewriterBell();
+      
+      // Speak the individual syllable completed!
+      audioSynth.speakJapanese(segment.kana);
+      
+      setRomajiProgress("");
+      
+      // Advance segment index or complete whole word
+      if (currentSegmentIdx + 1 >= item.segments.length) {
+        // Entire Japanese phrase spelled correctly!
+        setWordCorrect(true);
+        audioSynth.playFanfare();
+        if (onKeyStrike) onKeyStrike("complete");
+        
+        // Read out the entire name/phrase with a gorgeous micro-delay
+        setTimeout(() => {
+          audioSynth.speakJapanese(item.kanaStr, false);
+        }, 450);
+        
+        // Show calligraphic stroke red tracing overlay for a feedback period, then proceed to next round
+        setTimeout(() => {
+          setCompletedRounds(prev => prev + 1);
+          setSlideDirection(1);
+          audioSynth.playCarriageReturn();
+          setCurrentItemIdx((prevIdx) => (prevIdx + 1) % items.length);
+          setCurrentSegmentIdx(0);
+          setRomajiProgress("");
+          setWordCorrect(false);
+        }, 1200);
+      } else {
+        setCurrentSegmentIdx(currentSegmentIdx + 1);
+        if (onKeyStrike) onKeyStrike("correct");
+      }
+    } else if (isPrefixOfAny) {
+      // Mid-spelling of romaji character (e.g. typed 't' of 'tsu')
+      audioSynth.playTyping();
+      setRomajiProgress(proposedString);
+      if (onKeyStrike) onKeyStrike("correct");
+    } else {
+      // Typing error/deviation! Trigger a warning shake and reset entire word.
+      audioSynth.playError();
+      setErrorFlash(true);
+      setTimeout(() => setErrorFlash(false), 300);
+
+      // Reset to first kana segment on error (forced deep learning reinforcement!)
+      setCurrentSegmentIdx(0);
+      setRomajiProgress("");
+      if (onKeyStrike) onKeyStrike("error");
+    }
+  };
+
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (practiceMode === "handwriting") return;
-      if (isPaused || timerFinished || wordCorrect) return;
-
       const key = e.key === " " ? " " : e.key.toLowerCase();
-      // Only listen to standard alphabetic keys or space if in English Mode
-      const isValidKey = /^[a-z]$/.test(key) || (isEnglishMode && key === " ");
-      if (!isValidKey) return;
-
-      setPressedKey(key === " " ? "SPACE" : key.toUpperCase());
-      setTimeout(() => setPressedKey(null), 150);
-
-      const segment = item.segments[currentSegmentIdx];
-      const proposedString = romajiProgress + key;
-
-      // Check if proposedString is a prefix match of any acceptable romaji
-      const isPrefixOfAny = segment.romaji.some(r => r.startsWith(proposedString));
-      const isMatchOfAny = segment.romaji.some(r => r === proposedString);
-
-      if (isMatchOfAny) {
-        // Correct character fully completed!
-        audioSynth.playTyping();
-        audioSynth.playTypewriterBell();
-        
-        // Speak the individual syllable completed!
-        audioSynth.speakJapanese(segment.kana);
-        
-        setRomajiProgress("");
-        
-        // Advance segment index or complete whole word
-        if (currentSegmentIdx + 1 >= item.segments.length) {
-          // Entire Japanese phrase spelled correctly!
-          setWordCorrect(true);
-          audioSynth.playFanfare();
-          if (onKeyStrike) onKeyStrike("complete");
-          
-          // Read out the entire name/phrase with a gorgeous micro-delay
-          setTimeout(() => {
-            audioSynth.speakJapanese(item.kanaStr, false);
-          }, 450);
-          
-          // Show calligraphic stroke red tracing overlay for a feedback period, then proceed to next round
-          setTimeout(() => {
-            setCompletedRounds(prev => prev + 1);
-            setSlideDirection(1);
-            audioSynth.playCarriageReturn();
-            setCurrentItemIdx((prevIdx) => (prevIdx + 1) % items.length);
-            setCurrentSegmentIdx(0);
-            setRomajiProgress("");
-            setWordCorrect(false);
-          }, 1200);
-        } else {
-          setCurrentSegmentIdx(currentSegmentIdx + 1);
-          if (onKeyStrike) onKeyStrike("correct");
-        }
-      } else if (isPrefixOfAny) {
-        // Mid-spelling of romaji character (e.g. typed 't' of 'tsu')
-        audioSynth.playTyping();
-        setRomajiProgress(proposedString);
-        if (onKeyStrike) onKeyStrike("correct");
-      } else {
-        // Typing error/deviation! Trigger a warning shake and reset entire word.
-        audioSynth.playError();
-        setErrorFlash(true);
-        setTimeout(() => setErrorFlash(false), 300);
-
-        // Reset to first kana segment on error (forced deep learning reinforcement!)
-        setCurrentSegmentIdx(0);
-        setRomajiProgress("");
-        if (onKeyStrike) onKeyStrike("error");
-      }
+      processInputKey(key);
     };
 
     window.addEventListener("keydown", handleKeyPress);
     return () => {
       window.removeEventListener("keydown", handleKeyPress);
     };
-  }, [currentSegmentIdx, romajiProgress, item, isPaused, timerFinished, wordCorrect, onKeyStrike, isEnglishMode]);
+  }, [currentSegmentIdx, romajiProgress, item, isPaused, timerFinished, wordCorrect, onKeyStrike, isEnglishMode, practiceMode, currentItemIdx, items]);
 
   // Formatter for time display
   const formatTime = (ms: number) => {
@@ -498,22 +502,24 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                       );
 
                     return (
-                      <motion.div
+                      <motion.button
                         key={char}
+                        whileTap={{ scale: 0.85 }}
                         animate={{
                           scale: isPressed ? 0.9 : 1,
                           y: isPressed ? 2 : 0,
                         }}
-                        className={`w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded text-xs font-mono font-bold transition-all select-none ${
+                        onClick={() => processInputKey(char.toLowerCase())}
+                        className={`w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded text-xs font-mono font-bold transition-all select-none cursor-pointer ${
                           isPressed
                             ? "bg-amber-500 text-stone-950 shadow-inner"
                             : isGuideKey
-                            ? "bg-emerald-950 text-emerald-400 border border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)]"
-                            : "bg-stone-800 text-stone-300 border border-stone-700"
+                            ? "bg-emerald-950 text-emerald-400 border border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse"
+                            : "bg-stone-800 text-stone-300 border border-stone-700 hover:bg-stone-750"
                         }`}
                       >
                         {char}
-                      </motion.div>
+                      </motion.button>
                     );
                   })}
                 </div>
@@ -521,21 +527,23 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
               {isEnglishMode && (
                 <div className="flex justify-center mt-1">
-                  <motion.div
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
                     animate={{
                       scale: pressedKey === "SPACE" ? 0.95 : 1,
                       y: pressedKey === "SPACE" ? 2 : 0,
                     }}
-                    className={`w-40 h-7 flex items-center justify-center rounded text-[10px] font-mono font-bold uppercase transition-all select-none border ${
+                    onClick={() => processInputKey(" ")}
+                    className={`w-40 h-7 flex items-center justify-center rounded text-[10px] font-mono font-bold uppercase transition-all select-none border cursor-pointer ${
                       pressedKey === "SPACE"
                         ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"
                         : (!isPaused && !timerFinished && !wordCorrect && currentSegment.romaji.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === " "))
-                        ? "bg-emerald-950 text-emerald-400 border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)]"
-                        : "bg-stone-800 text-stone-300 border-stone-700"
+                        ? "bg-emerald-950 text-emerald-400 border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse"
+                        : "bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-750"
                     }`}
                   >
                     Space
-                  </motion.div>
+                  </motion.button>
                 </div>
               )}
             </div>

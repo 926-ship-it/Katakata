@@ -33,7 +33,7 @@ export const MascotComponent: React.FC<MascotComponentProps> = ({
   // Initial greeting
   useEffect(() => {
     if (isEnglishMode) {
-      setSpeech("Hello! I am Fuku-chan, your 50-Sounds companion! Let's perfect our typing muscle memory today!");
+      setSpeech("哈罗！我是守护灵福狸酱，今天我们也要努力熟练英语名词与西式人名拼写哦！");
     } else {
       setSpeech("哈罗！我是五音守护灵福狸酱，今天我们也要努力熟化拼音哦！");
     }
@@ -51,19 +51,19 @@ export const MascotComponent: React.FC<MascotComponentProps> = ({
 
     if (isEnglishMode) {
       if (voiceType === "male") {
-        setSpeech("Voice switched to deep, elegant Masculine Master. Bold and resonant, try hitting some keys!");
+        setSpeech("已切换为沉厚博雅的男声导师！雄浑有磁性，快去敲打拼读英文字词吧！");
         setExpression("determined");
       } else if (voiceType === "child") {
-        setSpeech("Yay! Cute Child Companion selected! So sweet, sounds just like my little friends!");
+        setSpeech("哇塞！你选了软萌的童声伴读！太清脆好听啦，听着像我的小伙伴！");
         setExpression("celebrate");
       } else if (voiceType === "alien") {
-        setSpeech("Beep boop... alien frequency matched! What a mechanical rhythm from outer space!");
+        setSpeech("哔哔……检测到跨纬度宇宙的外星人声！音调居然如此魔性高亢，难道是来自外星的赛博来客？！");
         setExpression("shocked");
       } else if (voiceType === "elderly") {
-        setSpeech("Switched to wise and warm Elderly Wisdom. Let's learn with patience and years of practice.");
+        setSpeech("已切换为宽仁和蔼的智慧老人！温热迟缓的声音里满是岁月沉淀，非常有韵味哦~");
         setExpression("happy");
       } else {
-        setSpeech("Switched back to gentle, friendly Female Voice! The standard for classical Japanese practice!");
+        setSpeech("已切回亲切温婉的女声导师！风吟拂面，标准英文拼写最配你啦。");
         setExpression("happy");
       }
     } else {
@@ -96,26 +96,26 @@ export const MascotComponent: React.FC<MascotComponentProps> = ({
     if (isEnglishMode) {
       if (currentPage === "start") {
         const startSpeeches = [
-          "Ready for our elegant unified card collection loop today?",
-          "Did you know repeating names strongly anchors your physical typing reflex?",
-          "Click my belly, and I will play sweet wind chimes for you!",
-          "Each flashcard has a unique story and beautiful natural voice. Let's unlock them!",
-          "Select the names you want to battle, and initiate unified training loop!"
+          "今天也要开始优雅的西式词汇/姓名联训拼写吗？我都准备好啦！",
+          "知道吗？多敲击键盘练习拼写，能让手指形成牢固的英语单词肌肉记忆哦！",
+          "点击我的小肚子，我可以通过琴弦发出神秘的风铃之声哦！",
+          "每一张闪卡都有专属的西方文化典故与发音，快去解锁看看吧！",
+          "快把想挑战的西方词条打上勾勾，开启‘一气呵成’的联合拼写训练吧！"
         ];
         setSpeech(startSpeeches[Math.floor(Math.random() * startSpeeches.length)]);
         setExpression("happy");
       } else if (currentPage === "training") {
         if (practiceMode === "handwriting") {
-          setSpeech("Take the brush! Trace each Japanese stroke carefully to capture its elegant structural beauty!");
+          setSpeech("执笔凝神！在一笔一划间感受英文字母线条的优美流畅吧！");
         } else {
-          setSpeech("Focus! Strike the correct key targets, matching mind and mechanical typing!");
+          setSpeech("打起精神！敲击对应键位，心手合一，拼出正确的英文单词吧！");
         }
         setExpression("determined");
       } else if (currentPage === "library") {
-        setSpeech("Wow! Look at this gorgeous card collection you built! Absolutely stunning!");
+        setSpeech("哇！这就是你一路汗水打磨出来的精美收藏馆吗？好多璀璨的西式词条卡牌啊！");
         setExpression("celebrate");
       } else if (currentPage === "unlocked_ceremony") {
-        setSpeech("Unbelievable! You have unlocked a legendary golden collection card!");
+        setSpeech("天呐！天降祥瑞！恭喜你完成了高级拼写，解锁了高贵金色图鉴！");
         setExpression("celebrate");
       }
     } else {
@@ -153,14 +153,14 @@ export const MascotComponent: React.FC<MascotComponentProps> = ({
     if (currentPage === "training" && lastAction) {
       if (isEnglishMode) {
         if (lastAction === "correct") {
-          const cheerWords = ["Awesome!", "Precise!", "Keep the rhythm!", "Flowing perfectly!", "So strong!"];
+          const cheerWords = ["好棒！", "精准！", "就是这个节奏！", "行云流水！", "太强啦！"];
           setSpeech(cheerWords[Math.floor(Math.random() * cheerWords.length)]);
           setExpression("cheering");
         } else if (lastAction === "error") {
-          setSpeech("Ouch, slightly off. Take a deep breath, let's try again together!");
+          setSpeech("哎呀，拼错了。深呼吸再试一次，福狸酱陪着你！");
           setExpression("shocked");
         } else if (lastAction === "complete") {
-          setSpeech("Flawless spelling! Magnificent work, buddy!");
+          setSpeech("完美熟化英语拼写！太厉害了我的朋友！");
           setExpression("celebrate");
           setTimeout(() => setExpression("happy"), 1500);
         }
@@ -225,12 +225,11 @@ export const MascotComponent: React.FC<MascotComponentProps> = ({
 
     if (isEnglishMode) {
       const funSpeeches = [
-        "Haha, that tickles! (*^▽^*)",
-        "Tapping me chimes bells and increases learning retention!",
-        "Is my big tail soft and fluffy?",
-        "Are you looking at my little ears? They are sensitive to perfect Japanese audio!",
-        "Practice more rounds, and romajis will soon become your second nature!",
-        "Cheer up! Wishing you a lovely productive day! Heart"
+        "呀！好痒呀！(*^▽^*) 练习拼写的时候，我的大尾巴也在为你加油哦！",
+        "点击我不仅能听到清脆的风铃，英语单词也能更牢固地印在大脑里呢！",
+        "狸狸在偷偷学习西方文化呢，今天又多认得几个西方名字啦！",
+        "连续练习，让手指在键盘上飞舞，你就是最棒的拼写达人！",
+        "啾咪！给你充满元气满满的一天，加油！❤"
       ];
       setSpeech(funSpeeches[Math.floor(Math.random() * funSpeeches.length)]);
     } else {

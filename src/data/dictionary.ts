@@ -938,253 +938,253 @@ export interface EnglishOverlay {
 export const ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
   sato: {
     word: "Richard",
-    categoryName: "English Names",
-    meaning: "A classic Germanic name meaning 'brave ruler' or 'powerful leader'. It has been popular for centuries."
+    categoryName: "西式人名",
+    meaning: "经典的日耳曼语源人名，意为‘勇敢的统治者’或‘强有力的领袖’，数百年来一直深受喜爱。"
   },
   suzuki: {
     word: "William",
-    categoryName: "English Names",
-    meaning: "A timeless English name of Germanic origin, meaning 'strong-willed warrior' or 'resolute protector'."
+    categoryName: "西式人名",
+    meaning: "经典的德语语源名字，意为‘强意志的战士’或‘坚定的守护者’，深具历史厚重感。"
   },
   kimura: {
     word: "Chloe",
-    categoryName: "English Names",
-    meaning: "Of Greek origin meaning 'blooming' or 'young green shoot'. It represents fertility, youth, and freshness."
+    categoryName: "西式人名",
+    meaning: "源自希腊语，意为‘正在绽放的’或‘年轻的绿芽’。象征着丰饶生命力、青春与生机蓬勃。"
   },
   tanaka: {
     word: "Jones",
-    categoryName: "English Names",
-    meaning: "A common and highly respected patronymic surname meaning 'son of John' or 'God is gracious'."
+    categoryName: "西式人名",
+    meaning: "非常常见且受人尊敬的英文父名姓氏，意为‘大卫之子’或‘上帝的恩赐’。"
   },
   yamada: {
     word: "Olivia",
-    categoryName: "English Names",
-    meaning: "A beautiful Latin name meaning 'olive tree', representing peace, fruitfulness, and classic dignity."
+    categoryName: "西式人名",
+    meaning: "优雅的拉丁语源女名，意为‘橄榄树’，代表和平、丰收与古典尊贵的情怀。"
   },
   oda: {
     word: "Elizabeth",
-    categoryName: "English Names",
-    meaning: "A noble Hebrew name meaning 'My God is an oath', held by legendary queens and historic rule makers."
+    categoryName: "西式人名",
+    meaning: "高贵的希伯来语名字，意为‘我的上帝是誓约’。历史上有多位传奇女王和杰出女性使用此名。"
   },
   sakura: {
     word: "Strawberry",
-    categoryName: "Nature & Animals",
-    meaning: "A sweet, bright-red heart-shaped summer fruit, widely enjoyed fresh and in delicious desserts."
+    categoryName: "自然与动物",
+    meaning: "草莓。一种甜美、鲜红的心形夏季水果，常作为鲜食或制作美味甜点，饱含元气色彩。"
   },
   fuji: {
     word: "Mountain Peak",
-    categoryName: "Nature & Animals",
-    meaning: "The majestic peak of high ranges, symbolizing strength, endurance, adventure, and panoramic heights."
+    categoryName: "自然与动物",
+    meaning: "山峰。山脉的雄伟峰顶，象征着力量、坚韧、勇敢探险与俯瞰万物的广阔视野。"
   },
   aozora: {
     word: "Blue Sky",
-    categoryName: "Nature & Animals",
-    meaning: "The clear azure sky above, conveying a sense of limitless freedom, joy, and sunny optimism."
+    categoryName: "自然与动物",
+    meaning: "蓝天。晴朗碧蓝的天空，传递出无限自由、喜悦与阳光般的乐观主义情怀。"
   },
   asagao: {
     word: "Morning Glory",
-    categoryName: "Nature & Animals",
-    meaning: "A gorgeous twining flower that blooms beautifully at dawn, symbol of seasonal rhythms."
+    categoryName: "自然与动物",
+    meaning: "牵牛花。清晨盛开的蔓生花朵，拥有美丽的喇叭状花冠，象征着生命的朝气与季节的韵律。"
   },
   kotone: {
     word: "Melody",
-    categoryName: "English Names",
-    meaning: "A sweet and pleasing sequence of musical notes that carries deep emotion and creative harmony."
+    categoryName: "西式人名",
+    meaning: "旋律。一串悦耳动听、协调而富有感情的音乐序列，承载着艺术创作与美妙共处的灵性。"
   },
   shiki: {
     word: "Seasons",
-    categoryName: "Nature & Animals",
-    meaning: "The wonderful annual sequence of spring, summer, autumn, and winter showing nature's life cycle."
+    categoryName: "自然与动物",
+    meaning: "四季。春、夏、秋、冬的自然轮回更替，生动展现了生命大自然的生生不息与时令律动。"
   },
   dango: {
     word: "Sweet Cake",
-    categoryName: "English Delicacies",
-    meaning: "A delicious confection crafted with sugar, flour, and icing, shared at warm birthday gatherings."
+    categoryName: "西餐美味",
+    meaning: "甜蛋糕。用糖、面粉和奶油精心制作的糕点，常常在温馨的生日派对与好友欢聚中分食。"
   },
   momiji: {
     word: "Maple Leaf",
-    categoryName: "Nature & Animals",
-    meaning: "The elegant star-shaped autumn leaf colored of brilliant crimson, symbol of fall nature trails."
+    categoryName: "自然与动物",
+    meaning: "枫叶。秋天里变成璀璨深红色的星形叶片，是秋日自然山野间充满诗情画意的绝美象征。"
   },
   daruma: {
     word: "Tumbling Toy",
-    categoryName: "Objects & Concepts",
-    meaning: "A classic weighted nesting toy that wobbles but never falls down, representing resilience."
+    categoryName: "物品与概念",
+    meaning: "不倒翁。底部加重且重心在下的传统玩具，无论怎么摇晃都不会倒下，代表着不屈不挠的复原力。"
   },
   heiwa: {
     word: "Harmony",
-    categoryName: "Objects & Concepts",
-    meaning: "A serene state of balance, unity, and peaceful cooperation within communities and inner self."
+    categoryName: "物品与概念",
+    meaning: "和谐。一种宁静祥和的状态，指社区之间或内心深处的平衡、团结与友好合作。"
   },
   kabuki: {
     word: "Broadway",
-    categoryName: "Objects & Concepts",
-    meaning: "A major hub of theatrical excellence, showcasing iconic musical dramas and stellar live acting."
+    categoryName: "物品与概念",
+    meaning: "百老汇。戏剧艺术的核心殿堂，以上演经典音乐剧和顶尖现场表演而闻名全球，洋溢着狂欢的魅力。"
   },
   toyotomi: {
     word: "James",
-    categoryName: "English Names",
-    meaning: "A popular English name meaning 'supplanter', worn by kings, explorers, and modern achievers."
+    categoryName: "西式人名",
+    meaning: "非常受欢迎的英语男名，意为‘代位者’或‘跟随者’。深受许多国王、探险家及现代名人的喜爱。"
   },
   tokugawa: {
     word: "Robert",
-    categoryName: "English Names",
-    meaning: "A classic name of Germanic origin, meaning 'bright fame' or 'shining with glorious reputation'."
+    categoryName: "西式人名",
+    meaning: "经典的日耳曼语源名字，意为‘辉煌的名声’或‘闪耀的荣耀’，饱含着伟人般的历史威望。"
   },
   kawabata: {
     word: "Arthur",
-    categoryName: "English Names",
-    meaning: "An ancient Celtic name meaning 'bear hero' or 'noble stone', associated with the legendary King Arthur."
+    categoryName: "西式人名",
+    meaning: "古老凯尔特语源名字，意为‘熊之英雄’或‘高贵的磐石’。常使人联想到传奇的亚瑟王。"
   },
   miyazaki: {
     word: "Director",
-    categoryName: "Objects & Concepts",
-    meaning: "The creative mastermind behind films, orchestrating visual flows, character growth, and deep plots."
+    categoryName: "物品与概念",
+    meaning: "导演。电影背后的创意总监，统筹视觉镜头、角色成长和故事叙事的灵魂人物。"
   },
   sushi: {
     word: "Sushi Rice",
-    categoryName: "English Delicacies",
-    meaning: "Lightly seasoned gourmet short-grain rice paired with ocean delicacies for a fresh, healthy bite."
+    categoryName: "西餐美味",
+    meaning: "寿司饭。经过温和调味、酸甜适口的短粒饱满大米，通常搭配海洋鲜美食材作轻盈一口食。"
   },
   matcha: {
     word: "Green Tea",
-    categoryName: "English Delicacies",
-    meaning: "A refreshing antioxidant-rich green herbal brew, loved for its calming focus and earthy notes."
+    categoryName: "西餐美味",
+    meaning: "绿茶。富含抗氧化成分的清晨幼嫩茶叶微粉，因苦尽甘来的清幽香气、提神且平静的口感而深受喜爱。"
   },
   ramen: {
     word: "Spicy Noodles",
-    categoryName: "English Delicacies",
-    meaning: "Delectable wheat noodles served in steaming aromatic savory broth, topped with tasty seasonings."
+    categoryName: "西餐美味",
+    meaning: "香辣拉面。热气腾腾、香气四溢的拉面，浸在精心熬制的浓郁高汤中，辅以香辛红油，暖腹安心。"
   },
   wagashi: {
     word: "Cheesecake",
-    categoryName: "English Delicacies",
-    meaning: "A rich, creamy, and velvety dessert built over a sweet graham cracker crust, a true favorite."
+    categoryName: "西餐美味",
+    meaning: "芝士蛋糕。口感浓郁、丝滑香软的西方流行甜点，通常搭配威化饼干酥底，是下午茶当红不让的主角。"
   },
   sake: {
     word: "bottled water",
-    categoryName: "Objects & Concepts",
-    meaning: "Pure, filtered fresh drinking water sealed in convenient portable bottles to keep you active and healthy."
+    categoryName: "物品与概念",
+    meaning: "瓶装水。在便携瓶中密封的纯净过滤淡水，帮助您在工作与高强度运动中补充水分、保持健康。"
   },
   jinja: {
     word: "Cathedral",
-    categoryName: "Objects & Concepts",
-    meaning: "An architectural masterpiece of sacred gatherings, distinguished by tall arches and stained glass."
+    categoryName: "物品与概念",
+    meaning: "大堂（大教堂）。宏伟壮丽、充满信仰气息的神圣建筑杰作，以高耸的尖顶拱门和斑斓彩色玻璃天窗著称。"
   },
   ninja: {
     word: "Shadow Agent",
-    categoryName: "Objects & Concepts",
-    meaning: "A stealthy special operations agent, known for unparalleled agility, intelligence, and secrecy."
+    categoryName: "物品与概念",
+    meaning: "影子情报员。精通隐匿、打探等影子谍战术，行动绝对隐秘快速、忠诚而敏锐的顶尖战术高手。"
   },
   bushi: {
     word: "Knight",
-    categoryName: "Objects & Concepts",
-    meaning: "A high-ranking armored warrior of medieval history, bound by strict vows of chivalry and courage."
+    categoryName: "物品与概念",
+    meaning: "骑士。中世纪历史上的重装贵族战士，恪守严格的谦逊、仗义、英勇和忠诚的八大德行誓言。"
   },
   bento: {
     word: "Lunch Box",
-    categoryName: "Objects & Concepts",
-    meaning: "A neatly organized portable container housing multiple partitions of delicious home-cooked meals."
+    categoryName: "物品与概念",
+    meaning: "便当盒（午餐盒）。分隔清晰、设计周到的便携容器，用于盛装丰盛、富有家常关怀的手作膳食。"
   },
   onsen: {
     word: "Hot Spring",
-    categoryName: "Nature & Animals",
-    meaning: "A warm, geothermal spring rich in soothing minerals, perfect for outdoor muscular relaxation."
+    categoryName: "自然与动物",
+    meaning: "温泉。地下天然涌出的富含矿物质的地热温水，对舒缓肌肉、静心理疗有极佳的放松和治愈疗效。"
   },
   hotaru: {
     word: "Firefly",
-    categoryName: "Nature & Animals",
-    meaning: "A tiny soft-bodied beetle that flashes beautiful yellow-green bioluminescent signals in summer nights."
+    categoryName: "自然与动物",
+    meaning: "萤火虫。一种微小的软体甲虫，在仲夏夜的草丛池塘边散发迷人的黄绿色冷光信号，充满浪漫气息。"
   },
   semi: {
     word: "Cicada",
-    categoryName: "Nature & Animals",
-    meaning: "A high-pitched summer insect that sings vibrant songs from tall outdoor trees during peak seasons."
+    categoryName: "自然与动物",
+    meaning: "蝉。在盛夏至酷热季节的绿树上，不断发出高亢声浪和悠扬鸣叫声、象征生命灿烂宣泄的昆虫。"
   },
   haiku: {
     word: "Poetry",
-    categoryName: "Objects & Concepts",
-    meaning: "An expressive artistic arrange of words, rhythm, and rich metaphors to evoke emotions."
+    categoryName: "物品与概念",
+    meaning: "诗歌。用优美跳跃的词藻、高雅的格律和深邃隐喻创作的语言艺术，用于传情达意、吟咏心境。"
   },
   torii: {
     word: "Gateway",
-    categoryName: "Objects & Concepts",
-    meaning: "An entrance frame separating different areas, welcoming tourists and visitors to beautiful parks."
+    categoryName: "物品与概念",
+    meaning: "大门。用于分隔不同区域或作为入口框架，欢迎游客到来或宣告一段庄严路途的转换。"
   },
   hanabi: {
     word: "Fireworks",
-    categoryName: "Nature & Animals",
-    meaning: "Visual aerial displays of colors and thunders launched to celebrate holidays and summer festivals."
+    categoryName: "自然与动物",
+    meaning: "烟花。利用绚烂火药在夜空中燃放的缤纷视觉和听觉盛宴，为节日庆典与重要活动增添欢庆气氛。"
   },
   soba: {
     word: "Buckwheat",
-    categoryName: "English Delicacies",
-    meaning: "A highly nutritious grain used to make delicious breakfast foods and traditional noodles."
+    categoryName: "西餐美味",
+    meaning: "荞麦。一种高度营养的耐旱谷类作物，主要用于碾作面粉，从而烹制成经典的传统麦香荞麦面条。"
   },
   tempura: {
     word: "Fried Shrimp",
-    categoryName: "English Delicacies",
-    meaning: "Crispy, golden-panko coated jumbo shrimp, fried to perfect tender crunchiness."
+    categoryName: "西餐美味",
+    meaning: "天妇罗大虾（炸虾）。裹着酥金黄金面衣的肥美大虾，经精微妙火油炸，口感酥脆蓬松、虾肉鲜甜Q弹。"
   },
   takoyaki: {
     word: "Octopus Ball",
-    categoryName: "English Delicacies",
-    meaning: "A savory sphere of wheat batter featuring a tender piece of saltwater octopus, baked on hot pans."
+    categoryName: "西餐美味",
+    meaning: "章鱼小丸子。一种源于街头的美味，在特制烤盘上翻转烤成金黄色外皮，包裹大块Q弹章鱼，香气四溢。"
   },
   mochi: {
     word: "Rice Cake",
-    categoryName: "English Delicacies",
-    meaning: "A delightfully chewy, sweet, and soft steamed flour treat, usually filled with sweet paste."
+    categoryName: "西餐美味",
+    meaning: "糯米糕。通过熟糯米碾打塑造而成的美味，质地极其柔韧软糯，可包甜馅或加入汤中慢熬。"
   },
   gohan: {
     word: "Steamed Rice",
-    categoryName: "English Delicacies",
-    meaning: "The fundamental standard grain cooked with hot steam, soft, fluffy, and perfect with any dish."
+    categoryName: "西餐美味",
+    meaning: "米饭。经过高温热蒸汽焖制而成的白大米饭，松软清甜、水润饱满，是佐餐膳食的基础支柱。"
   },
   yukata: {
     word: "Summer Dress",
-    categoryName: "Objects & Concepts",
-    meaning: "A light, breezy cotton garment worn during sunny outdoor leisure activities and warm picnics."
+    categoryName: "物品与概念",
+    meaning: "夏季轻服。质地极其透气、轻薄，在盛夏季节常作为乘凉、泡温泉和参加户外夏日野餐的休闲美装。"
   },
   matsuri: {
     word: "Carnival",
-    categoryName: "Objects & Concepts",
-    meaning: "A lively, energetic outdoor fair featuring musical bands, giant rides, games, and candy floss."
+    categoryName: "物品与概念",
+    meaning: "狂欢庆典。具有宏大规模的民间欢聚活动，往往伴随游行花车、游戏摊、美食及载歌载舞的欢快交融。"
   },
   geisha: {
     word: "Dancer",
-    categoryName: "Objects & Concepts",
-    meaning: "A performing artist who tells powerful historical stories through stylized, expressive bodily motions."
+    categoryName: "物品与概念",
+    meaning: "舞者（传统演艺人）。受过顶尖训练的古典表演家，通过精湛优雅的中世纪舞姿向观众叙述历史传说。"
   },
   origami: {
     word: "Paper Craft",
-    categoryName: "Objects & Concepts",
-    meaning: "The creative, calming craft of folding colored square papers into birds, stars, and shapes."
+    categoryName: "物品与概念",
+    meaning: "折纸艺术。通过灵巧的折线创意手工，仅凭双手将平整的彩色纸张演化出造型生动的动植物和几何载体。"
   },
   kimono: {
     word: "Silk Gown",
-    categoryName: "Objects & Concepts",
-    meaning: "A luxurious ceremonial robe crafted from premium silk fabrics, worn on highly formal stages."
+    categoryName: "物品与概念",
+    meaning: "绸缎华服。用极为名贵珍稀的织锦、真丝缎料手工裁制的正规华美大装礼袍，象征极高的尊贵礼仪。"
   },
   tsuki: {
     word: "Silver Moon",
-    categoryName: "Nature & Animals",
-    meaning: "The glowing celestial sphere that brightens the dark night sky, inspiring bedtime dreamers."
+    categoryName: "自然与动物",
+    meaning: "银月。高悬于漆黑苍穹中的神秘莹白色天体，撒下温柔静谧的光影，自古激荡着文人雅客的遐思。"
   },
   yuki: {
     word: "Snowflake",
-    categoryName: "Nature & Animals",
-    meaning: "A single, exquisitely symmetric ice crystal falling silently from grey clouds in beautiful winters."
+    categoryName: "自然与动物",
+    meaning: "雪花。在隆冬严寒高空水气凝结飘落的对称微晶冰体，千姿百态，将天地笼罩装扮成清雅雪原。"
   },
   kaze: {
     word: "Gentle Breeze",
-    categoryName: "Nature & Animals",
-    meaning: "A cool, light movement of air that softly rustles the green forest leaves on warm afternoons."
+    categoryName: "自然与动物",
+    meaning: "和风微风。一种轻柔拂面、温暖宜人的空气流动，悄然摇动枝叶和小风铃，令人心旷神怡。"
   },
   shiba: {
     word: "Puppy Dog",
-    categoryName: "Nature & Animals",
-    meaning: "A loyal, energetic, and highly playful companion with furry ears and a wagging tail."
+    categoryName: "自然与动物",
+    meaning: "柴犬。忠诚机警、性格极其逗趣亲人的日本本土名品古犬种，常常展现出阳光治愈系的微风微笑。"
   }
 };
 

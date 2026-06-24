@@ -162,7 +162,7 @@ export const StartPage: React.FC<StartPageProps> = ({
             <span className="inline-block w-3.5 h-10 md:h-12 bg-amber-500 animate-[pulse_1s_infinite] ml-1 shrink-0" title="Cursor" />
           </h1>
           <div className="text-lg md:text-xl font-serif font-bold text-stone-700 tracking-wider">
-            {uiTranslate("五十音集卡练习 / 假名打字图鉴", isEnglishMode, "五十音集卡练习 / 假名打字图鉴")}
+            {isEnglishMode ? "英语单词集卡练习 / 拼写打字图鉴" : "五十音集卡练习 / 假名打字图鉴"}
           </div>
         </div>
       </div>
@@ -177,7 +177,7 @@ export const StartPage: React.FC<StartPageProps> = ({
           <div className="flex-1 min-w-0">
             <div className="text-xs text-stone-500 font-mono">BINDER COLLECTION PROGRESS</div>
             <div className="text-2xl font-black text-stone-800 font-serif">
-              {collectedIds.length} <span className="text-sm text-stone-400 font-sans">/ {activeDict.length} {isEnglishMode ? "Cards" : "卡片"}</span>
+              {collectedIds.length} <span className="text-sm text-stone-400 font-sans">/ {activeDict.length} 卡片</span>
             </div>
             <div className="w-full bg-stone-100 rounded-full h-1.5 mt-1 overflow-hidden">
               <div 
@@ -196,10 +196,10 @@ export const StartPage: React.FC<StartPageProps> = ({
           <div className="flex-1 min-w-0">
             <div className="text-xs text-stone-500 font-mono">TODAY UNLOCKED LIMIT</div>
             <div className="text-xl font-bold text-stone-800">
-              {isEnglishMode ? "Target:" : "目标:"} <span className="text-rose-600 font-serif font-black">{sessionLimit}</span> {isEnglishMode ? "Cards" : "位姓名"}
+              目标: <span className="text-rose-600 font-serif font-black">{sessionLimit}</span> {isEnglishMode ? "个单词" : "位姓名"}
             </div>
             <div className="text-xs text-stone-400 mt-1">
-              {isEnglishMode ? "Custom session volume selection" : "由你每日自行选定，稳扎稳打"}
+              由你每日自行选定，稳扎稳打
             </div>
           </div>
           <div className="flex flex-col gap-1">
@@ -228,8 +228,8 @@ export const StartPage: React.FC<StartPageProps> = ({
           </div>
           <div className="flex-1">
             <div className="text-xs text-stone-500 font-mono">MEMORIES & FOLKLORES</div>
-            <p className="text-base font-black text-amber-900 font-serif">{isEnglishMode ? "Card Ledger Library" : "个人收藏卡牌库"}</p>
-            <p className="text-xs text-amber-700 mt-0.5">{isEnglishMode ? "Browse unlocked cards & folklore analysis →" : "翻阅已收集卡片，查阅AI文化解析 →"}</p>
+            <p className="text-base font-black text-amber-900 font-serif">{isEnglishMode ? "英语单词收藏相册" : "个人收藏卡牌库"}</p>
+            <p className="text-xs text-amber-700 mt-0.5">{isEnglishMode ? "翻阅已收集词条，查阅AI文化历史解析 →" : "翻阅已收集卡片，查阅AI文化解析 →"}</p>
           </div>
         </button>
       </div>
@@ -250,11 +250,11 @@ export const StartPage: React.FC<StartPageProps> = ({
             </span>
             <h2 className="text-xl font-black text-stone-900 font-serif flex items-center gap-1.5">
               <BarChart2 className="w-5 h-5 text-amber-600" />
-              <span>{uiTranslate("练习数据仪表盘 & 每日回顾温故", isEnglishMode, "练习数据仪表盘 & 每日回顾温故")}</span>
+              <span>{isEnglishMode ? "英文拼写数据仪 & 每日回顾温故" : "练习数据仪表盘 & 每日回顾温故"}</span>
             </h2>
           </div>
           <p className="text-xs text-stone-500 font-mono text-left sm:text-right">
-            {uiTranslate("当前熟力值", isEnglishMode, "当前熟力值")} : <span className="text-amber-800 font-bold">{totalRounds}</span> {isEnglishMode ? "Rounds Finished" : "圈大熟化"}
+            {isEnglishMode ? "当前单词熟力值" : "当前熟力值"} : <span className="text-amber-800 font-bold">{totalRounds}</span> {isEnglishMode ? "圈拼写大熟化" : "圈大熟化"}
           </p>
         </div>
 
@@ -269,20 +269,20 @@ export const StartPage: React.FC<StartPageProps> = ({
                   <Award className="w-7 h-7 text-amber-600 animate-pulse" />
                   <span className="text-xs font-serif font-black text-stone-800 mt-1 block leading-tight">
                     {(() => {
-                      if (isEnglishMode) {
-                        if (totalRounds < 3) return "Beginner";
-                        if (totalRounds < 10) return "Novice";
-                        if (totalRounds < 25) return "Intermediate";
-                        if (totalRounds < 50) return "Advanced";
-                        return "Master";
-                      } else {
-                        if (totalRounds < 3) return "初学者";
-                        if (totalRounds < 10) return "入门者";
-                        if (totalRounds < 25) return "熟练者";
-                        if (totalRounds < 50) return "精通者";
-                        return "大师";
-                      }
-                    })()}
+                    if (isEnglishMode) {
+                      if (totalRounds < 3) return "拼写新手";
+                      if (totalRounds < 10) return "词汇萌新";
+                      if (totalRounds < 25) return "熟练学者";
+                      if (totalRounds < 50) return "拼写达人";
+                      return "词汇宗师";
+                    } else {
+                      if (totalRounds < 3) return "初学者";
+                      if (totalRounds < 10) return "入门者";
+                      if (totalRounds < 25) return "熟练者";
+                      if (totalRounds < 50) return "精通者";
+                      return "大师";
+                    }
+                  })()}
                   </span>
                 </div>
                 <span className="text-[8px] font-mono text-stone-400 block scale-90">{uiTranslate("连续打卡动力", isEnglishMode, "连续打卡动力")}</span>
@@ -295,7 +295,7 @@ export const StartPage: React.FC<StartPageProps> = ({
                   {Math.round((collectedIds.length / activeDict.length) * 100)}%
                 </span>
                 <span className="text-[8px] font-mono text-stone-400 block scale-90">
-                  {collectedIds.length}{isEnglishMode ? " / " : "张 / "}{activeDict.length}{isEnglishMode ? " Cards" : "张"}
+                  {collectedIds.length} / {activeDict.length} 张
                 </span>
               </div>
 
@@ -310,7 +310,7 @@ export const StartPage: React.FC<StartPageProps> = ({
                     return accum + (roundsNum * cost * 3); // Average keystrokes per session rounds due to error reset overhead
                   }, 0)}+
                 </span>
-                <span className="text-[8px] font-mono text-stone-400 block scale-90">{isEnglishMode ? "Fingers Heat" : "估计打字功力"}</span>
+                <span className="text-[8px] font-mono text-stone-400 block scale-90">{isEnglishMode ? "打字手感热度" : "估计打字功力"}</span>
               </div>
             </div>
 
@@ -321,10 +321,10 @@ export const StartPage: React.FC<StartPageProps> = ({
               </span>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { id: "name", name: isEnglishMode ? "Japanese Names" : "人名册", color: "bg-slate-450", border: "border-slate-350" },
-                  { id: "nature", name: isEnglishMode ? "Nature & Scenery" : "自然物", color: "bg-pink-400", border: "border-pink-300" },
-                  { id: "culture", name: isEnglishMode ? "Tradition & Folklore" : "民俗祭", color: "bg-purple-500", border: "border-purple-300" },
-                  { id: "food", name: isEnglishMode ? "Cuisine & Food" : "和美味", color: "bg-rose-450", border: "border-rose-450" },
+                  { id: "name", name: isEnglishMode ? "西式人名" : "人名册", color: "bg-slate-450", border: "border-slate-350" },
+                  { id: "nature", name: isEnglishMode ? "自然与动物" : "自然物", color: "bg-pink-400", border: "border-pink-300" },
+                  { id: "culture", name: isEnglishMode ? "物品与概念" : "民俗祭", color: "bg-purple-500", border: "border-purple-300" },
+                  { id: "food", name: isEnglishMode ? "西餐美味" : "和美味", color: "bg-rose-450", border: "border-rose-450" },
                 ].map(cat => {
                   const catItems = activeDict.filter(x => x.category === cat.id);
                   const catUnlocked = catItems.filter(x => collectedIds.includes(x.id));
@@ -350,14 +350,14 @@ export const StartPage: React.FC<StartPageProps> = ({
             <div className="space-y-1">
               <span className="text-[10px] font-mono text-rose-700 font-black uppercase tracking-wider flex items-center gap-1">
                 <Clock className="w-3 h-3 text-rose-600 animate-spin-slow" />
-                <span>{isEnglishMode ? "Ebbinghaus Revision Helper" : "艾宾浩斯防忘曲轨推荐"}</span>
+                <span>{isEnglishMode ? "艾宾浩斯记忆防忘助手" : "艾宾浩斯防忘曲轨推荐"}</span>
               </span>
               <h3 className="text-sm font-black font-serif text-stone-850">
-                {isEnglishMode ? "Daily Core Retention Loop" : "每日防遗温故循环 Daily Review"}
+                {isEnglishMode ? "每日防遗忘温故循环" : "每日防遗温故循环 Daily Review"}
               </h3>
               <p className="text-[11px] text-stone-500 leading-relaxed">
                 {isEnglishMode 
-                  ? "Based on past practice volume, these 3 unlocked cards are prioritized for daily review:" 
+                  ? "基于你之前的拼写统计，这3个已解锁的英文单词已被推荐作为今日温故重点：" 
                   : "以下3个你已解锁的历史老卡，练力次数最少点，已被定为今日必练的温顾循环词条："}
               </p>
             </div>
@@ -371,10 +371,10 @@ export const StartPage: React.FC<StartPageProps> = ({
                 return (
                   <div className="flex-1 p-4 rounded-xl border border-dashed border-stone-300 flex flex-col items-center justify-center text-center space-y-1.5 bg-white">
                     <BookOpenCheck className="w-7 h-7 text-stone-350" />
-                    <p className="text-[11px] font-bold text-stone-600">{isEnglishMode ? "Review Stream Recommendations" : "拼写待解卡推荐"}</p>
+                    <p className="text-[11px] font-bold text-stone-600">{isEnglishMode ? "拼写推荐温故卡" : "拼写待解卡推荐"}</p>
                     <p className="text-[10px] text-stone-400 max-w-xs">
                       {isEnglishMode 
-                        ? "No cards unlocked yet. Practice and complete at least one card below to trigger this daily engine!" 
+                        ? "你目前还没有收集到任何英文单词。在下方列表选中并拼写熟化一轮吧！" 
                         : "目前你还没有收集到任何卡牌。在下方词库列表点击【拼写熟化】一轮，即可开启每日温顾智能引擎！"}
                     </p>
                   </div>
@@ -388,14 +388,14 @@ export const StartPage: React.FC<StartPageProps> = ({
                       <div key={item.id} className="p-1.5 px-2.5 rounded-lg bg-white border border-stone-250 flex items-center justify-between gap-2 shadow-sm">
                         <div className="flex items-center gap-1.5">
                           <span className="font-serif font-black text-stone-900 text-sm">
-                            {isEnglishMode ? (LANG_MAPPING[item.id]?.title || item.kanji) : item.kanji}
+                            {item.kanji}
                           </span>
                           <span className="text-[10px] text-stone-450 font-mono">
-                            {isEnglishMode ? `(${item.kanji} • ${item.kanaStr})` : `(${item.kanaStr})`}
+                            {isEnglishMode ? "" : `(${item.kanaStr})`}
                           </span>
                         </div>
                         <span className="text-[9px] font-mono text-amber-800 bg-amber-500/10 px-1.5 rounded font-black border border-amber-500/20">
-                          {isEnglishMode ? `Practiced ${practiceTimes[item.id] || 0} times` : `已练 ${practiceTimes[item.id] || 0} 轮`}
+                          {isEnglishMode ? `已练习 ${practiceTimes[item.id] || 0} 轮` : `已练 ${practiceTimes[item.id] || 0} 轮`}
                         </span>
                       </div>
                     ))}
@@ -409,7 +409,7 @@ export const StartPage: React.FC<StartPageProps> = ({
                     className="w-full py-2.5 rounded-xl bg-stone-900 border border-stone-850 hover:bg-amber-600 text-stone-50 hover:text-stone-950 font-black text-[11px] flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
                   >
                     <Play className="w-3.5 h-3.5" />
-                    <span>{isEnglishMode ? "Review All: Direct Spell Legacy Deck (3m) ＞" : "温故知新：一键拼通今日老卡 (3分钟) ＞"}</span>
+                    <span>{isEnglishMode ? "温故知新：一键拼通今日英文词 (3分钟) ＞" : "温故知新：一键拼通今日老卡 (3分钟) ＞"}</span>
                   </button>
                 </div>
               );
@@ -439,7 +439,7 @@ export const StartPage: React.FC<StartPageProps> = ({
                     }`}
                     title={isActive ? "Completed" : "Pending"}
                   >
-                    {isActive ? (isEnglishMode ? "O" : "印") : (isEnglishMode ? "X" : "默")}
+                    {isActive ? "印" : "默"}
                   </div>
                 </div>
               );
@@ -453,7 +453,7 @@ export const StartPage: React.FC<StartPageProps> = ({
         <div>
           <h2 className="text-2xl font-black text-stone-950 font-serif flex items-center gap-2">
             <Settings className="w-5.5 h-5.5 text-amber-600" />
-            {isEnglishMode ? "Step 1: Set Practices Duration Limit" : "第一步：设定本次循环的时长"}
+            {isEnglishMode ? "第一步：设定本次训练拼写时长" : "第一步：设定本次循环的时长"}
           </h2>
           <p className="text-xs text-stone-500 font-mono mt-1">THE TRAINING TIME ENGINE CONFIGURATION</p>
         </div>
@@ -474,7 +474,7 @@ export const StartPage: React.FC<StartPageProps> = ({
               }`}
             >
               <Clock className="w-4 h-4" />
-              <span>{mins} {isEnglishMode ? "Mins" : "分钟"}</span>
+              <span>{mins} 分钟</span>
             </button>
           ))}
           <button
@@ -486,7 +486,7 @@ export const StartPage: React.FC<StartPageProps> = ({
             }`}
           >
             <Settings className="w-3.5 h-3.5" />
-            <span>{isEnglishMode ? "Custom Duration" : "其它自定义"}</span>
+            <span>{isEnglishMode ? "其它自定义时长" : "其它自定义"}</span>
           </button>
         </div>
 
@@ -513,9 +513,7 @@ export const StartPage: React.FC<StartPageProps> = ({
               <span className="text-xs text-stone-600 font-sans">{isEnglishMode ? "min" : "分钟"}</span>
             </div>
             <div className="text-[11px] text-amber-700 italic">
-              {isEnglishMode 
-                ? "(Highly recommended to set 3 to 10 minutes to maintain optimal cognitive concentration)" 
-                : "（训练将在极短时间内产生肌肉习惯，建议设定 3 至 10 分钟）"}
+              {isEnglishMode ? "（连续高强度拼写大脑会形成神经记忆，建议设定 3 至 10 分钟）" : "（训练将在极短时间内产生肌肉习惯，建议设定 3 至 10 分钟）"}
             </div>
           </motion.div>
         )}
@@ -526,7 +524,7 @@ export const StartPage: React.FC<StartPageProps> = ({
         <div>
           <h2 className="text-2xl font-black text-stone-950 font-serif flex items-center gap-2">
             <Settings className="w-5.5 h-5.5 text-amber-600" />
-            {isEnglishMode ? "Step 2: Choose Practice Mode" : "第二步：选择练习模式"}
+            {isEnglishMode ? "第二步：选择英文练习交互模式" : "第二步：选择练习模式"}
           </h2>
           <p className="text-xs text-stone-500 font-mono mt-1">SELECT PREFERRED INTERACTION SYSTEM MODE</p>
         </div>
@@ -544,10 +542,10 @@ export const StartPage: React.FC<StartPageProps> = ({
               <Keyboard className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-bold text-sm">{isEnglishMode ? "Typing Practice Mode" : "打字练习模式"}</div>
+              <div className="font-bold text-sm">{isEnglishMode ? "字母打字练习模式" : "打字练习模式"}</div>
               <p className={`text-[11px] mt-1 leading-normal ${practiceMode === "typing" ? "text-stone-300" : "text-stone-500"}`}>
                 {isEnglishMode 
-                  ? "Type using physically attached or virtual keypads. Romaji typing matches and logs accuracy directly to foster keyboard muscle memory." 
+                  ? "敲击键盘物理键位或屏幕虚拟输入。以连续英文字母进行高速拼写验证，在规定时间内强化手脑协调拼写直觉。" 
                   : "敲击键盘物理键位或虚拟输入。以罗马音（Romaji）进行高速拼写验证，在规定循环内牢固肌肉敲击神经直觉。"}
               </p>
             </div>
@@ -565,10 +563,10 @@ export const StartPage: React.FC<StartPageProps> = ({
               <BookOpenCheck className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-bold text-sm">{isEnglishMode ? "Stroke Handwriting Mode" : "手写描红模式"}</div>
+              <div className="font-bold text-sm">{isEnglishMode ? "手写字母临摹模式" : "手写描红模式"}</div>
               <p className={`text-[11px] mt-1 leading-normal ${practiceMode === "handwriting" ? "text-stone-300" : "text-stone-500"}`}>
                 {isEnglishMode 
-                  ? "Practice hand strokes drawing directly on grid boards. Get precision ratings and muscle sensory flow for authentic Japanese handwriting style." 
+                  ? "在格内进行指尖或触控手写英文字母临摹。AI 智能审查字母笔锋契合度与溢出率，快速掌握字母的标准正规书写。" 
                   : "在格内进行指尖或手写笔划描红临摹。AI 智能审查笔锋契合度与溢出率，契合物理触觉，快速掌握假名风骨结构。"}
               </p>
             </div>
@@ -583,7 +581,7 @@ export const StartPage: React.FC<StartPageProps> = ({
             <div>
               <h2 className="text-2xl font-black text-stone-950 font-serif flex items-center gap-2">
                 <Sparkles className="w-5.5 h-5.5 text-amber-600" />
-                {isEnglishMode ? "Step 3: Select Name/Vocabulary Packs to Practice" : "第三步：选择目标人名 / 词汇组合进行熟化"}
+                {isEnglishMode ? "第三步：选择目标英文词汇组合进行熟化" : "第三步：选择目标人名 / 词汇组合进行熟化"}
               </h2>
               <p className="text-xs text-stone-500 font-mono mt-1">CHOOSE TARGET CARDS ACCORDING TO DEEPEST TYPING ENZYME LIMIT</p>
             </div>
@@ -591,20 +589,20 @@ export const StartPage: React.FC<StartPageProps> = ({
               onClick={handleRandomDraw}
               className="px-4 py-2 rounded-xl bg-orange-600 text-stone-50 hover:bg-orange-700 font-bold text-sm shadow-sm hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <span>{isEnglishMode ? "Random Draw" : "随机大密抽卡"}</span>
+              <span>{isEnglishMode ? "随机抽取单词" : "随机大密抽卡"}</span>
             </button>
           </div>
 
           {/* Dictionary Filtering Controls */}
           <div className="flex flex-wrap items-center gap-1.5 mt-4 border-b border-stone-200 pb-3">
             {[
-              { id: "all", label: isEnglishMode ? "All Packs" : "全部词库" },
-              { id: "locked", label: isEnglishMode ? "Locked Only" : "尚未解锁" },
-              { id: "unlocked", label: isEnglishMode ? "Collected Only" : "已经收集" },
-              { id: "name", label: isEnglishMode ? "Japanese Names" : "日本常见人名" },
-              { id: "nature", label: isEnglishMode ? "Seasonal Nature" : "四季自然" },
-              { id: "culture", label: isEnglishMode ? "Folklore Festivals" : "民俗祭典" },
-              { id: "food", label: isEnglishMode ? "Washoku Cuisine" : "和食美味" },
+              { id: "all", label: "全部词库" },
+              { id: "locked", label: "尚未解锁" },
+              { id: "unlocked", label: "已经收集" },
+              { id: "name", label: isEnglishMode ? "西式人名" : "日本常见人名" },
+              { id: "nature", label: isEnglishMode ? "自然与动物" : "四季自然" },
+              { id: "culture", label: isEnglishMode ? "物品与概念" : "民俗祭典" },
+              { id: "food", label: isEnglishMode ? "西餐美味" : "和食美味" },
             ].map((cat) => (
               <button
                 key={cat.id}
@@ -625,14 +623,14 @@ export const StartPage: React.FC<StartPageProps> = ({
             <div className="mt-4 p-4 bg-amber-500 text-stone-950 rounded-2xl border border-amber-600 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md select-none">
               <div className="space-y-0.5 text-left">
                 <div className="text-[10px] font-mono font-black text-amber-950 tracking-wider">
-                  ACTIVE COMBINATION LIST MATCHING TARGET SIZE ({selectedCardIds.length}/{sessionLimit})
+                  已激活的联合训练词单 ({selectedCardIds.length}/{sessionLimit})
                 </div>
                 <div className="text-sm font-bold">
-                  {isEnglishMode ? "Selected " : "已在下方勾选 "}
+                  已在下方勾选{" "}
                   <span className="bg-stone-900 font-mono font-black text-rose-50 px-2 py-0.5 rounded text-xs select-all">
                     {selectedCardIds.length}
                   </span>{" "}
-                  {isEnglishMode ? "cards for practice: " : "位人名词条："}
+                  {isEnglishMode ? "个英文词汇：" : "位人名词条："}
                   <span className="ml-1 font-serif font-black underline decoration-stone-900 decoration-wavy underline-offset-4">
                     {selectedCardIds
                       .map((id) => {
@@ -640,7 +638,7 @@ export const StartPage: React.FC<StartPageProps> = ({
                         return item?.kanji || "";
                       })
                       .filter(Boolean)
-                      .join(isEnglishMode ? ", " : "、")}
+                      .join("、")}
                   </span>
                 </div>
               </div>
@@ -649,7 +647,7 @@ export const StartPage: React.FC<StartPageProps> = ({
                 className="w-full sm:w-auto px-5 py-3 bg-stone-900 hover:bg-stone-850 text-stone-50 hover:text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
               >
                 <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-                <span>{isEnglishMode ? `Start ${selectedCardIds.length}-Card Joined Practice ＞` : `开启 ${selectedCardIds.length} 字连环拼音熟化 ＞`}</span>
+                <span>{isEnglishMode ? `开启 ${selectedCardIds.length} 词连环拼写熟化 ＞` : `开启 ${selectedCardIds.length} 字连环拼音熟化 ＞`}</span>
               </button>
             </div>
           )}
@@ -750,21 +748,21 @@ export const StartPage: React.FC<StartPageProps> = ({
 
                   <div className="space-y-1 pl-6 pt-2">
                     <div className="text-[10px] font-mono text-stone-400 font-bold tracking-widest select-none uppercase">
-                      {isEnglishMode ? (LANG_MAPPING[item.id]?.categoryName || uiTranslate(item.categoryName, isEnglishMode, item.categoryName)) : item.categoryName}
+                      {item.categoryName}
                     </div>
                     <div className="flex items-baseline gap-1.5 flex-wrap">
                       <span 
                         className="text-2xl font-black text-stone-900 font-serif"
                         style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
                       >
-                        {isEnglishMode ? (LANG_MAPPING[item.id]?.title || item.kanji) : item.kanji}
+                        {item.kanji}
                       </span>
                       <span className="text-xs text-stone-400 font-mono font-bold">
-                        {isEnglishMode ? `(${item.kanji} • ${item.kanaStr})` : `(${item.kanaStr})`}
+                        {isEnglishMode ? "" : `(${item.kanaStr})`}
                       </span>
                     </div>
                     <p className="text-stone-500 text-[11px] leading-relaxed line-clamp-3 pt-1 font-sans">
-                      {isEnglishMode ? (LANG_MAPPING[item.id]?.meaning || item.meaning) : item.meaning}
+                      {item.meaning}
                     </p>
                   </div>
 
@@ -812,18 +810,34 @@ export const StartPage: React.FC<StartPageProps> = ({
 
         <div className="text-stone-600 text-xs leading-relaxed pt-2">
           {activeTab === "intro" ? (
-            <ul className="list-disc pl-4 space-y-1">
-              <li>本系统拒绝廉价的多选题或速配游戏，采用<span className="font-bold text-stone-900">“不记忆不罢休”</span>的定点拼写训练。</li>
-              <li>开启训练后，你讲陷入固定的倒计时循环，你需要在规定时间内将本词不断拼出！</li>
-              <li>拼完一轮将自动归零重新开始。在紧促循环中，拼写将从大脑有意识的辨析，彻底融入手指打字的指尖肌肉直觉记忆。</li>
-              <li>计时结束时，只要你完成了足额拼写，即可翻开本词对应的永久限量版集包卡片！</li>
-            </ul>
+            isEnglishMode ? (
+              <ul className="list-disc pl-4 space-y-1">
+                <li>本系统拒绝廉价的多选题，采用<span className="font-bold text-stone-900">“不记忆不罢休”</span>的拼写训练。</li>
+                <li>开启训练后，你将陷入固定的倒计时循环，你需要在规定时间内将单词不断拼出！</li>
+                <li>拼完一轮将自动重新开始。在紧促循环中，拼写将从大脑有意识的辨析，彻底融入手指打字的肌肉记忆。</li>
+                <li>计时结束时，只要你完成了足额拼写，即可翻开本词对应的永久版收集卡片！</li>
+              </ul>
+            ) : (
+              <ul className="list-disc pl-4 space-y-1">
+                <li>本系统拒绝廉价的多选题或速配游戏，采用<span className="font-bold text-stone-900">“不记忆不罢休”</span>的定点拼写训练。</li>
+                <li>开启训练后，你将陷入固定的倒计时循环，你需要在规定时间内将本词不断拼出！</li>
+                <li>拼完一轮将自动归零重新开始。在紧促循环中，拼写将从大脑有意识的辨析，彻底融入手指打字的指尖肌肉直觉记忆。</li>
+                <li>计时结束时，只要你完成了足额拼写，即可翻开本词对应的永久限量版集包卡片！</li>
+              </ul>
+            )
           ) : (
-            <ul className="list-disc pl-4 space-y-1">
-              <li>逐假名匹配对应的罗马音（例如：“さ[sa]”、“と[to]”、“う[u]”）。</li>
-              <li>系统支持多种日本官方通用罗马音输入容差：输入 <span className="font-bold text-stone-800">“shi” / “si”</span> 均可代表 <span className="font-bold text-rose-600">し</span>，部分由于打字习惯细微差异（例如：“じ”输入 <span className="font-bold text-stone-800">“ji” / “zi”</span> ，“ふ”输入 <span className="font-bold text-stone-800">“fu” / “hu”</span>）均有完美匹配支持，杜绝严苛规则带来的拼音卡顿！</li>
-              <li>任何一个字母敲击错误，由于机制限制，该单词需要<span className="font-bold text-red-600">重头开始拼写</span>，这有益于逼迫你对模糊的五十音形成绝对准确的正向条件反射！</li>
-            </ul>
+            isEnglishMode ? (
+              <ul className="list-disc pl-4 space-y-1">
+                <li>逐字母匹配英文单词对应的正确拼写字母（例如：输入 “C-h-a-r-l-o-t-t-e” 拼写 “Charlotte”）。</li>
+                <li>任何一个字母敲击错误，由于机制限制，该单词需要<span className="font-bold text-red-600">重头开始拼写</span>，这有益于逼迫你对拼写形成绝对准确、流畅的正向反射！</li>
+              </ul>
+            ) : (
+              <ul className="list-disc pl-4 space-y-1">
+                <li>逐假名匹配对应的罗马音（例如：“さ[sa]”、“と[to]”、“う[u]”）。</li>
+                <li>系统支持多种日本官方通用罗马音输入容差：输入 <span className="font-bold text-stone-800">“shi” / “si”</span> 均可代表 <span className="font-bold text-rose-600">し</span>，部分由于打字习惯细微差异（例如：“じ”输入 <span className="font-bold text-stone-800">“ji” / “zi”</span> ，“ふ”输入 <span className="font-bold text-stone-800">“fu” / “hu”</span>）均有完美匹配支持，杜绝严苛规则带来的拼音卡顿！</li>
+                <li>任何一个字母敲击错误，由于机制限制，该单词需要<span className="font-bold text-red-600">重头开始拼写</span>，这有益于逼迫你对模糊的五十音形成绝对准确的正向条件反射！</li>
+              </ul>
+            )
           )}
         </div>
       </div>

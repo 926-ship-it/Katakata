@@ -42,12 +42,14 @@ async function startServer() {
     try {
       let prompt = "";
       if (isEnglish) {
-        prompt = `You are an erudite, friendly scholar of Japanese folklore and cultures, and an advanced Japanese language instructor.
-Please write a short cultural backstory or interesting wind-tale of the name/word "${name}" (Kana: ${kana}, Romaji: ${romaji}, Meaning: ${meaning}) which the user just unlocked.
-Requirements:
-1. Elegant, vivid, easy to understand, and highly engaging for beginners (ideal for card-collecting encyclopedias).
-2. Word limit: 160 words, clean formatting.
-3. End the description with a warm, encouraging sentence (with Japanese kana/romaji) to keep the user motivated in learning.`;
+        prompt = `你是一个博学、亲切的西式与民俗文化学者和高级语言教师。
+请针对用户在西式词汇/西方姓名练习中解锁的这个人名（或特定词汇）“${name}”（中文释义：${meaning}），
+写一段关于该姓名/词汇的语源由来、它在西方社会或历史中对应的有趣文化背景或精彩故事。
+要求：
+1. 请完全使用优雅、通俗易懂的【中文】进行撰写。
+2. 语言生动、富有画面感（非常适合初学者，像在看集卡大百科）。
+3. 字数限制在 160 字以内，排版清晰。
+4. 在结尾用英文写一句热情、积极的英文拼写或学习鼓励语句。`;
       } else {
         prompt = `你是一个博学、亲切的日本民俗文化学者和日语高级教师。
 请针对日语五十音练习中，用户解锁的这个人名（或特定词汇）“${name}”（假名：${kana}，罗马音：${romaji}，中文释义：${meaning}），
@@ -67,11 +69,11 @@ Requirements:
     } catch (error: any) {
       console.error("Gemini Story Generation failed:", error);
       const fallbackMsg = isEnglish
-        ? `"${name}" (${kana}) is a classic Japanese name/word representing "${meaning}". Practicing continuously helps lock it in memory. Keep going!`
+        ? `“${name}”是西方经典词汇/姓名，其中文大意是“${meaning}”。不断练习可以让大脑更熟悉噢，加油！`
         : `“${name}”（${kana}）是日本经典词汇，大意是“${meaning}”。不断重复练习能让大脑分泌多巴胺，加油！`;
       res.status(500).json({ 
         error: isEnglish
-          ? "Story generation failed. Backup interpretation: " + fallbackMsg
+          ? "生成生动故事失败（西文备用解析）：" + fallbackMsg
           : "生成生动故事失败，可能是因为网络或 API Key 限制，以下是备用解析：" + fallbackMsg
       });
     }

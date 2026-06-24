@@ -234,13 +234,13 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
           className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-stone-300 text-stone-600 bg-white hover:bg-stone-50 hover:text-stone-900 text-xs font-bold transition-all cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>{isEnglishMode ? "Back to Hub" : "返回首页"}</span>
+          <span>返回首页</span>
         </button>
 
         <div className="text-right">
           <span className="text-xs text-stone-500 font-mono">COLLECTION RATIO</span>
           <p className="text-xs font-bold font-mono text-stone-750">
-            {isEnglishMode ? "Collected" : "已收集"} : {collectedIds.length} / {activeDict.length} {isEnglishMode ? "Cards" : "张"} (
+            已收集 : {collectedIds.length} / {activeDict.length} 张 (
             {Math.round((collectedIds.length / activeDict.length) * 100)}%)
           </p>
         </div>
@@ -252,10 +252,10 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
           style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
         >
           <BookOpen className="w-7 h-7 text-amber-700" />
-          <span>{isEnglishMode ? "Katakata Flashcard Collection Binder" : "Katakata「カタカタ」闪卡收藏室"}</span>
+          <span>{isEnglishMode ? "Katakata 英语单词大收藏馆" : "Katakata「カタカタ」五十音闪卡藏馆"}</span>
         </h1>
         <p className="text-xs text-stone-500 font-mono uppercase tracking-wider">
-          {isEnglishMode ? "THE JAPANESE TYPING NOMINAL CARD BINDER LIBRARY & REVISION ROOM" : "THE JAPANESE NOMINAL CARD BINDER LIBRARY & REVISION ROOM"}
+          {isEnglishMode ? "THE ENGLISH NOUNS AND WESTERN NAMES COLLECTIVE TYPING STUDY ROOM" : "THE JAPANESE NOMINAL CARD BINDER LIBRARY & REVISION ROOM"}
         </p>
       </div>
 
@@ -335,13 +335,13 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
       {/* Categories select tabs */}
       <div className="flex flex-wrap items-center gap-1.5 border-b border-stone-200 pb-3">
         {[
-          { id: "all", label: isEnglishMode ? "All Cards" : "全部图鉴" },
-          { id: "collected", label: isEnglishMode ? "Collected Cards" : "已收集闪卡" },
-          { id: "locked", label: isEnglishMode ? "Locked Cards" : "未解锁图纸" },
-          { id: "name", label: isEnglishMode ? "Names / Kanji" : "日本人名" },
-          { id: "nature", label: isEnglishMode ? "Nature & Seasons" : "自然风物" },
-          { id: "culture", label: isEnglishMode ? "Traditions" : "民俗文化" },
-          { id: "food", label: isEnglishMode ? "Washoku Cuisine" : "日本美味" },
+          { id: "all", label: "全部图鉴" },
+          { id: "collected", label: "已收集闪卡" },
+          { id: "locked", label: "未解锁图纸" },
+          { id: "name", label: isEnglishMode ? "西式人名" : "日本人名" },
+          { id: "nature", label: isEnglishMode ? "自然与动物" : "自然风物" },
+          { id: "culture", label: isEnglishMode ? "物品与概念" : "民俗文化" },
+          { id: "food", label: isEnglishMode ? "西餐美味" : "日本美味" },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -544,16 +544,16 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   className="text-4xl font-black text-stone-950 font-serif"
                   style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
                 >
-                  {isEnglishMode ? (LANG_MAPPING[selectedCard.id]?.title || selectedCard.kanji) : selectedCard.kanji}
+                  {selectedCard.kanji}
                 </h2>
                 
                 <div className="flex justify-center gap-3">
                   <span className="text-sm font-mono text-stone-600">
-                    {isEnglishMode ? "Original: " : "假名: "}<b>{isEnglishMode ? `${selectedCard.kanji} (${selectedCard.kanaStr})` : selectedCard.kanaStr}</b>
+                    {isEnglishMode ? "英文单词: " : "假名: "}<b>{isEnglishMode ? selectedCard.kanji : selectedCard.kanaStr}</b>
                   </span>
                   <span className="text-stone-300">|</span>
                   <span className="text-sm font-mono text-stone-600">
-                    {isEnglishMode ? "Romaji: " : "罗马音: "}<b>{selectedCard.segments.map(s => s.displayRomaji).join("")}</b>
+                    {isEnglishMode ? "字母拼写: " : "罗马音: "}<b>{selectedCard.segments.map(s => s.displayRomaji).join("")}</b>
                   </span>
                 </div>
 
@@ -563,7 +563,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                     className="px-3 py-1 rounded-full bg-stone-900/10 hover:bg-stone-900/20 text-stone-850 transition-all text-[11px] font-bold flex items-center gap-1.5 cursor-pointer shadow-sm animate-pulse"
                   >
                     <Volume2 className="w-3 h-3 text-stone-700" />
-                    <span>{isEnglishMode ? "Pronounce" : "原声播音"}</span>
+                    <span>{isEnglishMode ? "听原声朗读" : "原声播音"}</span>
                   </button>
                 </div>
 
@@ -587,7 +587,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                       : "border-transparent text-stone-400 hover:text-stone-700"
                   }`}
                 >
-                  {isEnglishMode ? "🔮 Cultural Lore" : "🔮 文化历史释义"}
+                  🔮 文化历史释义
                 </button>
                 <button
                   onClick={() => {
@@ -600,7 +600,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   }`}
                 >
                   <PenTool className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
-                  <span>{isEnglishMode ? "✍️ Stroke Calligraphy" : "✍️ 手写描红临摹"}</span>
+                  <span>手写描红临摹</span>
                 </button>
               </div>
 
@@ -610,14 +610,14 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   <div className="space-y-2 bg-white p-4 rounded-xl border border-stone-200">
                     <div className="text-xs text-stone-400 font-mono">STANDARD LEXICON MEANING</div>
                     <p className="text-xs leading-relaxed text-stone-600 font-sans">
-                      {isEnglishMode ? (LANG_MAPPING[selectedCard.id]?.meaning || selectedCard.meaning) : selectedCard.meaning}
+                      {selectedCard.meaning}
                     </p>
                     <div className="pt-2 border-t border-stone-100 flex justify-between text-[11px] font-mono text-stone-500">
                       <span className="flex items-center gap-1">
                         <Activity className="w-3.5 h-3.5 text-amber-600" />
-                        {isEnglishMode ? "Practiced Runs: " : "累积熟练轮次: "}<b>{practiceTimes[selectedCard.id] || 0} {isEnglishMode ? "Rounds" : "轮"}</b>
+                        累积熟练轮次: <b>{practiceTimes[selectedCard.id] || 0} 轮</b>
                       </span>
-                      <span>{isEnglishMode ? "Category: " : "类别: "}{uiTranslate(selectedCard.categoryName, isEnglishMode, selectedCard.categoryName)}</span>
+                      <span>类别: {selectedCard.categoryName}</span>
                     </div>
                   </div>
 
@@ -626,14 +626,14 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <Sparkles className="w-4 h-4 text-rose-500" />
-                        <span className="text-xs font-mono font-bold text-stone-800">{isEnglishMode ? "GEMINI AI CULTURAL CHRONICLES" : "GEMINI AI 文化起源大百科"}</span>
+                        <span className="text-xs font-mono font-bold text-stone-800">GEMINI AI 文化起源大百科</span>
                       </div>
                       {!aiStory && !loadingAi && (
                         <button
                           onClick={() => handleFetchAiStory(selectedCard)}
                           className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-stone-50 font-bold text-xs flex items-center gap-1 cursor-pointer shadow-sm animate-bounce"
                         >
-                          🔮 {isEnglishMode ? "Reveal Folklore" : "探索文化轶事故事"}
+                          🔮 探索文化轶事故事
                         </button>
                       )}
                     </div>
@@ -649,7 +649,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                         </div>
                         <span className="text-xs font-mono text-stone-500 animate-pulse">
                           {isEnglishMode 
-                            ? "Gemini is searching history archives and folk etymologies, please wait..." 
+                            ? "Gemini 正在根据本词汇检索历史背景与文化起源，请稍候..." 
                             : "Gemini 正在根据本姓氏检索历史编年志与民俗起源，请稍候..."}
                         </span>
                       </div>
@@ -670,13 +670,13 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                         </p>
                         <div className="mt-3 pt-2 border-t border-rose-100/50 flex justify-between items-center">
                           <span className="text-[10px] text-rose-500 font-mono italic">
-                            ★ {isEnglishMode ? "Powered by Google Gemini 3.5 AI" : "由 Google Gemini 3.5 AI 倾情提供"}
+                            ★ 由 Google Gemini 3.5 AI 倾情提供
                           </span>
                           <button
                             onClick={() => handleFetchAiStory(selectedCard)}
                             className="text-[10px] text-stone-500 hover:text-stone-800 font-mono font-bold underline"
                           >
-                            {isEnglishMode ? "Regenerate ↻" : "重新解释 ↻"}
+                            重新解释 ↻
                           </button>
                         </div>
                       </motion.div>
@@ -696,7 +696,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   onClick={() => setSelectedCard(null)}
                   className="w-full py-2.5 rounded-xl border border-stone-300 hover:bg-stone-100 text-stone-800 font-bold text-xs transition-colors cursor-pointer"
                 >
-                  {isEnglishMode ? "Close Album" : "合上相册"}
+                  合上相册
                 </button>
               </div>
             </motion.div>
@@ -732,7 +732,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   onClick={() => setCustomNotification(null)}
                   className="px-6 py-2 bg-stone-900 text-stone-50 hover:bg-stone-800 text-xs font-bold rounded-lg cursor-pointer"
                 >
-                  {isEnglishMode ? "Okay" : "知道了"}
+                  知道了
                 </button>
               </div>
             </motion.div>
@@ -766,7 +766,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   onClick={() => setCustomConfirm(null)}
                   className="px-5 py-2 border border-stone-300 hover:bg-stone-50 text-stone-700 text-xs font-bold rounded-lg cursor-pointer"
                 >
-                  {isEnglishMode ? "Cancel" : "取消"}
+                  取消
                 </button>
                 <button
                   onClick={() => {
@@ -775,7 +775,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   }}
                   className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg cursor-pointer"
                 >
-                  {isEnglishMode ? "Confirm" : "确认导入"}
+                  确认导入
                 </button>
               </div>
             </motion.div>
@@ -791,10 +791,10 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
       <div className="p-8 text-center border-2 border-dashed border-stone-300 rounded-2xl bg-stone-50 text-stone-400 font-serif">
         <BookOpen className="w-12 h-12 text-stone-300 mx-auto mb-2" />
         <p className="text-sm">
-          {isEnglishMode ? "No cards matching the selected filters found." : "暂无符合当前过滤条件的名人闪卡。"}
+          暂无符合当前过滤条件的名人闪卡。
         </p>
         <p className="text-xs text-stone-400 mt-1 font-sans">
-          {isEnglishMode ? "Go back and select typing or calligraphy practices to unlock cards!" : "开启拼写训练来解锁属于你的五十音大图鉴吧！"}
+          开启拼写训练来解锁属于你的五十音大图鉴吧！
         </p>
       </div>
     );
