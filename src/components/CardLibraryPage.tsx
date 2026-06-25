@@ -11,10 +11,14 @@ interface CardLibraryPageProps {
   collectedIds: string[];
   practiceTimes: Record<string, number>; // Maps cardId to total completed practice rounds
   onGoBack: () => void;
-  onImportData: (unlockedCards: string[], ptTimes: Record<string, number>, settings?: any) => void;
+  onImportData: (unlockedCards: string[], ptTimes: Record<string, number>, settings?: any, importedCoins?: number, importedUpgrades?: any) => void;
   isEnglishMode?: boolean;
   customCards?: DictionaryItem[];
   setCustomCards?: React.Dispatch<React.SetStateAction<DictionaryItem[]>>;
+  coins?: number;
+  setCoins?: React.Dispatch<React.SetStateAction<number>>;
+  cardUpgrades?: Record<string, { level: number; exp: number; stars: number }>;
+  setCardUpgrades?: React.Dispatch<React.SetStateAction<Record<string, { level: number; exp: number; stars: number }>>>;
 }
 
 export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
@@ -25,15 +29,28 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
   isEnglishMode = false,
   customCards = [],
   setCustomCards,
+  coins = 300,
+  setCoins,
+  cardUpgrades = {},
+  setCardUpgrades,
 }) => {
   const activeDict = React.useMemo(() => {
     return [...getDictionary(isEnglishMode), ...customCards];
   }, [isEnglishMode, customCards]);
+
+  // Gamified Tabs: Binder (Collection) and Gacha (Summon Shrine)
+  const [libraryTab, setLibraryTab] = useState<"binder" | "gacha">("binder");
+
+  // Gacha Summon States
+  const [summonRevealCard, setSummonRevealCard] = useState<DictionaryItem | null>(null);
+  const [summonDuplicateInfo, setSummonDuplicateInfo] = useState<string>("");
+  const [isSummoning, setIsSummoning] = useState<boolean>(false);
+
   const [selectedCard, setSelectedCard] = useState<DictionaryItem | null>(null);
   const [aiStory, setAiStory] = useState<string>("");
   const [loadingAi, setLoadingAi] = useState<boolean>(false);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [activeDetailTab, setActiveDetailTab] = useState<"story" | "drawing" | "chat">("story");
+  const [activeDetailTab, setActiveDetailTab] = useState<"story" | "drawing" | "chat" | "upgrade">("story");
 
   // Persistent Card Live Chat History State
   const [chatHistories, setChatHistories] = useState<Record<string, { role: "user" | "model"; content: string }[]>>(() => {
@@ -366,6 +383,173 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
     }
   };
 
+  // --- GAMIFIED UPGRADE & SUMMON HANDLERS ---
+  const [upgradeMessage, setUpgradeMessage] = useState<string>("");
+
+  const getLevelTitle = (level: number) => {
+    switch (level) {
+      case 1: return "初学乍练";
+      case 2: return "驾轻就熟";
+      case 3: return "融会贯通";
+      case 4: return "炉火纯青";
+      case 5: return "一代宗师";
+      default: return "初学乍练";
+    }
+  };
+
+  const handleManualLevelUp = (cardId: string) => {
+    if (!coins || coins < 30) {
+      setUpgradeMessage("❌ 您的和币不足！快去进行拼写练习赚取和币吧。");
+      audioSynth.playError();
+      setTimeout(() => setUpgradeMessage(""), 3000);
+      return;
+    }
+
+    if (setCoins && setCardUpgrades && cardUpgrades) {
+      setCoins(prev => prev - 30);
+      const prevUpgrade = cardUpgrades[cardId] || { level: 1, exp: 0, stars: 0 };
+      let nextLevel = prevUpgrade.level;
+      let nextExp = prevUpgrade.exp + 35;
+      if (nextExp >= 100) {
+        if (nextLevel < 5) {
+          nextLevel += 1;
+          nextExp = nextExp - 100;
+          setUpgradeMessage(`🎉 恭喜！等级成功淬炼至 Lv.${nextLevel}！`);
+          audioSynth.speakJapanese("おめでとう"); // congratulations
+        } else {
+          nextLevel = 5;
+          nextExp = 100;
+          setUpgradeMessage("✨ 卡牌已达最高修炼等级 Lv.5！");
+        }
+      } else {
+        setUpgradeMessage("✨ 注入和币成功，经验值增加了 35 点！");
+      }
+
+      setCardUpgrades(prev => ({
+        ...prev,
+        [cardId]: { level: nextLevel, exp: nextExp, stars: prevUpgrade.stars }
+      }));
+
+      setTimeout(() => setUpgradeMessage(""), 3000);
+    }
+  };
+
+  const handleManualStarUp = (cardId: string) => {
+    if (!coins || coins < 80) {
+      setUpgradeMessage("❌ 您的和币不足！快去进行拼写练习赚取和币吧。");
+      audioSynth.playError();
+      setTimeout(() => setUpgradeMessage(""), 3000);
+      return;
+    }
+
+    if (setCoins && setCardUpgrades && cardUpgrades) {
+      setCoins(prev => prev - 80);
+      const prevUpgrade = cardUpgrades[cardId] || { level: 1, exp: 0, stars: 0 };
+      const nextStars = Math.min(5, prevUpgrade.stars + 1);
+      
+      setCardUpgrades(prev => ({
+        ...prev,
+        [cardId]: { level: prevUpgrade.level, exp: prevUpgrade.exp, stars: nextStars }
+      }));
+
+      setUpgradeMessage(`⭐ 成功突破！星级晋升至 ${nextStars} 星！`);
+      audioSynth.speakJapanese("すごい"); // amazing!
+      setTimeout(() => setUpgradeMessage(""), 3000);
+    }
+  };
+
+  const handleGachaSummon = (packType: "beginner" | "culture" | "legendary") => {
+    let cost = 60;
+    let weights: Record<string, number> = { N: 70, R: 25, SR: 5, SSR: 0 };
+    let packName = "和风新手包";
+
+    if (packType === "culture") {
+      cost = 120;
+      weights = { N: 30, R: 50, SR: 15, SSR: 5 };
+      packName = "万叶繁茂包";
+    } else if (packType === "legendary") {
+      cost = 200;
+      weights = { N: 0, R: 60, SR: 30, SSR: 10 };
+      packName = "天道神珍包";
+    }
+
+    if (!coins || coins < cost) {
+      alert(`和币不足！抽取【${packName}】需要 ${cost} 和币，您当前只有 ${coins} 和币。\n快去拼写大厅温故练习赚取和币吧！`);
+      audioSynth.playError();
+      return;
+    }
+
+    setIsSummoning(true);
+    setSummonDuplicateInfo("");
+    setSummonRevealCard(null);
+
+    // Pick rarity based on weights
+    const rand = Math.random() * 100;
+    let pickedRarity: "N" | "R" | "SR" | "SSR" = "N";
+    if (rand < weights.SSR) {
+      pickedRarity = "SSR";
+    } else if (rand < weights.SSR + weights.SR) {
+      pickedRarity = "SR";
+    } else if (rand < weights.SSR + weights.SR + weights.R) {
+      pickedRarity = "R";
+    } else {
+      pickedRarity = "N";
+    }
+
+    // Filter dictionary by picked rarity
+    let pool = activeDict.filter(c => c.rarity === pickedRarity && c.category !== "custom");
+    if (pool.length === 0) {
+      pool = activeDict.filter(c => c.category !== "custom");
+    }
+
+    const rewardCard = pool[Math.floor(Math.random() * pool.length)];
+
+    setTimeout(() => {
+      // Perform deduction
+      if (setCoins) {
+        setCoins(prev => prev - cost);
+      }
+
+      // Check duplicate
+      const isAlreadyOwned = collectedIds.includes(rewardCard.id);
+      if (isAlreadyOwned) {
+        // Upgrade Card EXP instead of unlocking new
+        const prevUp = cardUpgrades[rewardCard.id] || { level: 1, exp: 0, stars: 0 };
+        let nextExp = prevUp.exp + 50;
+        let nextLevel = prevUp.level;
+        while (nextExp >= 100 && nextLevel < 5) {
+          nextExp -= 100;
+          nextLevel += 1;
+        }
+        if (nextLevel >= 5) {
+          nextLevel = 5;
+          nextExp = Math.min(100, nextExp);
+        }
+
+        if (setCardUpgrades) {
+          setCardUpgrades(prev => ({
+            ...prev,
+            [rewardCard.id]: { level: nextLevel, exp: nextExp, stars: prevUp.stars }
+          }));
+        }
+
+        // Refund some coins!
+        if (setCoins) {
+          setCoins(prev => prev + 20);
+        }
+
+        setSummonDuplicateInfo("💡 已经收集过该闪卡！自动为您转化为 50 点卡牌 EXP 经验，并额外为您补偿返还 20 枚和币！");
+      } else {
+        // Unlock new card!
+        onImportData([...collectedIds, rewardCard.id], practiceTimes, undefined, coins - cost, cardUpgrades);
+      }
+
+      setSummonRevealCard(rewardCard);
+      setIsSummoning(false);
+      audioSynth.speakJapanese(rewardCard.kanaStr);
+    }, 1200); // 1.2s atmospheric summoning pause
+  };
+
   // Categories select tabs filter calculation
   const filteredCollection = activeDict.filter(item => {
     // Category filter logic
@@ -409,243 +593,522 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
         </p>
       </div>
 
-      {/* Save Export/Import Panel Box styled with typewriter and monospace aesthetics */}
-      <div className="bg-[#f5f3ef] border-2 border-stone-800/10 rounded-2xl p-4 space-y-3.5 shadow-sm relative overflow-hidden">
-        {/* Typewriter details */}
-        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-stone-200/50 via-transparent to-transparent pointer-events-none" />
-        
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
-              <h3 className="font-mono font-bold text-stone-800 text-xs tracking-wide">
-                KATAKATA SYSTEM ARCHIVE HUB 【打字集卡机存档中心】
-              </h3>
+      {/* ⛩️ Dual Shinto wood-carved tab bar switcher */}
+      <div className="flex border-b-2 border-stone-800 select-none">
+        <button
+          onClick={() => {
+            setLibraryTab("binder");
+            audioSynth.playCardSlide();
+          }}
+          className={`flex-1 py-3 text-xs sm:text-sm font-black text-center flex items-center justify-center gap-2 cursor-pointer transition-all ${
+            libraryTab === "binder"
+              ? "bg-stone-900 text-stone-100 font-serif border-t-2 border-l-2 border-r-2 border-stone-800 rounded-t-xl"
+              : "text-stone-400 hover:text-stone-700 bg-transparent font-serif"
+          }`}
+        >
+          <BookOpen className="w-4 h-4 text-amber-600" />
+          <span>📖 {isEnglishMode ? "PERSONAL CARD BINDER" : "个人闪卡藏馆"}</span>
+        </button>
+        <button
+          onClick={() => {
+            setLibraryTab("gacha");
+            audioSynth.playCardSlide();
+          }}
+          className={`flex-1 py-3 text-xs sm:text-sm font-black text-center flex items-center justify-center gap-2 cursor-pointer transition-all ${
+            libraryTab === "gacha"
+              ? "bg-stone-900 text-stone-100 font-serif border-t-2 border-l-2 border-r-2 border-stone-800 rounded-t-xl"
+              : "text-stone-400 hover:text-stone-700 bg-transparent font-serif"
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+          <span>⛩️ {isEnglishMode ? "SHRINE SUMMON GACHA" : "御神殿召唤抽卡"}</span>
+        </button>
+      </div>
+
+      {libraryTab === "binder" ? (
+        <>
+          {/* Save Export/Import Panel Box styled with typewriter and monospace aesthetics */}
+          <div className="bg-[#f5f3ef] border-2 border-stone-800/10 rounded-2xl p-4 space-y-3.5 shadow-sm relative overflow-hidden">
+            {/* Typewriter details */}
+            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-stone-200/50 via-transparent to-transparent pointer-events-none" />
+            
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
+                  <h3 className="font-mono font-bold text-stone-800 text-xs tracking-wide">
+                    KATAKATA SYSTEM ARCHIVE HUB 【打字集卡机存档中心】
+                  </h3>
+                </div>
+                <p className="text-[12px] text-stone-550 leading-relaxed font-sans max-w-xl">
+                  💡 <span className="font-semibold text-stone-700">说明：</span>卡牌与练习记录均保存在当前浏览器本地。若清除浏览器缓存数据可能会导致丢失，建议您定期导出 JSON 格式备份文件。
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 font-mono">
+                {/* Real input type file hidden */}
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleImportBackup} 
+                  accept=".json" 
+                  className="hidden" 
+                />
+
+                <button
+                  onClick={() => {
+                    audioSynth.playCardSlide();
+                    handleExportBackup();
+                  }}
+                  disabled={!isStorageAvailable}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer shadow-sm ${
+                    isStorageAvailable 
+                      ? "bg-white border-stone-300 text-stone-600 hover:bg-stone-50 hover:text-stone-900 active:scale-95"
+                      : "bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed opacity-50"
+                  }`}
+                  title="导出当前集卡进度与统计到本地 file"
+                >
+                  <Download className="w-3.5 h-3.5 text-amber-700" />
+                  <span>导出存档</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    audioSynth.playCardSlide();
+                    fileInputRef.current?.click();
+                  }}
+                  disabled={!isStorageAvailable}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-sm ${
+                    isStorageAvailable
+                      ? "bg-stone-900 border-transparent text-stone-50 hover:bg-stone-800 hover:text-white active:scale-95"
+                      : "bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed opacity-50"
+                  }`}
+                  title="选择一份历史 Katakata JSON 存档进行恢复"
+                >
+                  <Upload className="w-3.5 h-3.5 text-amber-400" />
+                  <span>导入存档</span>
+                </button>
+              </div>
             </div>
-            <p className="text-[12px] text-stone-550 leading-relaxed font-sans max-w-xl">
-              💡 <span className="font-semibold text-stone-700">说明：</span>卡牌与练习记录均保存在当前浏览器本地。若清除浏览器缓存数据可能会导致丢失，建议您定期导出 JSON 格式备份文件。
-            </p>
+
+            {/* Local Storage Restricted Warning Banner */}
+            {!isStorageAvailable && (
+              <div className="bg-red-50 border border-red-200 text-red-700 p-2.5 rounded-xl text-xs font-sans flex items-center gap-2 animate-bounce">
+                <span className="text-sm">⚠️</span>
+                <span>{isEnglishMode ? "Browser local storage is limited. Save functions are disabled." : "当前浏览器限制了本地存储，存档功能不可用。请确认您未开启极限无痕/隐私保护或禁用了本地 LocalStorage 功能。"}</span>
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 font-mono">
-            {/* Real input type file hidden */}
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleImportBackup} 
-              accept=".json" 
-              className="hidden" 
-            />
-
-            <button
-              onClick={() => {
-                audioSynth.playCardSlide();
-                handleExportBackup();
-              }}
-              disabled={!isStorageAvailable}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer shadow-sm ${
-                isStorageAvailable 
-                  ? "bg-white border-stone-300 text-stone-600 hover:bg-stone-50 hover:text-stone-900 active:scale-95"
-                  : "bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed opacity-50"
-              }`}
-              title="导出当前集卡进度与统计到本地文件"
-            >
-              <Download className="w-3.5 h-3.5 text-amber-700" />
-              <span>导出存档</span>
-            </button>
-
-            <button
-              onClick={() => {
-                audioSynth.playCardSlide();
-                fileInputRef.current?.click();
-              }}
-              disabled={!isStorageAvailable}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-sm ${
-                isStorageAvailable
-                  ? "bg-stone-900 border-transparent text-stone-50 hover:bg-stone-800 hover:text-white active:scale-95"
-                  : "bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed opacity-50"
-              }`}
-              title="选择一份历史 Katakata JSON 存档进行恢复"
-            >
-              <Upload className="w-3.5 h-3.5 text-amber-400" />
-              <span>导入存档</span>
-            </button>
+          {/* Categories select tabs */}
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-stone-200 pb-3">
+            {[
+              { id: "all", label: "全部图鉴" },
+              { id: "collected", label: "已收集闪卡" },
+              { id: "locked", label: "未解锁图纸" },
+              { id: "name", label: isEnglishMode ? "西式人名" : "日本人名" },
+              { id: "nature", label: isEnglishMode ? "自然与动物" : "自然风物" },
+              { id: "culture", label: isEnglishMode ? "物品与概念" : "民俗文化" },
+              { id: "food", label: isEnglishMode ? "西餐美味" : "日本美味" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setCategoryFilter(tab.id)}
+                className={`py-1 px-3 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                  categoryFilter === tab.id
+                    ? "bg-amber-800 text-stone-50"
+                    : "bg-stone-200 text-stone-600 hover:bg-stone-300"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
-        </div>
 
-        {/* Local Storage Restricted Warning Banner */}
-        {!isStorageAvailable && (
-          <div className="bg-red-50 border border-red-200 text-red-700 p-2.5 rounded-xl text-xs font-sans flex items-center gap-2 animate-bounce">
-            <span className="text-sm">⚠️</span>
-            <span>{isEnglishMode ? "Browser local storage is limited. Save functions are disabled." : "当前浏览器限制了本地存储，存档功能不可用。请确认您未开启极限无痕/隐私保护或禁用了本地 LocalStorage 功能。"}</span>
-          </div>
-        )}
-      </div>
+          {/* Collection Binder Array */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {filteredCollection.map((item) => {
+              const isCollected = collectedIds.includes(item.id) || item.category === "custom";
+              const practiceRounds = practiceTimes[item.id] || 0;
+              const upgrade = cardUpgrades[item.id] || { level: 1, exp: 0, stars: 0 };
 
-      {/* Categories select tabs */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-stone-200 pb-3">
-        {[
-          { id: "all", label: "全部图鉴" },
-          { id: "collected", label: "已收集闪卡" },
-          { id: "locked", label: "未解锁图纸" },
-          { id: "name", label: isEnglishMode ? "西式人名" : "日本人名" },
-          { id: "nature", label: isEnglishMode ? "自然与动物" : "自然风物" },
-          { id: "culture", label: isEnglishMode ? "物品与概念" : "民俗文化" },
-          { id: "food", label: isEnglishMode ? "西餐美味" : "日本美味" },
-          { id: "custom", label: isEnglishMode ? "Custom Docs" : "自定义词组" },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setCategoryFilter(tab.id)}
-            className={`py-1 px-3 rounded-full text-xs font-medium cursor-pointer transition-colors ${
-              categoryFilter === tab.id
-                ? "bg-amber-800 text-stone-50"
-                : "bg-stone-200 text-stone-600 hover:bg-stone-300"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Collection Binder Array */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {filteredCollection.map((item) => {
-          const isCollected = collectedIds.includes(item.id) || item.category === "custom";
-          const practiceRounds = practiceTimes[item.id] || 0;
-
-          // Custom exquisite visual styling depending on rarity & collected states
-          let cardBgClass = "bg-[#fcfbf9]/90 border-stone-250";
-          if (isCollected) {
-            if (item.rarity === "SSR") {
-              cardBgClass = "bg-gradient-to-br from-amber-50 via-yellow-100 to-amber-100 border-amber-400";
-            } else if (item.rarity === "SR") {
-              cardBgClass = "bg-gradient-to-br from-orange-50 via-stone-50 to-amber-50 border-orange-300";
-            } else if (item.rarity === "R") {
-              cardBgClass = "bg-gradient-to-br from-sky-50 via-white to-blue-50 border-sky-300";
-            } else {
-              cardBgClass = "bg-gradient-to-b from-stone-50 to-stone-100 border-stone-300";
-            }
-          }
-
-          return (
-            <motion.div
-              whileHover={{ y: isCollected ? -5 : 0, scale: isCollected ? 1.02 : 1 }}
-              key={item.id}
-              onClick={() => {
-                if (isCollected) {
-                  setSelectedCard(item);
-                  setAiStory(""); // reset AI field
-                  setActiveDetailTab("story");
-                  audioSynth.speakJapanese(item.kanaStr);
+              // Custom exquisite visual styling depending on rarity & collected states
+              let cardBgClass = "bg-[#fcfbf9]/90 border-stone-250";
+              if (isCollected) {
+                if (item.rarity === "SSR") {
+                  cardBgClass = "bg-gradient-to-tr from-pink-200 via-purple-200 via-indigo-200 via-emerald-200 via-yellow-100 to-rose-200 border-amber-400 shadow-purple-500/15";
+                } else if (item.rarity === "SR") {
+                  cardBgClass = "bg-gradient-to-br from-orange-50 via-stone-50 to-amber-50 border-orange-300";
+                } else if (item.rarity === "R") {
+                  cardBgClass = "bg-gradient-to-br from-sky-50 via-white to-blue-50 border-sky-300";
+                } else {
+                  cardBgClass = "bg-gradient-to-b from-stone-50 to-stone-100 border-stone-300";
                 }
-              }}
-              className={`p-4 rounded-xl border-2 flex flex-col justify-between h-56 transition-all relative overflow-hidden select-none ${
-                isCollected ? "cursor-pointer shadow-sm" : "bg-stone-100/50 border-stone-200 opacity-60"
-              } ${cardBgClass}`}
-              style={{
-                boxShadow: isCollected ? `0 4px 14px ${item.glowColor}` : "none",
-              }}
-            >
-              {/* Antique voucher dashed inner sub-border */}
-              <div className="absolute inset-1.5 border border-dashed border-stone-800/10 rounded-lg pointer-events-none" />
+              }
 
-              {/* Japanese corner bracket markers */}
-              <div className="absolute top-2 left-2 w-1.5 h-1.5 border-t border-l border-stone-850/30 pointer-events-none" />
-              <div className="absolute top-2 right-2 w-1.5 h-1.5 border-t border-r border-stone-850/30 pointer-events-none" />
-              <div className="absolute bottom-2 left-2 w-1.5 h-1.5 border-b border-l border-stone-850/30 pointer-events-none" />
-              <div className="absolute bottom-2 right-2 w-1.5 h-1.5 border-b border-r border-stone-850/30 pointer-events-none" />
-
-              {/* Card top badge */}
-              <div className="flex items-center justify-between z-10">
-                <span 
-                  className="text-[9px] font-mono font-black border px-1 rounded-sm tracking-widest scale-90"
+              return (
+                <motion.div
+                  whileHover={{ y: isCollected ? -5 : 0, scale: isCollected ? 1.02 : 1 }}
+                  key={item.id}
+                  onClick={() => {
+                    if (isCollected) {
+                      setSelectedCard(item);
+                      setAiStory(""); // reset AI field
+                      setActiveDetailTab("story");
+                      audioSynth.speakJapanese(item.kanaStr);
+                    }
+                  }}
+                  className={`p-4 rounded-xl border-2 flex flex-col justify-between h-56 transition-all relative overflow-hidden select-none ${
+                    isCollected ? "cursor-pointer shadow-sm" : "bg-stone-100/50 border-stone-200 opacity-60"
+                  } ${cardBgClass}`}
                   style={{
-                    backgroundColor: item.rarity === "SSR" ? "#fee2e2" : item.rarity === "SR" ? "#ffedd5" : item.rarity === "R" ? "#e0f2fe" : "#f1f5f9",
-                    color: item.rarity === "SSR" ? "#b91c1c" : item.rarity === "SR" ? "#c2410c" : item.rarity === "R" ? "#0284c7" : "#475569",
-                    borderColor: item.rarity === "SSR" ? "#fed7aa" : item.rarity === "SR" ? "#fed7aa" : "#bae6fd"
+                    boxShadow: isCollected ? `0 4px 14px ${item.glowColor}` : "none",
                   }}
                 >
-                  {item.rarity}
-                </span>
-                {isCollected ? (
-                  <span className="text-[8px] bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded font-black border border-emerald-200">
-                    ★ 已收藏
-                  </span>
-                ) : (
-                  <span className="text-[8px] bg-stone-200/80 text-stone-500 px-1.5 rounded font-bold">
-                    🔒 未解锁
-                  </span>
-                )}
-              </div>
+                  {/* Antique voucher dashed inner sub-border */}
+                  <div className="absolute inset-1.5 border border-dashed border-stone-800/10 rounded-lg pointer-events-none" />
 
-              {/* Red calligraphic seal stamp overlay */}
-              {isCollected && (
-                <div className="absolute bottom-11 right-3 pointer-events-none select-none opacity-25 transform rotate-12">
-                  <div className={`w-8 h-8 rounded-full border-2 border-solid flex items-center justify-center font-serif text-[9px] font-bold ${
-                    item.rarity === "SSR" ? "border-red-600 text-red-600" : "border-amber-700 text-amber-700"
-                  }`}>
-                    {item.rarity === "SSR" ? "神珍" : item.rarity === "SR" ? "极品" : "珍藏"}
+                  {/* Japanese corner bracket markers */}
+                  <div className="absolute top-2 left-2 w-1.5 h-1.5 border-t border-l border-stone-850/30 pointer-events-none" />
+                  <div className="absolute top-2 right-2 w-1.5 h-1.5 border-t border-r border-stone-850/30 pointer-events-none" />
+                  <div className="absolute bottom-2 left-2 w-1.5 h-1.5 border-b border-l border-stone-850/30 pointer-events-none" />
+                  <div className="absolute bottom-2 right-2 w-1.5 h-1.5 border-b border-r border-stone-850/30 pointer-events-none" />
+
+                  {/* Card top badge */}
+                  <div className="flex items-center justify-between z-10">
+                    <span 
+                      className="text-[9px] font-mono font-black border px-1 rounded-sm tracking-widest scale-90 animate-pulse"
+                      style={{
+                        backgroundColor: item.rarity === "SSR" ? "#fee2e2" : item.rarity === "SR" ? "#ffedd5" : item.rarity === "R" ? "#e0f2fe" : "#f1f5f9",
+                        color: item.rarity === "SSR" ? "#b91c1c" : item.rarity === "SR" ? "#c2410c" : item.rarity === "R" ? "#0284c7" : "#475569",
+                        borderColor: item.rarity === "SSR" ? "#fed7aa" : item.rarity === "SR" ? "#fed7aa" : "#bae6fd"
+                      }}
+                    >
+                      {item.rarity}
+                    </span>
+                    {isCollected ? (
+                      <div className="flex flex-col items-end z-10">
+                        <span className="text-[8px] bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded font-black border border-emerald-200">
+                          ★ 已收藏
+                        </span>
+                        {/* Interactive stars indicator */}
+                        <div className="text-[8px] text-amber-500 font-bold mt-0.5 tracking-tighter">
+                          {"★".repeat(upgrade.stars) + "☆".repeat(5 - upgrade.stars)}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-[8px] bg-stone-200/80 text-stone-500 px-1.5 rounded font-bold z-10">
+                        🔒 未解锁
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Red calligraphic seal stamp overlay */}
+                  {isCollected && (
+                    <div className="absolute bottom-11 right-3 pointer-events-none select-none opacity-25 transform rotate-12">
+                      <div className={`w-8 h-8 rounded-full border-2 border-solid flex items-center justify-center font-serif text-[9px] font-bold ${
+                        item.rarity === "SSR" ? "border-red-600 text-red-600" : "border-amber-700 text-amber-700"
+                      }`}>
+                        {item.rarity === "SSR" ? "神珍" : item.rarity === "SR" ? "极品" : "珍藏"}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Central text layout */}
+                  <div className="text-center py-1 space-y-1.5 z-10 flex flex-col items-center justify-center">
+                    {/* Embedded Card Illustration */}
+                    <div className="mb-0.5">
+                      <CardIllustration
+                        id={item.id}
+                        category={item.category}
+                        className={`w-11 h-11 transition-all ${isCollected ? "opacity-95 contrast-110" : "opacity-20 grayscale pointer-events-none"}`}
+                      />
+                    </div>
+
+                    {isCollected ? (
+                      <>
+                        <h3 
+                          className="text-2xl font-extrabold text-stone-950 font-serif drop-shadow-sm select-none tracking-wide"
+                          style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
+                        >
+                          {item.kanji}
+                        </h3>
+                        {/* Upgrade level badge */}
+                        <div className="text-[8px] bg-stone-900/5 text-stone-600 px-1.5 py-0.2 rounded-full font-bold scale-90 -mt-1 select-none">
+                          Lv.{upgrade.level} · {getLevelTitle(upgrade.level)}
+                        </div>
+                        <p className="text-[10px] font-mono text-stone-500 font-bold italic leading-none">
+                          {isEnglishMode ? "" : `(${item.kanaStr})`}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <span 
+                          className="text-lg font-serif text-stone-350 font-bold select-none tracking-wider block"
+                          style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
+                        >
+                          {item.segments.map(s => s.kana).join("")}
+                        </span>
+                        <p className="text-[9px] font-mono text-stone-400">
+                          未解锁隐藏词条
+                        </p>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Footer: Rarity & Practice Count statistics */}
+                  <div className="pt-2 border-t border-dashed border-stone-800/10 flex items-center justify-between z-10">
+                    <span className="text-[9px] font-mono text-stone-450 font-bold">
+                      {uiTranslate(item.categoryName, isEnglishMode, item.categoryName)}
+                    </span>
+                    {isCollected && (
+                      <span className="text-[9px] font-mono text-stone-500 flex items-center gap-0.5 font-bold">
+                        <RotateCw className="w-2.5 h-2.5 text-stone-400" />
+                        {practiceRounds}轮温故
+                      </span>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {emptyStatePlaceholder()}
+        </>
+      ) : (
+        <div className="space-y-6">
+          {/* Shrine Introduction Banner */}
+          <div className="p-6 rounded-2xl bg-gradient-to-br from-[#7c2d12] to-[#451a03] border-2 border-amber-500 shadow-xl text-stone-100 text-center space-y-3 relative overflow-hidden select-none">
+            {/* Shinto Shrine torii gate visual icon or styling details */}
+            <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-amber-400 opacity-40 rounded-tl" />
+            <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-amber-400 opacity-40 rounded-tr" />
+            <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-amber-400 opacity-40 rounded-bl" />
+            <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-amber-400 opacity-40 rounded-br" />
+
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 text-xl font-serif">
+              ⛩️
+            </div>
+            <h2 className="text-xl sm:text-2xl font-serif font-black tracking-wider text-amber-300">五十音神明之启・御神殿召唤</h2>
+            <p className="text-xs text-stone-300 max-w-xl mx-auto leading-relaxed font-serif">
+              欢迎来到神秘的和歌祈愿神社！在这里，您可以消耗通过在拼写大厅练习温故积攒的【和币】来进行神圣召唤。您将获得全新的高级五十音假名闪卡，或为已有假名充能升级！
+            </p>
+            <div className="pt-1.5 flex justify-center gap-4 text-xs font-mono">
+              <span className="flex items-center gap-1 bg-black/30 px-3 py-1 rounded-full text-amber-300 border border-amber-500/20">
+                🪙 我的当前和币: <b>{coins} 和币</b>
+              </span>
+              <span className="flex items-center gap-1 bg-black/30 px-3 py-1 rounded-full text-emerald-300 border border-emerald-500/20">
+                🎴 已解锁卡牌: <b>{collectedIds.length} / {activeDict.length} 张</b>
+              </span>
+            </div>
+          </div>
+
+          {/* Gacha Packs Bento Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 select-none">
+            {/* Beginner pack */}
+            <motion.div 
+              whileHover={{ y: -5 }}
+              className="p-5 rounded-2xl bg-[#fcfbf9] border-2 border-stone-250 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 bg-blue-50 text-blue-700 font-bold px-3 py-1 rounded-bl text-[9px] font-mono tracking-wider">
+                NOVICE PACK
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-2xl">🌱</span>
+                <h3 className="text-base font-black text-stone-900 font-serif">和风新手御守包</h3>
+                <p className="text-xs text-stone-500 leading-relaxed font-sans">
+                  非常适合新手打牢基础的入门包，能够快速召唤 N 级和 R 级基础假名闪卡。
+                </p>
+                <div className="text-[9px] bg-stone-100/50 p-2.5 rounded-xl border font-mono text-stone-500 leading-normal space-y-0.5">
+                  <div className="font-bold text-stone-700">Rarity Rates (稀有度概率):</div>
+                  <div>• 普通 N 级 (Common): 70%</div>
+                  <div>• 珍稀 R 级 (Rare): 25%</div>
+                  <div>• 极品 SR 级 (Epic): 5%</div>
+                  <div>• 神珍 SSR 级 (Legend): 0%</div>
+                </div>
+              </div>
+              <button
+                onClick={() => handleGachaSummon("beginner")}
+                className="w-full py-2.5 rounded-xl bg-stone-900 hover:bg-stone-850 text-stone-50 font-black text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow"
+              >
+                <span>召唤 1 次</span>
+                <span className="font-mono text-stone-400 opacity-90">🪙 60 和币</span>
+              </button>
+            </motion.div>
+
+            {/* Culture/Nature Pack */}
+            <motion.div 
+              whileHover={{ y: -5 }}
+              className="p-5 rounded-2xl bg-[#fcfbf9] border-2 border-amber-300 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 bg-amber-100 text-amber-800 font-bold px-3 py-1 rounded-bl text-[9px] font-mono tracking-wider">
+                POPULAR CHOICE
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-2xl">🌸</span>
+                <h3 className="text-base font-black text-amber-900 font-serif">万叶繁茂名物包</h3>
+                <p className="text-xs text-stone-500 leading-relaxed font-sans">
+                  融入了万物自然与传统民俗的高级卡包，极高概率出现珍稀 R 级与 SR 极品闪卡！
+                </p>
+                <div className="text-[9px] bg-amber-50 p-2.5 rounded-xl border border-amber-200 font-mono text-amber-800/80 leading-normal space-y-0.5">
+                  <div className="font-bold text-amber-800">Rarity Rates (稀有度概率):</div>
+                  <div>• 普通 N 级 (Common): 30%</div>
+                  <div>• 珍稀 R 级 (Rare): 50%</div>
+                  <div>• 极品 SR 级 (Epic): 15%</div>
+                  <div>• 神珍 SSR 级 (Legend): 5%</div>
+                </div>
+              </div>
+              <button
+                onClick={() => handleGachaSummon("culture")}
+                className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow"
+              >
+                <span>召唤 1 次</span>
+                <span className="font-mono text-amber-200 opacity-90">🪙 120 和币</span>
+              </button>
+            </motion.div>
+
+            {/* Legendary SSR Pack */}
+            <motion.div 
+              whileHover={{ y: -5 }}
+              className="p-5 rounded-2xl bg-[#fcfbf9] border-2 border-purple-300 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 bg-purple-100 text-purple-800 font-bold px-3 py-1 rounded-bl text-[9px] font-mono tracking-wider">
+                SSR RATE UP!
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-2xl">✨</span>
+                <h3 className="text-base font-black text-purple-900 font-serif">天道神珍宿命包</h3>
+                <p className="text-xs text-stone-500 leading-relaxed font-sans">
+                  直接获得高阶智慧启示！100% 屏蔽普通 N 级卡牌，高达 10% 概率爆出传说级 SSR 闪卡！
+                </p>
+                <div className="text-[9px] bg-purple-50 p-2.5 rounded-xl border border-purple-200 font-mono text-purple-800/80 leading-normal space-y-0.5">
+                  <div className="font-bold text-purple-800">Rarity Rates (稀有度概率):</div>
+                  <div>• 普通 N 级 (Common): 0%</div>
+                  <div>• 珍稀 R 级 (Rare): 60%</div>
+                  <div>• 极品 SR 级 (Epic): 30%</div>
+                  <div>• 神珍 SSR 级 (Legend): 10%</div>
+                </div>
+              </div>
+              <button
+                onClick={() => handleGachaSummon("legendary")}
+                className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-lg"
+              >
+                <span>召唤 1 次</span>
+                <span className="font-mono text-purple-200 opacity-90">🪙 200 和币</span>
+              </button>
+            </motion.div>
+          </div>
+
+          {/* Gacha summoning active overlay */}
+          <AnimatePresence>
+            {isSummoning && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-stone-950/90 backdrop-blur-md select-none"
+              >
+                <div className="space-y-6 text-center">
+                  <motion.div 
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                    className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full mx-auto"
+                  />
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-serif font-black text-amber-300 animate-pulse">正在叩问太鼓、祈求神明降临...</h3>
+                    <p className="text-xs text-stone-400">五十音神明正在拨弄和歌线，闪卡即将在神社中显现！</p>
                   </div>
                 </div>
-              )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-              {/* Central text layout */}
-              <div className="text-center py-2 space-y-1.5 z-10 flex flex-col items-center justify-center">
-                {/* Embedded Card Illustration */}
-                <div className="mb-1">
-                  <CardIllustration
-                    id={item.id}
-                    category={item.category}
-                    className={`w-12 h-12 transition-all ${isCollected ? "opacity-95 contrast-110" : "opacity-20 grayscale pointer-events-none"}`}
-                  />
-                </div>
-
-                {isCollected ? (
-                  <>
-                    <h3 
-                      className="text-2xl font-extrabold text-stone-950 font-serif drop-shadow-sm select-none tracking-wide"
-                      style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
-                    >
-                      {item.kanji}
-                    </h3>
-                    <p className="text-[10px] font-mono text-stone-500 font-bold italic">
-                      {isEnglishMode ? "" : `(${item.kanaStr})`}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <span 
-                      className="text-lg font-serif text-stone-350 font-bold select-none tracking-wider block"
-                      style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
-                    >
-                      {item.segments.map(s => s.kana).join("")}
+          {/* Summon Reveal Card Ceremony Popup overlay */}
+          <AnimatePresence>
+            {summonRevealCard && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-stone-950/95 backdrop-blur-md p-4 select-none"
+              >
+                <div className="max-w-md w-full bg-stone-900 border border-stone-800 rounded-3xl p-6 text-center space-y-6 relative shadow-2xl">
+                  {/* Confetti overlay sparkles */}
+                  <div className="absolute -top-12 left-1/2 -translate-x-1/2 text-5xl">🎉✨</div>
+                  
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono tracking-widest text-amber-500 font-bold uppercase">
+                      SUMMON REVEALED • 神社降临结果
                     </span>
-                    <p className="text-[9px] font-mono text-stone-400">
-                      未解锁隐藏词条
+                    <h3 className="text-2xl font-serif font-black text-stone-100">恭喜获得神之和卡！</h3>
+                  </div>
+
+                  {/* Exquisite Card detail rendering */}
+                  <motion.div 
+                    initial={{ scale: 0.8, rotate: -3 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: "spring", stiffness: 100 }}
+                    className={`p-6 rounded-2xl border-2 mx-auto max-w-xs space-y-4 relative overflow-hidden ${
+                      summonRevealCard.rarity === "SSR"
+                        ? "bg-gradient-to-tr from-pink-300 via-purple-300 via-indigo-200 via-emerald-200 via-yellow-200 to-rose-200 border-amber-400 text-stone-950 shadow-2xl shadow-purple-500/30"
+                        : summonRevealCard.rarity === "SR"
+                        ? "bg-gradient-to-br from-orange-50 via-stone-50 to-amber-50 border-orange-300 text-stone-900"
+                        : summonRevealCard.rarity === "R"
+                        ? "bg-gradient-to-br from-sky-50 via-white to-blue-50 border-sky-300 text-stone-900"
+                        : "bg-gradient-to-b from-stone-50 to-stone-100 border-stone-300 text-stone-900"
+                    }`}
+                  >
+                    <div className="absolute top-2 left-3 text-[9px] font-mono text-stone-500 font-bold">
+                      {summonRevealCard.rarityName}  ・  #{summonRevealCard.id.toUpperCase()}
+                    </div>
+
+                    <div className="flex justify-center pt-2">
+                      <div className="p-2.5 bg-white/80 backdrop-blur-sm border border-stone-200 rounded-2xl shadow-sm">
+                        <CardIllustration id={summonRevealCard.id} category={summonRevealCard.category} className="w-12 h-12" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <h4 className="text-3xl font-serif font-black tracking-wide leading-none">{summonRevealCard.kanji}</h4>
+                      <p className="text-xs font-mono font-bold text-stone-600">
+                        ({summonRevealCard.kanaStr})  •  {summonRevealCard.segments.map(s => s.displayRomaji).join("")}
+                      </p>
+                    </div>
+
+                    <p className="text-xs text-stone-600 font-sans leading-relaxed px-2 bg-white/40 rounded-xl p-2.5">
+                      {summonRevealCard.meaning}
                     </p>
-                  </>
-                )}
-              </div>
+                  </motion.div>
 
-              {/* Footer: Rarity & Practice Count statistics */}
-              <div className="pt-2 border-t border-dashed border-stone-800/10 flex items-center justify-between z-10">
-                <span className="text-[9px] font-mono text-stone-450 font-bold">
-                  {uiTranslate(item.categoryName, isEnglishMode, item.categoryName)}
-                </span>
-                {isCollected && (
-                  <span className="text-[9px] font-mono text-stone-500 flex items-center gap-0.5 font-bold">
-                    <RotateCw className="w-2.5 h-2.5 text-stone-400" />
-                    {practiceRounds}轮温故
-                  </span>
-                )}
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
+                  {summonDuplicateInfo && (
+                    <p className="text-xs text-amber-400 font-mono leading-relaxed bg-amber-500/10 p-3 rounded-xl border border-amber-500/20 max-w-xs mx-auto">
+                      {summonDuplicateInfo}
+                    </p>
+                  )}
 
-      {emptyStatePlaceholder()}
+                  {/* Footer button */}
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => audioSynth.speakJapanese(summonRevealCard.kanaStr)}
+                      className="px-4 py-1.5 rounded-full bg-stone-800 hover:bg-stone-700 text-amber-300 text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" />
+                      <span>播放朗读语音</span>
+                    </button>
+                    <div>
+                      <button
+                        onClick={() => setSummonRevealCard(null)}
+                        className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs transition-colors cursor-pointer shadow-md w-full max-w-xs mx-auto block"
+                      >
+                        收进和歌藏馆
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* Floating Modal detailed view / AI Storyteller with Card Flip style layout */}
       <AnimatePresence>
@@ -660,11 +1123,11 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
               initial={{ scale: 0.95 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.95 }}
-              className="max-w-xl w-full bg-stone-50 rounded-2xl border-2 border-stone-800 p-6 md:p-8 space-y-6 relative shadow-2xl my-8 text-stone-900"
+              className="max-w-md w-full bg-stone-50 rounded-2xl border-2 border-stone-800 p-4 sm:p-6 space-y-4 relative shadow-2xl my-8 text-stone-900"
             >
               <button
                 onClick={() => setSelectedCard(null)}
-                className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-stone-200 text-stone-600 transition-colors"
+                className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-stone-200 text-stone-600 transition-colors z-20"
                 title={isEnglishMode ? "Close" : "关闭"}
               >
                 ✕
@@ -672,36 +1135,40 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
 
               {/* Inside detail header: beautiful premium styling card view on top */}
               <div 
-                className={`p-6 rounded-xl border-2 bg-gradient-to-br ${selectedCard.bgGradient} ${selectedCard.borderColor} text-center space-y-3 relative overflow-hidden`}
-                style={{ boxShadow: `0 4px 15px ${selectedCard.glowColor}` }}
+                className={`p-4 rounded-xl border-2 ${
+                  selectedCard.rarity === "SSR"
+                    ? "bg-gradient-to-tr from-pink-300 via-purple-300 via-indigo-200 via-emerald-200 via-yellow-200 to-rose-200 border-amber-400 shadow-lg shadow-purple-500/20"
+                    : `bg-gradient-to-br ${selectedCard.bgGradient} ${selectedCard.borderColor}`
+                } text-center space-y-2 relative overflow-hidden`}
+                style={{ boxShadow: `0 4px 12px ${selectedCard.glowColor}` }}
               >
-                <span className="absolute top-2 left-3 text-[10px] font-mono text-stone-500 font-bold">
+                <span className="absolute top-2 left-3 text-[9px] font-mono text-stone-500 font-bold">
                   {selectedCard.rarityName}  ・  #{selectedCard.id.toUpperCase()}
                 </span>
 
-                <div className="flex justify-center pt-2">
-                  <div className="p-3 bg-white/70 backdrop-blur-sm border border-stone-200/50 rounded-2xl shadow-sm">
+                <div className="flex justify-center pt-1.5">
+                  <div className="p-2 bg-white/70 backdrop-blur-sm border border-stone-200/50 rounded-2xl shadow-sm">
                     <CardIllustration
                       id={selectedCard.id}
                       category={selectedCard.category}
-                      className="w-16 h-16"
+                      className="w-11 h-11"
                     />
                   </div>
                 </div>
                 
                 <h2 
-                  className="text-4xl font-black text-stone-950 font-serif"
+                  className="text-2xl sm:text-3xl font-black text-stone-950 font-serif leading-tight"
                   style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
                 >
                   {selectedCard.kanji}
                 </h2>
                 
-                <div className="flex justify-center gap-3">
-                  <span className="text-sm font-mono text-stone-600">
+                <div className="flex justify-center gap-2.5 text-xs text-stone-600">
+                  <span className="font-mono">
                     {isEnglishMode ? "英文单词: " : "假名: "}<b>{isEnglishMode ? selectedCard.kanji : selectedCard.kanaStr}</b>
                   </span>
                   <span className="text-stone-300">|</span>
-                  <span className="text-sm font-mono text-stone-600">
+                  <span className="font-mono">
                     {isEnglishMode ? "字母拼写: " : "罗马音: "}<b>{selectedCard.segments.map(s => s.displayRomaji).join("")}</b>
                   </span>
                 </div>
@@ -709,18 +1176,18 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                 <div className="flex justify-center pt-0.5">
                   <button
                     onClick={() => audioSynth.speakJapanese(selectedCard.kanaStr)}
-                    className="px-3 py-1 rounded-full bg-stone-900/10 hover:bg-stone-900/20 text-stone-850 transition-all text-[11px] font-bold flex items-center gap-1.5 cursor-pointer shadow-sm animate-pulse"
+                    className="px-2.5 py-0.5 rounded-full bg-stone-900/10 hover:bg-stone-900/20 text-stone-850 transition-all text-[10px] font-bold flex items-center gap-1 cursor-pointer shadow-sm animate-pulse"
                   >
-                    <Volume2 className="w-3 h-3 text-stone-700" />
+                    <Volume2 className="w-2.5 h-2.5 text-stone-700" />
                     <span>{isEnglishMode ? "听原声朗读" : "原声播音"}</span>
                   </button>
                 </div>
 
-                <div className="flex gap-2 justify-center pt-2">
+                <div className="flex gap-1.5 justify-center pt-1">
                   {selectedCard.segments.map((s, idx) => (
-                    <div key={idx} className="bg-stone-900/5 px-2 py-1 rounded text-xs">
-                      <span className="font-serif font-black pr-1">{s.text || s.kana}</span>
-                      <span className="font-mono text-[9px] text-stone-500">{s.displayRomaji}</span>
+                    <div key={idx} className="bg-stone-900/5 px-1.5 py-0.5 rounded text-[10px]">
+                      <span className="font-serif font-black pr-0.5">{s.text || s.kana}</span>
+                      <span className="font-mono text-[8px] text-stone-500">{s.displayRomaji}</span>
                     </div>
                   ))}
                 </div>
@@ -730,39 +1197,52 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
               <div className="flex border-b border-stone-200">
                 <button
                   onClick={() => setActiveDetailTab("story")}
-                  className={`flex-1 pb-2 text-xs font-bold text-center border-b-2 transition-all ${
+                  className={`flex-1 pb-2 text-[10px] sm:text-xs font-bold text-center border-b-2 transition-all ${
                     activeDetailTab === "story"
                       ? "border-amber-500 text-stone-950 font-black"
                       : "border-transparent text-stone-400 hover:text-stone-700"
                   }`}
                 >
-                  🔮 文化历史释义
+                  🔮 文化释义
                 </button>
                 <button
                   onClick={() => {
                     setActiveDetailTab("drawing");
                   }}
-                  className={`flex-1 pb-2 text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-1 ${
+                  className={`flex-1 pb-2 text-[10px] sm:text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-0.5 ${
                     activeDetailTab === "drawing"
                       ? "border-amber-500 text-stone-950 font-black"
                       : "border-transparent text-stone-400 hover:text-stone-700"
                   }`}
                 >
-                  <PenTool className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
-                  <span>手写描红临摹</span>
+                  <PenTool className="w-3 h-3 text-rose-500" />
+                  <span>描红临摹</span>
                 </button>
                 <button
                   onClick={() => {
                     setActiveDetailTab("chat");
                   }}
-                  className={`flex-1 pb-2 text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-1 ${
+                  className={`flex-1 pb-2 text-[10px] sm:text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-0.5 ${
                     activeDetailTab === "chat"
                       ? "border-amber-500 text-stone-950 font-black"
                       : "border-transparent text-stone-400 hover:text-stone-700"
                   }`}
                 >
-                  <MessageSquare className="w-3.5 h-3.5 text-sky-500" />
-                  <span>💬 角色宿命私聊</span>
+                  <MessageSquare className="w-3 h-3 text-sky-500" />
+                  <span>💬 私聊</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveDetailTab("upgrade");
+                  }}
+                  className={`flex-1 pb-2 text-[10px] sm:text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-0.5 ${
+                    activeDetailTab === "upgrade"
+                      ? "border-amber-500 text-stone-950 font-black"
+                      : "border-transparent text-stone-400 hover:text-stone-700"
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3 text-amber-550 animate-pulse" />
+                  <span>⚡ 淬炼</span>
                 </button>
               </div>
 
@@ -970,6 +1450,82 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                       <Send className="w-3.5 h-3.5" />
                     </button>
                   </form>
+                </div>
+              )}
+
+              {activeDetailTab === "upgrade" && (
+                <div className="space-y-4 bg-white p-4 rounded-xl border border-stone-200 select-none">
+                  <div className="text-center space-y-1">
+                    <div className="text-xs text-stone-400 font-mono">CARD CULTIVATION ENGINE</div>
+                    <h3 className="font-serif font-black text-stone-800 text-sm">闪卡太鼓淬炼 & 五星升华</h3>
+                    <p className="text-[11px] text-stone-500">
+                      通过注入在拼写大厅练习温故赚取的【和币】，可以手动对您心爱的闪卡进行经验升级、冲破星级极限！
+                    </p>
+                  </div>
+
+                  {/* Upgrades current status card */}
+                  <div className="p-3.5 bg-stone-50 rounded-xl border space-y-2 font-mono text-[11px]">
+                    <div className="flex justify-between items-center text-stone-700">
+                      <span>当前修炼状态:</span>
+                      <span className="font-bold text-amber-700">
+                        Lv.{(cardUpgrades[selectedCard.id]?.level || 1)} · {getLevelTitle(cardUpgrades[selectedCard.id]?.level || 1)}
+                      </span>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[10px] text-stone-500">
+                        <span>经验进度:</span>
+                        <span>{(cardUpgrades[selectedCard.id]?.exp || 0)} / 100 EXP</span>
+                      </div>
+                      <div className="w-full bg-stone-200 h-2 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-amber-500 h-full transition-all duration-300" 
+                          style={{ width: `${cardUpgrades[selectedCard.id]?.exp || 0}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center text-stone-700 pt-1 border-t border-dashed">
+                      <span>星级等阶:</span>
+                      <span className="text-amber-500 text-xs tracking-tighter font-bold flex gap-0.5">
+                        {"★".repeat(cardUpgrades[selectedCard.id]?.stars || 0) + "☆".repeat(5 - (cardUpgrades[selectedCard.id]?.stars || 0))}
+                      </span>
+                    </div>
+                  </div>
+
+                  {upgradeMessage && (
+                    <div className="p-2 bg-amber-50 border border-amber-200 text-amber-800 text-center text-xs font-mono rounded-lg animate-bounce">
+                      {upgradeMessage}
+                    </div>
+                  )}
+
+                  {/* Buttons */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => handleManualLevelUp(selectedCard.id)}
+                      disabled={(cardUpgrades[selectedCard.id]?.level || 1) >= 5 && (cardUpgrades[selectedCard.id]?.exp || 0) >= 100}
+                      className="p-2.5 rounded-xl border border-stone-250 bg-white hover:bg-stone-50 text-stone-850 font-bold text-xs transition-colors cursor-pointer text-center space-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="text-amber-600 font-black">⚡ 经验淬炼</div>
+                      <div className="text-[9px] text-stone-500 font-mono font-medium">🪙 30 和币 (+35 EXP)</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleManualStarUp(selectedCard.id)}
+                      disabled={(cardUpgrades[selectedCard.id]?.stars || 0) >= 5}
+                      className="p-2.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100/80 text-amber-950 font-bold text-xs transition-colors cursor-pointer text-center space-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="text-amber-700 font-black font-serif">⭐ 境界突破</div>
+                      <div className="text-[9px] text-stone-650 font-mono font-medium">🪙 80 和币 (+1 星)</div>
+                    </button>
+                  </div>
+
+                  <p className="text-[9px] text-stone-450 leading-relaxed text-center font-sans">
+                    💡 提示：闪卡满级为 Lv.5，升星可突破当前卡牌的视觉底色光圈，更能温故获得倍率加成！
+                  </p>
                 </div>
               )}
 

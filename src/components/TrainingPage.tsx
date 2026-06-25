@@ -175,8 +175,8 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
     if (practiceMode === "handwriting") return;
     if (isPaused || timerFinished || wordCorrect) return;
 
-    // Only listen to standard alphabetic keys or space if in English Mode
-    const isValidKey = /^[a-z]$/.test(key) || (isEnglishMode && key === " ");
+    // Only listen to standard alphabetic keys, space, numbers, hyphen or underscore
+    const isValidKey = /^[a-z0-9]$/.test(key) || key === " " || key === "-" || key === "_";
     if (!isValidKey) return;
 
     // De-duplicate rapid duplicate events (e.g. from keydown + onChange firing together within 30ms)
@@ -296,6 +296,12 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
         return;
       }
+      
+      // Prevent default browser scroll when spacebar is pressed during training/typing
+      if (e.key === " ") {
+        e.preventDefault();
+      }
+
       const key = e.key === " " ? " " : e.key.toLowerCase();
       processInputKeyRef.current(key);
     };
@@ -442,7 +448,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         )}
 
         {/* Dynamic Card Slider Carousel Area */}
-        <div className="relative overflow-hidden my-2 sm:my-4 min-h-[160px] sm:min-h-[230px] flex items-center justify-between px-1 sm:px-12 bg-white/40 rounded-xl sm:rounded-2xl border border-stone-200 shadow-inner">
+        <div className="relative overflow-hidden my-2 sm:my-4 min-h-[240px] sm:min-h-[300px] py-3 sm:py-6 flex items-center justify-between px-1 sm:px-12 bg-white/40 rounded-xl sm:rounded-2xl border border-stone-200 shadow-inner">
           
           {/* Slide Left Button */}
           <button
@@ -557,7 +563,11 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                 ) : (
                   <>
                     {/* Gridded TracingKana slots array */}
-                    <div className="flex flex-wrap items-center justify-center gap-4 py-2">
+                    <div className={`flex items-center justify-center py-2 max-w-full ${
+                      isEnglishMode 
+                        ? "flex-nowrap gap-1 sm:gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-1" 
+                        : "flex-wrap gap-2.5 sm:gap-4"
+                    }`}>
                       {item.segments.map((segment, idx) => {
                         const isCorrectSegment = wordCorrect || idx < currentSegmentIdx;
                         const isActiveSegment = !wordCorrect && idx === currentSegmentIdx;
@@ -718,7 +728,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                   }
                   e.target.value = "";
                 }}
-                className="opacity-0 absolute -z-10 w-1 h-1 pointer-events-none"
+                className="opacity-0 fixed top-4 left-4 -z-50 w-1 h-1 pointer-events-none"
                 aria-hidden="true"
                 autoCapitalize="none"
                 autoCorrect="off"

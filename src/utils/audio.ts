@@ -5,6 +5,7 @@ class RetroAudioSynth {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
   private voiceType: string = "female"; // "female" | "male" | "child"
+  private lastSpeakTime: number = 0;
 
   private bgmInterval: any = null;
   private droneOsc1: OscillatorNode | null = null;
@@ -45,6 +46,20 @@ class RetroAudioSynth {
   // Speaks Japanese syllable or full word using SpeechSynthesis API (with automatic English detection for English Mode)
   speakJapanese(text: string, cancelActive: boolean = true) {
     if (this.isMuted) return;
+    
+    // Intelligent Speed Typing Voice Protection:
+    // If the user is typing extremely fast (e.g. interval between syllable completed is less than 350ms),
+    // and this is an individual syllable (cancelActive is true and length is small), we skip speaking
+    // the intermediate syllable. This prevents the browser's TTS system from lagging or clogging up,
+    // keeping the typewriter sound 100% crispy, and then playing the final complete word perfectly at the end!
+    const now = Date.now();
+    const isShortSyllable = text.length <= 3;
+    if (cancelActive && isShortSyllable && (now - this.lastSpeakTime < 380)) {
+      this.lastSpeakTime = now;
+      return;
+    }
+    this.lastSpeakTime = now;
+
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       try {
         if (window.speechSynthesis.paused) {

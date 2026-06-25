@@ -1,12 +1,15 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
-import { BookOpen, Sparkles, Trophy, Settings, HelpCircle, Flame, Keyboard, BarChart2, Calendar, Award, Clock, ArrowRight, RotateCw, Play, BookOpenCheck, Activity, Plus, FileText, Trash2, CheckCircle, AlertCircle, Upload } from "lucide-react";
+import { BookOpen, Sparkles, Trophy, Settings, HelpCircle, Flame, Keyboard, BarChart2, Calendar, Award, Clock, ArrowRight, RotateCw, Play, BookOpenCheck, Activity, Plus, FileText, Trash2, CheckCircle, AlertCircle, Upload, Gamepad2 } from "lucide-react";
 import { DICTIONARY, DictionaryItem, getDictionary } from "../data/dictionary";
 import { uiTranslate, LANG_MAPPING } from "../utils/lang";
+import { NarrativeStyle, nTrans } from "../utils/narrative";
 
 interface StartPageProps {
   onStartTraining: (items: DictionaryItem[], durationMs: number) => void;
   onGoToLibrary: () => void;
+  onGoToSpellRush: () => void;
+  onGoToMemoryMatch: () => void;
   collectedIds: string[];
   practiceTimes: Record<string, number>;
   practiceMode: "typing" | "handwriting";
@@ -14,11 +17,14 @@ interface StartPageProps {
   isEnglishMode?: boolean;
   customCards?: DictionaryItem[];
   setCustomCards?: React.Dispatch<React.SetStateAction<DictionaryItem[]>>;
+  narrativeStyle: NarrativeStyle;
 }
 
 export const StartPage: React.FC<StartPageProps> = ({
   onStartTraining,
   onGoToLibrary,
+  onGoToSpellRush,
+  onGoToMemoryMatch,
   collectedIds,
   practiceTimes = {},
   practiceMode,
@@ -26,6 +32,7 @@ export const StartPage: React.FC<StartPageProps> = ({
   isEnglishMode = false,
   customCards = [],
   setCustomCards,
+  narrativeStyle,
 }) => {
   const activeDict = React.useMemo(() => {
     return [...getDictionary(isEnglishMode), ...customCards];
@@ -222,6 +229,87 @@ export const StartPage: React.FC<StartPageProps> = ({
     }
   };
 
+  // Direct Full-Text spelling mode (without AI card generation)
+  const handleDirectFullTextSpelling = () => {
+    if (!docText.trim()) {
+      setParseError(isEnglishMode ? "Please enter or upload some text first." : "请先输入或拖入需要解析的文本内容。");
+      return;
+    }
+    setParseError("");
+    setParseSuccess("");
+
+    // Split text into lines, filter out empty lines, trim them
+    const lines = docText
+      .split(/\n+/)
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+
+    if (lines.length === 0) {
+      setParseError(isEnglishMode ? "No readable text found." : "未发现可读文本。");
+      return;
+    }
+
+    const newItems: DictionaryItem[] = lines.map((line, index) => {
+      const uniqueId = "custom-fulltext-" + Date.now() + "-" + index + "-" + Math.random().toString(36).substr(2, 5);
+      
+      // Clean punctuation for typing safety, but keep original for display.
+      const cleanLineForTyping = line
+        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'，。？！、；：（）“”‘’【】「」]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      let generatedSegments: { kana: string; romaji: string[]; displayRomaji: string }[] = [];
+      
+      if (isEnglishMode) {
+        // Character by character for English, preserving case/space
+        generatedSegments = cleanLineForTyping.split("").map((char) => ({
+          kana: char,
+          romaji: [char.toLowerCase()],
+          displayRomaji: char
+        }));
+      } else {
+        // split kana into syllables for Japanese
+        generatedSegments = splitKanaIntoSyllables(cleanLineForTyping);
+      }
+
+      // If segments is empty, fallback to a space
+      if (generatedSegments.length === 0) {
+        generatedSegments = [{ kana: " ", romaji: [" "], displayRomaji: " " }];
+      }
+
+      return {
+        id: uniqueId,
+        kanji: line, // Original line containing punctuation for beautiful rendering
+        kanaStr: cleanLineForTyping, // Phonetic typing characters
+        category: "custom" as const,
+        categoryName: isEnglishMode ? "Full Text Spelling" : "全文拼写",
+        meaning: isEnglishMode 
+          ? `Line ${index + 1} of custom document` 
+          : `自定义文稿第 ${index + 1} 行`,
+        rarity: "SR" as const,
+        rarityName: isEnglishMode ? "Special" : "珍贵",
+        glowColor: "rgba(245,158,11,0.15)",
+        borderColor: "border-amber-400/60",
+        bgGradient: "from-amber-500/10 to-stone-900/40",
+        segments: generatedSegments
+      };
+    });
+
+    if (setCustomCards) {
+      setCustomCards((prev) => {
+        const existingIds = prev.map((c) => c.id);
+        const filteredNewItems = newItems.filter((item) => !existingIds.includes(item.id));
+        return [...prev, ...filteredNewItems];
+      });
+    }
+
+    setParseSuccess(isEnglishMode 
+      ? `Successfully loaded ${newItems.length} lines for Full-Text Typing!` 
+      : `已成功加载 ${newItems.length} 行文本，开启全文直接拼写打字模式！`
+    );
+    setDocText("");
+  };
+
   const handleManualAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualKanji.trim() || !manualMeaning.trim()) {
@@ -287,7 +375,7 @@ export const StartPage: React.FC<StartPageProps> = ({
     return item.category === selectedCategory;
   });
 
-  // Automatically keep CARD selections synchronized with sessionLimit
+  // Automatically keep CARD selections synchronized with sessionLimit with randomized additions
   React.useEffect(() => {
     setSelectedCardIds((prev) => {
       const poolIds = filteredDict.map(item => item.id);
@@ -302,13 +390,22 @@ export const StartPage: React.FC<StartPageProps> = ({
       if (currentValid.length < sessionLimit) {
         const needed = sessionLimit - currentValid.length;
         const remaining = poolIds.filter(id => !currentValid.includes(id));
-        const extra = remaining.slice(0, needed);
+        // Shuffle remaining to ensure selections feel truly randomized and fresh
+        const shuffledRemaining = [...remaining].sort(() => Math.random() - 0.5);
+        const extra = shuffledRemaining.slice(0, needed);
         return [...currentValid, ...extra];
       }
       
       return currentValid;
     });
   }, [sessionLimit, selectedCategory]);
+
+  const handleRandomizeSelection = () => {
+    if (filteredDict.length === 0) return;
+    const shuffled = [...filteredDict].sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, Math.min(sessionLimit, shuffled.length)).map(item => item.id);
+    setSelectedCardIds(selected);
+  };
 
   const handleToggleCheckbox = (id: string) => {
     setSelectedCardIds((prev) => {
@@ -469,9 +566,87 @@ export const StartPage: React.FC<StartPageProps> = ({
           <div className="flex-1">
             <div className="text-xs text-stone-500 font-mono">MEMORIES & FOLKLORES</div>
             <p className="text-base font-black text-amber-900 font-serif">{isEnglishMode ? "英语单词收藏相册" : "个人收藏卡牌库"}</p>
-            <p className="text-xs text-amber-700 mt-0.5">{isEnglishMode ? "翻阅已收集词条，查阅AI文化历史解析 →" : "翻阅已收集卡片，查阅AI文化解析 →"}</p>
+            <p className="text-xs text-amber-700 mt-0.5">{isEnglishMode ? "翻阅已收集词条，查阅AI cultural历史解析 →" : "翻阅已收集卡片，查阅AI文化解析 →"}</p>
           </div>
         </button>
+      </div>
+
+      {/* 🎴 和风游艺场：限时疾驰 & 翻牌记忆消消乐 (Playground Arcade) */}
+      <div className="p-6 rounded-2xl border-2 border-stone-800 bg-[#faf8f4] space-y-4 shadow-sm select-none relative overflow-hidden">
+        <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+          <div className="space-y-0.5">
+            <span className="text-[9px] font-mono font-black text-amber-850 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full uppercase tracking-wider">
+              {narrativeStyle === "mythology" ? "Wabi-Sabi Playground Arcade" : narrativeStyle === "cultural" ? "Fuga Elegant Playground" : "Cognitive Training Center"}
+            </span>
+            <h2 className="text-lg font-black text-stone-900 font-serif flex items-center gap-1.5">
+              <Gamepad2 className="w-5 h-5 text-amber-600 animate-bounce" />
+              <span>
+                {narrativeStyle === "mythology" 
+                  ? "和鸣神社游艺场（温故双雄）" 
+                  : narrativeStyle === "cultural" 
+                  ? "风雅和歌游艺馆（经典温故）" 
+                  : "假名温故评测中心（练习矩阵）"}
+              </span>
+            </h2>
+          </div>
+          <span className="text-[10px] text-stone-400 font-mono tracking-widest font-bold">FUN MINIGAMES</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Game 1: Spell Rush */}
+          <button
+            onClick={onGoToSpellRush}
+            className="p-4 rounded-xl border-2 border-stone-800 bg-amber-50 hover:bg-amber-100/50 text-left transition-all flex gap-4 group cursor-pointer shadow-sm active:scale-[0.98]"
+          >
+            <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-700 font-black text-xl group-hover:scale-110 transition-transform">
+              ⚡
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[9px] font-mono font-black text-amber-800 block uppercase tracking-wide">SPELL RUSH TIME ATTACK</span>
+              <h3 className="font-serif font-black text-stone-900 text-sm mt-0.5 group-hover:text-amber-850">
+                {narrativeStyle === "mythology" 
+                  ? "时钟守卫战：限时罗马音疾驰" 
+                  : narrativeStyle === "cultural" 
+                  ? "时钟疾驰战：限时罗马音竞速" 
+                  : "罗马音极速拼写测试"}
+              </h3>
+              <p className="text-[11px] text-stone-500 leading-normal mt-1">
+                {narrativeStyle === "mythology" 
+                  ? "在 60 秒倒计时内快速拼出罗马音！音调阶梯式连击，疯狂爆出和币礼赏！"
+                  : narrativeStyle === "cultural"
+                  ? "在 60 秒内展开罗马音大竞速！随着连击数（Combo）提升，获取大量岁币成果！"
+                  : "在 60 秒限时中测试发音拼写准确度，通过连续正确配对积累积分奖励！"}
+              </p>
+            </div>
+          </button>
+
+          {/* Game 2: Memory Match */}
+          <button
+            onClick={onGoToMemoryMatch}
+            className="p-4 rounded-xl border-2 border-stone-800 bg-rose-50 hover:bg-rose-100/50 text-left transition-all flex gap-4 group cursor-pointer shadow-sm active:scale-[0.98]"
+          >
+            <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-700 font-black text-xl group-hover:scale-110 transition-transform">
+              🎴
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[9px] font-mono font-black text-rose-800 block uppercase tracking-wide">KANA MEMORY MATCH</span>
+              <h3 className="font-serif font-black text-stone-900 text-sm mt-0.5 group-hover:text-rose-850">
+                {narrativeStyle === "mythology" 
+                  ? "和风花札：记忆翻牌消消乐" 
+                  : narrativeStyle === "cultural" 
+                  ? "风雅和歌：经典翻牌记忆对对碰" 
+                  : "假名字形字音记忆对配"}
+              </h3>
+              <p className="text-[11px] text-stone-500 leading-normal mt-1">
+                {narrativeStyle === "mythology" 
+                  ? "翻牌找出假名与其拼写含义配对！成功配对时卡牌化作唯美花瓣消散，优雅轻快！"
+                  : narrativeStyle === "cultural"
+                  ? "旋转精美的和乐歌牌，完成假名配对！步数越少，获得的岁币与完美评价越高！"
+                  : "通过双向映射逻辑配对假名字音与字形，训练大脑短时记忆，赚取等级积分！"}
+              </p>
+            </div>
+          </button>
+        </div>
       </div>
 
       {/* COMPREHENSIVE PRACTICE DASHBOARD & DAILY REVISION ENGINE ("练习仪表盘" & "每日回顾") */}
@@ -986,7 +1161,6 @@ export const StartPage: React.FC<StartPageProps> = ({
               { id: "nature", label: isEnglishMode ? "自然与动物" : "四季自然" },
               { id: "culture", label: isEnglishMode ? "物品与概念" : "民俗祭典" },
               { id: "food", label: isEnglishMode ? "西餐美味" : "和食美味" },
-              { id: "custom", label: isEnglishMode ? "My Documents" : "我的文稿/自定义" },
             ].map((cat) => (
               <button
                 key={cat.id}
@@ -1092,29 +1266,46 @@ export const StartPage: React.FC<StartPageProps> = ({
                     )}
                   </div>
 
-                  <button
-                    onClick={handleAiParse}
-                    disabled={isParsing || !docText.trim()}
-                    className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer select-none ${
-                      isParsing 
-                        ? "bg-stone-300 text-stone-500 cursor-not-allowed" 
-                        : docText.trim()
-                          ? "bg-amber-500 hover:bg-amber-600 text-stone-950 shadow-sm" 
+                  <div className="flex flex-col gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleDirectFullTextSpelling}
+                      disabled={isParsing || !docText.trim()}
+                      className={`w-full py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer select-none ${
+                        docText.trim()
+                          ? "bg-amber-500 hover:bg-amber-600 text-stone-950 shadow-md ring-2 ring-amber-300/40" 
                           : "bg-stone-200 text-stone-400 cursor-not-allowed"
-                    }`}
-                  >
-                    {isParsing ? (
-                      <>
-                        <RotateCw className="w-4 h-4 animate-spin text-stone-500" />
-                        <span>{isEnglishMode ? "AI Parsing with Gemini..." : "Gemini AI 正在智能提取并进行声调标记..."}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        <span>{isEnglishMode ? "AI Parse & Generate Cards" : "AI 智能切分单词并发起卡牌转换 ＞"}</span>
-                      </>
-                    )}
-                  </button>
+                      }`}
+                    >
+                      <Keyboard className="w-4 h-4 text-stone-800" />
+                      <span>{isEnglishMode ? "⚡ Direct Full-Text Spelling Mode (Recommended)" : "⚡ 开启全文直接拼写打字模式 (推荐，零延迟)"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleAiParse}
+                      disabled={isParsing || !docText.trim()}
+                      className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer select-none ${
+                        isParsing 
+                          ? "bg-stone-300 text-stone-500 cursor-not-allowed" 
+                          : docText.trim()
+                            ? "bg-stone-900 hover:bg-stone-800 text-stone-100 shadow-sm border border-stone-800" 
+                            : "bg-stone-200 text-stone-400 cursor-not-allowed"
+                      }`}
+                    >
+                      {isParsing ? (
+                        <>
+                          <RotateCw className="w-4 h-4 animate-spin text-stone-500" />
+                          <span>{isEnglishMode ? "AI Parsing with Gemini..." : "Gemini AI 正在智能切分并注音..."}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                          <span>{isEnglishMode ? "AI Vocab Card Extraction" : "Gemini AI 词义切分与卡牌提取 ＞"}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Right side: Manual Add */}
@@ -1219,13 +1410,23 @@ export const StartPage: React.FC<StartPageProps> = ({
                   </span>
                 </div>
               </div>
-              <button
-                onClick={handleStartGroupTraining}
-                className="w-full sm:w-auto px-5 py-3 bg-stone-900 hover:bg-stone-850 text-stone-50 hover:text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
-              >
-                <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-                <span>{isEnglishMode ? `开启 ${selectedCardIds.length} 词连环拼写熟化 ＞` : `开启 ${selectedCardIds.length} 字连环拼音熟化 ＞`}</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
+                <button
+                  type="button"
+                  onClick={handleRandomizeSelection}
+                  className="w-full sm:w-auto px-4 py-3 bg-stone-100 hover:bg-stone-200 text-stone-900 border border-stone-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                  title={isEnglishMode ? "Randomly select another set of cards" : "随机换一批训练卡片"}
+                >
+                  <span>🎲 {isEnglishMode ? "Shuffle" : "换一批"}</span>
+                </button>
+                <button
+                  onClick={handleStartGroupTraining}
+                  className="flex-1 sm:flex-initial px-5 py-3 bg-stone-900 hover:bg-stone-850 text-stone-50 hover:text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                  <span>{isEnglishMode ? `开启 ${selectedCardIds.length} 词连环拼写熟化 ＞` : `开启 ${selectedCardIds.length} 字连环拼音熟化 ＞`}</span>
+                </button>
+              </div>
             </div>
           )}
 

@@ -1,21 +1,55 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Sparkles, Trophy, BookOpen, Volume2, VolumeX, Key, HelpCircle, Gamepad2, Info, ChevronLeft, ChevronRight, Music, Smile, Mic, Home } from "lucide-react";
+import { Sparkles, Trophy, BookOpen, Volume2, VolumeX, Key, HelpCircle, Gamepad2, Info, ChevronLeft, ChevronRight, Music, Smile, Mic, Home, Clock } from "lucide-react";
 import { StartPage } from "./components/StartPage";
 import { TrainingPage } from "./components/TrainingPage";
 import { CardLibraryPage } from "./components/CardLibraryPage";
 import { MascotComponent } from "./components/MascotComponent";
+import { SpellRushPage } from "./components/SpellRushPage";
+import { MemoryMatchPage } from "./components/MemoryMatchPage";
 import { DictionaryItem } from "./data/dictionary";
 import { audioSynth } from "./utils/audio";
 import { uiTranslate } from "./utils/lang";
+import { NarrativeStyle, nTrans } from "./utils/narrative";
 
-type ScreenState = "start" | "training" | "library" | "unlocked_ceremony";
+type ScreenState = "start" | "training" | "library" | "unlocked_ceremony" | "spell_rush" | "memory_match";
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<ScreenState>("start");
   const [collectedIds, setCollectedIds] = useState<string[]>([]);
   const [practiceTimes, setPracticeTimes] = useState<Record<string, number>>({});
   
+  // Custom states for Gamification (B: Gacha, D: Card Leveling/Stars)
+  const [coins, setCoins] = useState<number>(() => {
+    try {
+      const val = localStorage.getItem("fifty_sound_coins");
+      return val ? Number(val) : 300; // Start with 300 coins so users can enjoy pulling Gacha packs!
+    } catch (_) {
+      return 300;
+    }
+  });
+
+  const [cardUpgrades, setCardUpgrades] = useState<Record<string, { level: number; exp: number; stars: number }>>(() => {
+    try {
+      const val = localStorage.getItem("fifty_sound_card_upgrades");
+      return val ? JSON.parse(val) : {};
+    } catch (_) {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("fifty_sound_coins", String(coins));
+    } catch (_) {}
+  }, [coins]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("fifty_sound_card_upgrades", JSON.stringify(cardUpgrades));
+    } catch (_) {}
+  }, [cardUpgrades]);
+
   // Custom interactive panel states
   const [isMuted, setIsMuted] = useState<boolean>(() => {
     try {
@@ -55,28 +89,59 @@ export default function App() {
     }
   });
 
+  const [narrativeStyle, setNarrativeStyle] = useState<NarrativeStyle>(() => {
+    try {
+      const val = localStorage.getItem("fifty_sound_narrative_style");
+      return (val as NarrativeStyle) || "cultural"; // default to inclusive 'cultural'
+    } catch (_) {
+      return "cultural";
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("fifty_sound_narrative_style", narrativeStyle);
+    } catch (_) {}
+  }, [narrativeStyle]);
+
+  const [onlineSeconds, setOnlineSeconds] = useState<number>(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setOnlineSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatOnlineTime = (totalSecs: number, isEng: boolean) => {
+    const hrs = Math.floor(totalSecs / 3600);
+    const mins = Math.floor((totalSecs % 3600) / 60);
+    const secs = totalSecs % 60;
+
+    if (isEng) {
+      if (hrs > 0) return `${hrs}h ${mins}m ${secs}s`;
+      if (mins > 0) return `${mins}m ${secs}s`;
+      return `${secs}s`;
+    } else {
+      if (hrs > 0) return `${hrs}小时${mins}分${secs}秒`;
+      if (mins > 0) return `${mins}分${secs}秒`;
+      return `${secs}秒`;
+    }
+  };
+
   // Selection for active training
   const [activeCards, setActiveCards] = useState<DictionaryItem[]>([]);
   const [activeDurationMs, setActiveDurationMs] = useState<number>(3 * 60 * 1000);
 
-  // Custom uploaded/pasted user dictionary cards
-  const [customCards, setCustomCards] = useState<DictionaryItem[]>(() => {
-    try {
-      const stored = localStorage.getItem("fifty_sound_custom_cards");
-      return stored ? JSON.parse(stored) : [];
-    } catch (_) {
-      return [];
-    }
-  });
+  // Custom uploaded/pasted user dictionary cards (decommissioned & purged as requested)
+  const [customCards, setCustomCards] = useState<DictionaryItem[]>([]);
 
-  // Sync custom cards
+  // Purge any existing custom cards from local storage immediately to ensure privacy & cleanliness
   useEffect(() => {
     try {
-      localStorage.setItem("fifty_sound_custom_cards", JSON.stringify(customCards));
-    } catch (e) {
-      console.warn("localStorage restricted", e);
-    }
-  }, [customCards]);
+      localStorage.removeItem("fifty_sound_custom_cards");
+    } catch (_) {}
+  }, []);
   
   // Last newly unlocked cards representation for ceremony modal
   const [ceremonyCards, setCeremonyCards] = useState<DictionaryItem[]>([]);
@@ -211,6 +276,30 @@ export default function App() {
       console.warn("localStorage restricted", e);
     }
 
+    // Earn coins and Card XP / Leveling upgrades (D)
+    const baseCoins = rounds * 20;
+    const accBonus = accuracy && accuracy >= 80 ? Math.floor((accuracy - 50) * 0.8) : 0;
+    const earnedCoins = Math.max(10, baseCoins + accBonus);
+    setCoins((prev) => prev + earnedCoins);
+
+    const nextUpgrades = { ...cardUpgrades };
+    activeCards.forEach((card) => {
+      const upgrade = nextUpgrades[card.id] || { level: 1, exp: 0, stars: 0 };
+      const expGain = rounds * 25; // 25 XP per practice round
+      let nextExp = upgrade.exp + expGain;
+      let nextLevel = upgrade.level;
+      while (nextExp >= 100 && nextLevel < 5) {
+        nextExp -= 100;
+        nextLevel += 1;
+      }
+      if (nextLevel >= 5) {
+        nextLevel = 5;
+        nextExp = Math.min(100, nextExp);
+      }
+      nextUpgrades[card.id] = { level: nextLevel, exp: nextExp, stars: upgrade.stars };
+    });
+    setCardUpgrades(nextUpgrades);
+
     // Save session logs for dynamic analytics trend visualization
     if (kpm !== undefined && accuracy !== undefined) {
       try {
@@ -257,9 +346,17 @@ export default function App() {
     setActiveCards([]);
   };
 
-  const handleImportData = (unlockedCards: string[], ptTimes: Record<string, number>, settings?: any) => {
+  const handleImportData = (
+    unlockedCards: string[], 
+    ptTimes: Record<string, number>, 
+    settings?: any,
+    importedCoins?: number,
+    importedUpgrades?: any
+  ) => {
     setCollectedIds(unlockedCards);
     setPracticeTimes(ptTimes);
+    if (importedCoins !== undefined) setCoins(importedCoins);
+    if (importedUpgrades !== undefined) setCardUpgrades(importedUpgrades);
     if (settings) {
       if (settings.hasOwnProperty("muted")) setIsMuted(settings.muted);
       if (settings.hasOwnProperty("bgm")) setBgmEnabled(settings.bgm);
@@ -376,7 +473,11 @@ export default function App() {
                     initial="enter"
                     animate="center"
                     exit="exit"
-                    className={`p-6 rounded-2xl border-2 bg-gradient-to-br ${card.bgGradient} ${card.borderColor} text-stone-950 w-[240px] h-[310px] space-y-4 flex flex-col justify-between relative cursor-pointer`}
+                    className={`p-6 rounded-2xl border-2 ${
+                      card.rarity === "SSR" 
+                        ? "bg-gradient-to-tr from-pink-300 via-purple-300 via-indigo-200 via-emerald-200 via-yellow-200 to-rose-200 border-amber-400 shadow-xl shadow-purple-500/20 animate-[pulse_3s_infinite]"
+                        : `bg-gradient-to-br ${card.bgGradient} ${card.borderColor}`
+                    } text-stone-950 w-[240px] h-[310px] space-y-4 flex flex-col justify-between relative cursor-pointer`}
                     style={{ 
                       backfaceVisibility: "hidden",
                       transformStyle: "preserve-3d"
@@ -579,11 +680,50 @@ export default function App() {
                 <option value="elderly">{isEnglishMode ? "Elderly Wisdom" : "智慧老人"}</option>
               </select>
             </div>
+
+            {/* Inclusive Narrative & Vocabulary Style Switcher */}
+            <div className="flex items-center gap-1 bg-stone-50 border border-stone-200 px-1.5 py-1 rounded-lg shadow-sm">
+              <span className="text-xs select-none">🎭</span>
+              <select
+                value={narrativeStyle}
+                onChange={(e) => {
+                  setNarrativeStyle(e.target.value as NarrativeStyle);
+                  audioSynth.playCardSlide();
+                }}
+                className="text-[10px] font-mono font-bold text-stone-700 bg-transparent outline-none border-none py-0.5 cursor-pointer max-w-[90px] sm:max-w-none"
+                title={isEnglishMode ? "Select theme terminology narrative style" : "选择语境与术语风格（对无信仰者友好选择）"}
+              >
+                <option value="cultural">🏮 {isEnglishMode ? "Cultural Style" : "人文古风"}</option>
+                <option value="mythology">⛩️ {isEnglishMode ? "Mythology Style" : "神道传说"}</option>
+                <option value="academic">🏫 {isEnglishMode ? "Academic Style" : "现代学术"}</option>
+              </select>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {/* ⏱️ Online Session Timer */}
+            <div 
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-stone-50 border border-stone-200 shadow-sm text-stone-700"
+              title={isEnglishMode ? "Current online duration of this session" : `本次网页在线时间：${nTrans("onlineTime", narrativeStyle)}`}
+            >
+              <Clock className="w-3.5 h-3.5 text-stone-500 animate-pulse" />
+              <span className="text-xs font-mono font-bold text-stone-600 flex items-center gap-1">
+                <span className="opacity-70 text-[9px] font-sans font-normal">{nTrans("onlineTime", narrativeStyle)}:</span>
+                <span>{formatOnlineTime(onlineSeconds, isEnglishMode)}</span>
+              </span>
+            </div>
+
             {currentPage !== "training" && (
               <>
+                {/* 🪙 Gamified Coins Counter */}
+                <div 
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 shadow-sm text-stone-850"
+                  title={narrativeStyle === "mythology" ? "我的和币：在集卡藏馆中用于召唤卡包或强化卡牌等级" : narrativeStyle === "cultural" ? "我的岁币：在集卡藏馆中用于兑换卡包或提升卡牌等级" : "我的积分：在卡牌库中用于解锁卡包和评估等级"}
+                >
+                  <span className="text-xs select-none">🪙</span>
+                  <span className="text-xs font-mono font-black text-amber-800">{coins} {nTrans("coinName", narrativeStyle)}</span>
+                </div>
+
                 <button
                   onClick={() => setCurrentPage("start")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
@@ -632,6 +772,8 @@ export default function App() {
               <StartPage
                 onStartTraining={handleStartTraining}
                 onGoToLibrary={() => setCurrentPage("library")}
+                onGoToSpellRush={() => setCurrentPage("spell_rush")}
+                onGoToMemoryMatch={() => setCurrentPage("memory_match")}
                 collectedIds={collectedIds}
                 practiceTimes={practiceTimes}
                 practiceMode={practiceMode}
@@ -639,6 +781,7 @@ export default function App() {
                 isEnglishMode={isEnglishMode}
                 customCards={customCards}
                 setCustomCards={setCustomCards}
+                narrativeStyle={narrativeStyle}
               />
             </motion.div>
           )}
@@ -686,6 +829,10 @@ export default function App() {
                 isEnglishMode={isEnglishMode}
                 customCards={customCards}
                 setCustomCards={setCustomCards}
+                coins={coins}
+                setCoins={setCoins}
+                cardUpgrades={cardUpgrades}
+                setCardUpgrades={setCardUpgrades}
               />
             </motion.div>
           )}
@@ -699,6 +846,44 @@ export default function App() {
               transition={{ duration: 0.3 }}
             >
               {celebrateCongratulationsEffect()}
+            </motion.div>
+          )}
+
+          {currentPage === "spell_rush" && (
+            <motion.div
+              key="spell_rush"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+            >
+              <SpellRushPage
+                collectedIds={collectedIds}
+                onGoBack={() => setCurrentPage("start")}
+                isEnglishMode={isEnglishMode}
+                coins={coins}
+                setCoins={setCoins}
+                narrativeStyle={narrativeStyle}
+              />
+            </motion.div>
+          )}
+
+          {currentPage === "memory_match" && (
+            <motion.div
+              key="memory_match"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.2 }}
+            >
+              <MemoryMatchPage
+                collectedIds={collectedIds}
+                onGoBack={() => setCurrentPage("start")}
+                isEnglishMode={isEnglishMode}
+                coins={coins}
+                setCoins={setCoins}
+                narrativeStyle={narrativeStyle}
+              />
             </motion.div>
           )}
         </AnimatePresence>
