@@ -679,27 +679,31 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
                   本段期望: <span className="text-stone-700 font-bold font-mono">[{currentCard.segments[currentSegmentIdx]?.displayRomaji}]</span>
                 </p>
 
-                {/* Desktop Virtual Keyboard Helper view */}
-                <div className="hidden sm:flex flex-col gap-1.5 pt-4 max-w-md mx-auto">
+                {/* Desktop/Mobile Virtual Keyboard Helper view */}
+                <div className="flex flex-col gap-1 sm:gap-1.5 pt-4 max-w-md mx-auto">
                   {[
                     ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
                     ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
                     ["Z", "X", "C", "V", "B", "N", "M"]
                   ].map((row, rowIdx) => (
-                    <div key={rowIdx} className="flex justify-center gap-1 text-[9px] font-mono">
+                    <div key={rowIdx} className="flex justify-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-mono">
                       {row.map((char) => {
                         const isPrimaryTarget = currentCard.segments[currentSegmentIdx]?.displayRomaji.toUpperCase().includes(char);
                         return (
-                          <span 
+                          <button 
                             key={char} 
-                            className={`w-7 h-7 rounded border flex items-center justify-center font-bold transition-all ${
+                            onClick={() => {
+                              handleTypewriterInput(char.toLowerCase());
+                              setTimeout(() => inputRef.current?.focus(), 10);
+                            }}
+                            className={`w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded border flex items-center justify-center font-bold transition-all cursor-pointer active:scale-90 select-none ${
                               isPrimaryTarget 
-                                ? "border-amber-400 bg-amber-50 text-amber-900 shadow-sm font-black scale-105" 
-                                : "border-stone-200 bg-stone-50 text-stone-400"
+                                ? "border-amber-400 bg-amber-50 hover:bg-amber-100/80 text-amber-900 shadow-sm font-black scale-105" 
+                                : "border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-400"
                             }`}
                           >
                             {char}
-                          </span>
+                          </button>
                         );
                       })}
                     </div>

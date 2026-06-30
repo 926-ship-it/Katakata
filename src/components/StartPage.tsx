@@ -10,6 +10,7 @@ interface StartPageProps {
   onGoToLibrary: () => void;
   onGoToSpellRush: () => void;
   onGoToMemoryMatch: () => void;
+  onGoToKanaTraining: () => void;
   collectedIds: string[];
   practiceTimes: Record<string, number>;
   practiceMode: "typing" | "handwriting";
@@ -25,6 +26,7 @@ export const StartPage: React.FC<StartPageProps> = ({
   onGoToLibrary,
   onGoToSpellRush,
   onGoToMemoryMatch,
+  onGoToKanaTraining,
   collectedIds,
   practiceTimes = {},
   practiceMode,
@@ -592,7 +594,34 @@ export const StartPage: React.FC<StartPageProps> = ({
           <span className="text-[10px] text-stone-400 font-mono tracking-widest font-bold">FUN MINIGAMES</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Game 3: Kana Training Room */}
+          <button
+            onClick={onGoToKanaTraining}
+            className="p-4 rounded-xl border-2 border-stone-800 bg-emerald-50 hover:bg-emerald-100/50 text-left transition-all flex gap-4 group cursor-pointer shadow-sm active:scale-[0.98]"
+          >
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-700 font-black text-xl group-hover:scale-110 transition-transform">
+              🌸
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[9px] font-mono font-black text-emerald-800 block uppercase tracking-wide">KANA WORKOUT MATRIX</span>
+              <h3 className="font-serif font-black text-stone-900 text-sm mt-0.5 group-hover:text-emerald-850">
+                {narrativeStyle === "mythology" 
+                  ? "御守殿：五十音专项肌肉熟化" 
+                  : narrativeStyle === "cultural" 
+                  ? "风雅学宫：五十音单字熟记室" 
+                  : "五十音专项肌肉记忆强化"}
+              </h3>
+              <p className="text-[11px] text-stone-500 leading-normal mt-1">
+                {narrativeStyle === "mythology" 
+                  ? "直接进行五十音单字的发音与字形极速记忆反射训练！支持平假名、片假名深度自由筛选！"
+                  : narrativeStyle === "cultural"
+                  ? "摒弃繁杂词汇干扰，进行最纯正的基础五十音单音字形/按键高频练习，巩固日语地基！"
+                  : "专为初学者与基础巩固者设计的纯单字假名拼写训练营，自选音行、一键开启强化循环！"}
+              </p>
+            </div>
+          </button>
+
           {/* Game 1: Spell Rush */}
           <button
             onClick={onGoToSpellRush}

@@ -675,7 +675,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                           scale: isPressed ? 0.9 : 1,
                           y: isPressed ? 2 : 0,
                         }}
-                        onClick={() => processInputKey(char.toLowerCase())}
+                        onClick={() => {
+                          processInputKey(char.toLowerCase());
+                          setTimeout(() => inputRef.current?.focus(), 10);
+                        }}
                         className={`w-6 h-6 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center rounded text-[9px] sm:text-xs font-mono font-bold transition-all select-none cursor-pointer ${
                           isPressed
                             ? "bg-amber-500 text-stone-950 shadow-inner"
@@ -699,7 +702,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                       scale: pressedKey === "SPACE" ? 0.95 : 1,
                       y: pressedKey === "SPACE" ? 2 : 0,
                     }}
-                    onClick={() => processInputKey(" ")}
+                    onClick={() => {
+                      processInputKey(" ");
+                      setTimeout(() => inputRef.current?.focus(), 10);
+                    }}
                     className={`w-28 sm:w-40 h-5.5 sm:h-7 flex items-center justify-center rounded text-[9px] sm:text-[10px] font-mono font-bold uppercase transition-all select-none border cursor-pointer ${
                       pressedKey === "SPACE"
                         ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"

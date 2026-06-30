@@ -7,12 +7,13 @@ import { CardLibraryPage } from "./components/CardLibraryPage";
 import { MascotComponent } from "./components/MascotComponent";
 import { SpellRushPage } from "./components/SpellRushPage";
 import { MemoryMatchPage } from "./components/MemoryMatchPage";
+import { KanaTrainingPage } from "./components/KanaTrainingPage";
 import { DictionaryItem } from "./data/dictionary";
 import { audioSynth } from "./utils/audio";
 import { uiTranslate } from "./utils/lang";
 import { NarrativeStyle, nTrans } from "./utils/narrative";
 
-type ScreenState = "start" | "training" | "library" | "unlocked_ceremony" | "spell_rush" | "memory_match";
+type ScreenState = "start" | "training" | "library" | "unlocked_ceremony" | "spell_rush" | "memory_match" | "kana_training";
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<ScreenState>("start");
@@ -774,6 +775,7 @@ export default function App() {
                 onGoToLibrary={() => setCurrentPage("library")}
                 onGoToSpellRush={() => setCurrentPage("spell_rush")}
                 onGoToMemoryMatch={() => setCurrentPage("memory_match")}
+                onGoToKanaTraining={() => setCurrentPage("kana_training")}
                 collectedIds={collectedIds}
                 practiceTimes={practiceTimes}
                 practiceMode={practiceMode}
@@ -883,6 +885,23 @@ export default function App() {
                 coins={coins}
                 setCoins={setCoins}
                 narrativeStyle={narrativeStyle}
+              />
+            </motion.div>
+          )}
+
+          {currentPage === "kana_training" && (
+            <motion.div
+              key="kana_training"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+            >
+              <KanaTrainingPage
+                onGoBack={() => setCurrentPage("start")}
+                narrativeStyle={narrativeStyle}
+                coins={coins}
+                setCoins={setCoins}
               />
             </motion.div>
           )}
