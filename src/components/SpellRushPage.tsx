@@ -74,6 +74,43 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
     }
   }, [gameState, currentCard, currentSegmentIdx]);
 
+  // Global keydown listener to prevent default page scrolling or clicking of active buttons on space bar
+  // and supporting seamless typing even if hidden input loses focus.
+  useEffect(() => {
+    if (gameState !== "playing") return;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isInput = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+
+      // Space bar should ALWAYS be intercepted to prevent scrolling or double clicks on active buttons
+      if (e.key === " ") {
+        e.preventDefault();
+        handleTypewriterInput(" ");
+        return;
+      }
+
+      // If the user is typing in the hidden input, let the input's onChange event handle standard a-z keys
+      if (isInput) {
+        return;
+      }
+
+      // Otherwise (the input somehow lost focus), we process the a-z typing keys globally
+      const key = e.key;
+      const lowerKey = key.toLowerCase();
+      const isValidKey = /^[a-z0-9]$/.test(lowerKey) || lowerKey === "-" || lowerKey === "_";
+      
+      if (isValidKey) {
+        handleTypewriterInput(key);
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleGlobalKeyDown);
+    };
+  }, [gameState, currentCard, currentSegmentIdx, romajiProgress, combo]);
+
   // --- AUDIO SYNTH FOR PITCH-RISING COMBO ---
   const playComboTone = (comboLevel: number) => {
     if (muted) return;
@@ -390,6 +427,7 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
             if (val.length > 0) {
               handleTypewriterInput(val[val.length - 1]);
             }
+            e.target.value = "";
           }}
           className="opacity-0 fixed top-0 left-0 w-0 h-0 pointer-events-none"
           autoFocus

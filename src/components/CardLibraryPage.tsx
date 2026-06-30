@@ -561,6 +561,30 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 px-2 md:px-0">
+      <style>{`
+        @keyframes shimmersweep {
+          0% { transform: translate(-100%, -100%) rotate(45deg); }
+          100% { transform: translate(100%, 100%) rotate(45deg); }
+        }
+        .holo-sheen {
+          position: absolute;
+          top: 0; left: 0; width: 250%; height: 250%;
+          background: linear-gradient(
+            135deg,
+            rgba(255, 255, 255, 0) 30%,
+            rgba(255, 255, 255, 0.35) 50%,
+            rgba(255, 255, 255, 0) 70%
+          );
+          transform: rotate(45deg);
+          transition: none;
+          pointer-events: none;
+          mix-blend-mode: overlay;
+          z-index: 5;
+        }
+        .animate-holo-sheen {
+          animation: shimmersweep 3.5s infinite linear;
+        }
+      `}</style>
       {/* Top Navigator */}
       <div className="flex items-center justify-between">
         <button
@@ -767,6 +791,11 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                 >
                   {/* Antique voucher dashed inner sub-border */}
                   <div className="absolute inset-1.5 border border-dashed border-stone-800/10 rounded-lg pointer-events-none" />
+
+                  {/* Holographic Premium Foil Card Sheen Overlay */}
+                  {isCollected && (item.rarity === "SSR" || item.rarity === "SR") && (
+                    <div className="holo-sheen animate-holo-sheen" />
+                  )}
 
                   {/* Japanese corner bracket markers */}
                   <div className="absolute top-2 left-2 w-1.5 h-1.5 border-t border-l border-stone-850/30 pointer-events-none" />
@@ -1057,6 +1086,11 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                         : "bg-gradient-to-b from-stone-50 to-stone-100 border-stone-300 text-stone-900"
                     }`}
                   >
+                    {/* Holographic Premium Foil Card Sheen Overlay */}
+                    {(summonRevealCard.rarity === "SSR" || summonRevealCard.rarity === "SR") && (
+                      <div className="holo-sheen animate-holo-sheen" />
+                    )}
+
                     <div className="absolute top-2 left-3 text-[9px] font-mono text-stone-500 font-bold">
                       {summonRevealCard.rarityName}  ・  #{summonRevealCard.id.toUpperCase()}
                     </div>
@@ -1133,63 +1167,82 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                 ✕
               </button>
 
-              {/* Inside detail header: beautiful premium styling card view on top */}
+              {/* Inside detail header: beautiful premium styling vertical TCG card view on top */}
               <div 
-                className={`p-4 rounded-xl border-2 ${
+                className={`w-[260px] h-[360px] mx-auto p-5 rounded-2xl border-2 ${
                   selectedCard.rarity === "SSR"
-                    ? "bg-gradient-to-tr from-pink-300 via-purple-300 via-indigo-200 via-emerald-200 via-yellow-200 to-rose-200 border-amber-400 shadow-lg shadow-purple-500/20"
+                    ? "bg-gradient-to-tr from-pink-300 via-purple-300 via-indigo-200 via-emerald-200 via-yellow-200 to-rose-200 border-amber-400 shadow-xl shadow-purple-500/20"
                     : `bg-gradient-to-br ${selectedCard.bgGradient} ${selectedCard.borderColor}`
-                } text-center space-y-2 relative overflow-hidden`}
-                style={{ boxShadow: `0 4px 12px ${selectedCard.glowColor}` }}
+                } text-center flex flex-col justify-between relative overflow-hidden`}
+                style={{ boxShadow: `0 6px 20px ${selectedCard.glowColor}` }}
               >
-                <span className="absolute top-2 left-3 text-[9px] font-mono text-stone-500 font-bold">
-                  {selectedCard.rarityName}  ・  #{selectedCard.id.toUpperCase()}
-                </span>
+                {/* Holographic Premium Foil Card Sheen Overlay */}
+                {(selectedCard.rarity === "SSR" || selectedCard.rarity === "SR") && (
+                  <div className="holo-sheen animate-holo-sheen" />
+                )}
 
-                <div className="flex justify-center pt-1.5">
-                  <div className="p-2 bg-white/70 backdrop-blur-sm border border-stone-200/50 rounded-2xl shadow-sm">
+                {/* Card Top Header */}
+                <div className="flex items-center justify-between z-10 w-full">
+                  <span 
+                    className="text-[9px] font-mono font-black border px-1.5 py-0.5 rounded-sm tracking-widest"
+                    style={{
+                      backgroundColor: selectedCard.rarity === "SSR" ? "#fee2e2" : selectedCard.rarity === "SR" ? "#ffedd5" : selectedCard.rarity === "R" ? "#e0f2fe" : "#f1f5f9",
+                      color: selectedCard.rarity === "SSR" ? "#b91c1c" : selectedCard.rarity === "SR" ? "#c2410c" : selectedCard.rarity === "R" ? "#0284c7" : "#475569",
+                      borderColor: selectedCard.rarity === "SSR" ? "#fed7aa" : selectedCard.rarity === "SR" ? "#fed7aa" : "#bae6fd"
+                    }}
+                  >
+                    {selectedCard.rarity}
+                  </span>
+                  <span className="text-[9px] font-mono text-stone-500 font-bold">
+                    #{selectedCard.id.toUpperCase()}
+                  </span>
+                </div>
+
+                {/* Illustration and Main Kanji */}
+                <div className="space-y-3 z-10 flex flex-col items-center">
+                  <div className="p-2.5 bg-white/70 backdrop-blur-sm border border-stone-200/50 rounded-2xl shadow-sm">
                     <CardIllustration
                       id={selectedCard.id}
                       category={selectedCard.category}
-                      className="w-11 h-11"
+                      className="w-12 h-12"
                     />
                   </div>
-                </div>
-                
-                <h2 
-                  className="text-2xl sm:text-3xl font-black text-stone-950 font-serif leading-tight"
-                  style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
-                >
-                  {selectedCard.kanji}
-                </h2>
-                
-                <div className="flex justify-center gap-2.5 text-xs text-stone-600">
-                  <span className="font-mono">
-                    {isEnglishMode ? "英文单词: " : "假名: "}<b>{isEnglishMode ? selectedCard.kanji : selectedCard.kanaStr}</b>
-                  </span>
-                  <span className="text-stone-300">|</span>
-                  <span className="font-mono">
-                    {isEnglishMode ? "字母拼写: " : "罗马音: "}<b>{selectedCard.segments.map(s => s.displayRomaji).join("")}</b>
-                  </span>
-                </div>
-
-                <div className="flex justify-center pt-0.5">
-                  <button
-                    onClick={() => audioSynth.speakJapanese(selectedCard.kanaStr)}
-                    className="px-2.5 py-0.5 rounded-full bg-stone-900/10 hover:bg-stone-900/20 text-stone-850 transition-all text-[10px] font-bold flex items-center gap-1 cursor-pointer shadow-sm animate-pulse"
-                  >
-                    <Volume2 className="w-2.5 h-2.5 text-stone-700" />
-                    <span>{isEnglishMode ? "听原声朗读" : "原声播音"}</span>
-                  </button>
-                </div>
-
-                <div className="flex gap-1.5 justify-center pt-1">
-                  {selectedCard.segments.map((s, idx) => (
-                    <div key={idx} className="bg-stone-900/5 px-1.5 py-0.5 rounded text-[10px]">
-                      <span className="font-serif font-black pr-0.5">{s.text || s.kana}</span>
-                      <span className="font-mono text-[8px] text-stone-500">{s.displayRomaji}</span>
+                  
+                  <div className="space-y-1">
+                    <h2 
+                      className="text-3xl font-black text-stone-950 font-serif leading-none tracking-wide"
+                      style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
+                    >
+                      {selectedCard.kanji}
+                    </h2>
+                    <div className="flex justify-center gap-1.5 text-[10px] text-stone-600 font-medium">
+                      <span>{isEnglishMode ? "单词:" : "假名:"} <b>{isEnglishMode ? selectedCard.kanji : selectedCard.kanaStr}</b></span>
+                      <span className="text-stone-300">|</span>
+                      <span>{isEnglishMode ? "拼写:" : "罗马音:"} <b>{selectedCard.segments.map(s => s.displayRomaji).join("")}</b></span>
                     </div>
-                  ))}
+                  </div>
+                </div>
+
+                {/* Voice button and breakdown segments at bottom */}
+                <div className="space-y-3 z-10 w-full">
+                  <div className="flex justify-center">
+                    <button
+                      onClick={() => audioSynth.speakJapanese(selectedCard.kanaStr)}
+                      className="px-3 py-1 rounded-full bg-stone-900/10 hover:bg-stone-900/20 text-stone-850 transition-all text-[10px] font-bold flex items-center gap-1 cursor-pointer shadow-sm animate-pulse"
+                    >
+                      <Volume2 className="w-3 h-3 text-stone-700" />
+                      <span>{isEnglishMode ? "听原声朗读" : "原声播音"}</span>
+                    </button>
+                  </div>
+
+                  <div className="flex gap-1 justify-center flex-wrap">
+                    {selectedCard.segments.map((s, idx) => (
+                      <div key={idx} className="bg-stone-900/5 px-1.5 py-0.5 rounded text-[10px] flex flex-col items-center">
+                        <span className="font-serif font-black">{s.text || s.kana}</span>
+                        <span className="font-mono text-[8px] text-stone-500 scale-90">{s.displayRomaji}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 

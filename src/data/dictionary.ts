@@ -1819,7 +1819,62 @@ export const DICTIONARY: DictionaryItem[] = [
       { kana: "ん", romaji: ["n"], displayRomaji: "n" },
       { kana: "た", romaji: ["ta"], displayRomaji: "ta" },
       { kana: "ま", romaji: ["ma"], displayRomaji: "ma" },
-      { kana: "进", romaji: ["go"], displayRomaji: "go" }
+      { kana: "ご", romaji: ["go"], displayRomaji: "go" }
+    ]
+  },
+  {
+    id: "edamame",
+    kanji: "枝豆",
+    kanaStr: "えだまめ",
+    category: "food",
+    categoryName: "日本美味",
+    meaning: "毛豆。在盐水中煮熟的鲜嫩大豆荚，在居酒屋中常作为佐酒冷盘。它含有丰富的营养与豆香，是日本仲夏最具元气的风味小吃。",
+    rarity: "N",
+    rarityName: "普通 (N)",
+    glowColor: "rgba(16, 185, 129, 0.2)",
+    borderColor: "border-emerald-200",
+    bgGradient: "from-emerald-50 to-green-100",
+    segments: [
+      { kana: "え", romaji: ["e"], displayRomaji: "e" },
+      { kana: "だ", romaji: ["da"], displayRomaji: "da" },
+      { kana: "ま", romaji: ["ma"], displayRomaji: "ma" },
+      { kana: "め", romaji: ["me"], displayRomaji: "me" }
+    ]
+  },
+  {
+    id: "tanuki",
+    kanji: "狸",
+    kanaStr: "たぬき",
+    category: "nature",
+    categoryName: "自然风物",
+    meaning: "信乐烧狸猫。日本传说中具有变身神力的生灵，在日本商店和住宅门前常摆放其标志性陶像，头戴斗笠、手持酒瓶，象征着招财进宝与开运吉祥。",
+    rarity: "R",
+    rarityName: "稀有 (R)",
+    glowColor: "rgba(120, 113, 108, 0.25)",
+    borderColor: "border-stone-300",
+    bgGradient: "from-stone-50 to-amber-100",
+    segments: [
+      { kana: "た", romaji: ["ta"], displayRomaji: "ta" },
+      { kana: "ぬ", romaji: ["nu"], displayRomaji: "nu" },
+      { kana: "き", romaji: ["ki"], displayRomaji: "ki" }
+    ]
+  },
+  {
+    id: "wotome",
+    kanji: "少女",
+    kanaStr: "をとめ",
+    category: "culture",
+    categoryName: "民俗文化",
+    meaning: "歌谣中的纯真少女。在《万叶集》等日本古籍 and 神乐歌谣中，“をとめ”是代表纯洁、娇羞、灵动与美好青春的雅致称呼，充满了古典和歌的质朴韵味。",
+    rarity: "SR",
+    rarityName: "卓越 (SR)",
+    glowColor: "rgba(236, 72, 153, 0.45)",
+    borderColor: "border-pink-300",
+    bgGradient: "from-pink-50 to-purple-100",
+    segments: [
+      { kana: "を", romaji: ["wo", "o"], displayRomaji: "wo" },
+      { kana: "と", romaji: ["to"], displayRomaji: "to" },
+      { kana: "め", romaji: ["me"], displayRomaji: "me" }
     ]
   }
 ];
@@ -2320,6 +2375,21 @@ export const ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
     word: "Poached Egg",
     categoryName: "西餐美味",
     meaning: "温泉流沙蛋。在温暖天然温泉中经过温和火候久煨而出的软嫩半熟蛋，宛如白玉布丁，裹着流沙般的浓郁蛋黄，入口软滑清香。"
+  },
+  edamame: {
+    word: "Green Soybean",
+    categoryName: "西餐美味",
+    meaning: "盐水毛豆。在滚热咸水中快火煮熟的翠绿毛豆荚，是和风夏日里最清爽解腻的健康下酒开胃冷盘小食。"
+  },
+  tanuki: {
+    word: "Raccoon Dog",
+    categoryName: "自然与动物",
+    meaning: "和风福运狸猫。日本古老传说里善于变身的可爱狸猫陶制像，常作为招财化煞、开运亨通的玄关迎客吉祥挂件摆设。"
+  },
+  wotome: {
+    word: "Young Maiden",
+    categoryName: "文学与民风",
+    meaning: "和歌雅致少女。在日本《万叶集》等古乐民风中，对清丽、纯真而富有生机之大和少女的诗意称誉，代表最古朴天然的青春之美。"
   }
 };
 

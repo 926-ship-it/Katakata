@@ -218,6 +218,94 @@ export const CardIllustration: React.FC<CardIllustrationProps> = ({ id, category
         </div>
       );
 
+    case "edamame":
+      return (
+        <div className={`relative flex items-center justify-center ${className}`}>
+          {/* Edamame pod with salt crystals */}
+          <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_3px_6px_rgba(16,185,129,0.35)] animate-pulse">
+            {/* Pod green curve */}
+            <path d="M12,50 Q30,30 50,45 Q70,60 88,50 Q75,75 50,60 Q25,45 12,50 Z" className="fill-emerald-600 stroke-emerald-700 stroke-2" />
+            {/* Bean bumps inside */}
+            <circle cx="28" cy="49" r="8" className="fill-emerald-400" />
+            <circle cx="28" cy="49" r="5" className="fill-green-200" style={{ fillOpacity: 0.5 }} />
+            <circle cx="50" cy="53" r="9" className="fill-emerald-400" />
+            <circle cx="50" cy="53" r="6" className="fill-green-200" style={{ fillOpacity: 0.5 }} />
+            <circle cx="72" cy="51" r="8" className="fill-emerald-400" />
+            <circle cx="72" cy="51" r="5" className="fill-green-200" style={{ fillOpacity: 0.5 }} />
+            {/* Salt crystals (little sparkling white squares) */}
+            <polygon points="20,38 23,41 20,44 17,41" className="fill-white" />
+            <polygon points="45,35 48,38 45,41 42,38" className="fill-white" />
+            <polygon points="65,37 68,40 65,43 62,40" className="fill-white" />
+            <polygon points="55,68 58,71 55,74 52,71" className="fill-white" />
+          </svg>
+        </div>
+      );
+
+    case "tanuki":
+      return (
+        <div className={`relative flex items-center justify-center ${className}`}>
+          {/* Shigaraki Tanuki figurine */}
+          <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_4px_8px_rgba(120,113,108,0.3)]">
+            {/* Hat */}
+            <polygon points="50,15 15,42 85,42" className="fill-amber-700 stroke-amber-800 stroke-[1.5]" />
+            <ellipse cx="50" cy="41" rx="20" ry="5" className="fill-amber-600" />
+            {/* Ears */}
+            <path d="M30,38 L22,30 L28,42 Z" className="fill-stone-800" />
+            <path d="M70,38 L78,30 L72,42 Z" className="fill-stone-800" />
+            {/* Body */}
+            <circle cx="50" cy="65" r="28" className="fill-stone-700 stroke-stone-800" />
+            {/* White round belly */}
+            <circle cx="50" cy="70" r="18" className="fill-stone-50" />
+            {/* Face */}
+            <ellipse cx="50" cy="48" rx="16" ry="12" className="fill-stone-100" />
+            {/* Cute eyes */}
+            <ellipse cx="42" cy="46" rx="4" ry="5" className="fill-stone-900" />
+            <circle cx="43" cy="44" r="1" className="fill-white" />
+            <ellipse cx="58" cy="46" rx="4" ry="5" className="fill-stone-900" />
+            <circle cx="57" cy="44" r="1" className="fill-white" />
+            {/* Nose */}
+            <polygon points="50,49 48,51 52,51" className="fill-stone-900" />
+            {/* Leaf on hat */}
+            <path d="M50,15 Q60,8 55,2 Q48,10 50,15" className="fill-emerald-500" />
+            {/* Small sake bottle in hand */}
+            <path d="M75,65 Q85,65 82,80 Q72,80 75,65" className="fill-stone-200 stroke-stone-400" />
+            <line x1="75" y1="68" x2="81" y2="68" className="stroke-stone-400" />
+          </svg>
+        </div>
+      );
+
+    case "wotome":
+      return (
+        <div className={`relative flex items-center justify-center ${className}`}>
+          {/* Elegant classical Japanese Maiden (Wotome) */}
+          <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_4px_10px_rgba(236,72,153,0.35)]">
+            {/* Aura circle */}
+            <circle cx="50" cy="50" r="38" className="fill-pink-100/50 stroke-pink-200 stroke-dashed" />
+            {/* Flowing hair back */}
+            <path d="M22,50 C22,25 78,25 78,50 C78,65 82,85 82,85 L18,85 C18,85 22,65 22,50 Z" className="fill-stone-950" />
+            {/* Face */}
+            <ellipse cx="50" cy="46" rx="18" ry="19" className="fill-rose-50" />
+            {/* Traditional hair bangs */}
+            <path d="M32,38 Q50,26 68,38 Q50,42 32,38" className="fill-stone-950" />
+            {/* Serene closed eyes */}
+            <path d="M38,48 Q43,51 44,48" fill="none" className="stroke-stone-900 stroke-2 stroke-linecap-round" />
+            <path d="M62,48 Q57,51 56,48" fill="none" className="stroke-stone-900 stroke-2 stroke-linecap-round" />
+            {/* Blushing cheeks */}
+            <circle cx="35" cy="53" r="3.5" className="fill-pink-400 opacity-60 blur-[0.5px]" />
+            <circle cx="65" cy="53" r="3.5" className="fill-pink-400 opacity-60 blur-[0.5px]" />
+            {/* Red lip dot */}
+            <circle cx="50" cy="56" r="1.5" className="fill-rose-600" />
+            {/* Hair blossom flower */}
+            <path d="M28,28 Q34,24 32,18 Q26,22 28,28 Z" className="fill-pink-400" />
+            <circle cx="30" cy="23" r="2.5" className="fill-yellow-300" />
+            {/* Overlap kimono collar */}
+            <polygon points="50,68 32,85 68,85" className="fill-purple-300" />
+            <polygon points="50,65 35,85 65,85" className="fill-pink-300" />
+            <line x1="50" y1="65" x2="50" y2="85" className="stroke-white stroke-[1.5]" />
+          </svg>
+        </div>
+      );
+
     default:
       // Fallback placeholder based on categories
       if (category === "name") {

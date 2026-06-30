@@ -45,7 +45,7 @@ class RetroAudioSynth {
 
   // Speaks Japanese syllable or full word using SpeechSynthesis API (with automatic English detection for English Mode)
   speakJapanese(text: string, cancelActive: boolean = true) {
-    if (this.isMuted) return;
+    if (this.isMuted || !text || text.trim() === "") return;
     
     // Intelligent Speed Typing Voice Protection:
     // If the user is typing extremely fast (e.g. interval between syllable completed is less than 350ms),

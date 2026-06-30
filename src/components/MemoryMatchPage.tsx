@@ -223,6 +223,9 @@ export const MemoryMatchPage: React.FC<MemoryMatchPageProps> = ({
 
       // Check if correct match
       if (firstCard.itemId === secondCard.itemId && firstCard.type !== secondCard.type) {
+        const clickX = event?.clientX ?? window.innerWidth / 2;
+        const clickY = event?.clientY ?? window.innerHeight / 2;
+
         // MATCH DETECTED!
         setTimeout(() => {
           const finalCards = [...updatedCards];
@@ -241,8 +244,7 @@ export const MemoryMatchPage: React.FC<MemoryMatchPageProps> = ({
           }
 
           // Trigger falling cherry blossoms animation centered around the click point
-          const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-          triggerSakuraExplosion(event.clientX, event.clientY);
+          triggerSakuraExplosion(clickX, clickY);
 
           // Verify if board is fully solved
           const allSolved = finalCards.every(c => c.isMatched);
