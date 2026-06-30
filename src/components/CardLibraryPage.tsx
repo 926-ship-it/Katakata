@@ -21,6 +21,16 @@ interface CardLibraryPageProps {
   setCardUpgrades?: React.Dispatch<React.SetStateAction<Record<string, { level: number; exp: number; stars: number }>>>;
 }
 
+interface UpgradeParticle {
+  id: number;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  delay: number;
+  char: string;
+}
+
 export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
   collectedIds,
   practiceTimes,
@@ -51,6 +61,11 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
   const [loadingAi, setLoadingAi] = useState<boolean>(false);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [activeDetailTab, setActiveDetailTab] = useState<"story" | "drawing" | "chat" | "upgrade">("story");
+
+  // Upgrade animation states
+  const [particles, setParticles] = useState<UpgradeParticle[]>([]);
+  const [isUpgradedClass, setIsUpgradedClass] = useState(false);
+  const [isStarredClass, setIsStarredClass] = useState(false);
 
   // Persistent Card Live Chat History State
   const [chatHistories, setChatHistories] = useState<Record<string, { role: "user" | "model"; content: string }[]>>(() => {
@@ -407,6 +422,12 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
 
     if (setCoins && setCardUpgrades && cardUpgrades) {
       setCoins(prev => prev - 30);
+      
+      // Triple retro coin arpeggio sounds
+      audioSynth.playCoin();
+      setTimeout(() => audioSynth.playCoin(), 70);
+      setTimeout(() => audioSynth.playCoin(), 140);
+
       const prevUpgrade = cardUpgrades[cardId] || { level: 1, exp: 0, stars: 0 };
       let nextLevel = prevUpgrade.level;
       let nextExp = prevUpgrade.exp + 35;
@@ -415,7 +436,10 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
           nextLevel += 1;
           nextExp = nextExp - 100;
           setUpgradeMessage(`🎉 恭喜！等级成功淬炼至 Lv.${nextLevel}！`);
-          audioSynth.speakJapanese("おめでとう"); // congratulations
+          setTimeout(() => {
+            audioSynth.speakJapanese("おめでとう"); // congratulations
+            audioSynth.playTypewriterBell(); // typewriter margin bell
+          }, 350);
         } else {
           nextLevel = 5;
           nextExp = 100;
@@ -429,6 +453,23 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
         ...prev,
         [cardId]: { level: nextLevel, exp: nextExp, stars: prevUpgrade.stars }
       }));
+
+      // Generate flying coins & sparkles
+      const newParticles: UpgradeParticle[] = Array.from({ length: 12 }).map((_, idx) => {
+        const isSpark = idx % 2 === 0;
+        return {
+          id: Date.now() + idx,
+          startX: 60 + Math.random() * 50 - 25, // Above level up button
+          startY: 230 + Math.random() * 16 - 8,
+          endX: 160 + Math.random() * 80 - 40,   // Flying to status card/progress bar
+          endY: 55 + Math.random() * 20 - 10,
+          delay: idx * 0.04,
+          char: isSpark ? "✨" : "🪙",
+        };
+      });
+      setParticles(newParticles);
+      setIsUpgradedClass(true);
+      setTimeout(() => setIsUpgradedClass(false), 850);
 
       setTimeout(() => setUpgradeMessage(""), 3000);
     }
@@ -444,6 +485,17 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
 
     if (setCoins && setCardUpgrades && cardUpgrades) {
       setCoins(prev => prev - 80);
+
+      // Quad coin arpeggio sounds + typewriter bell
+      audioSynth.playCoin();
+      setTimeout(() => audioSynth.playCoin(), 65);
+      setTimeout(() => audioSynth.playCoin(), 130);
+      setTimeout(() => audioSynth.playCoin(), 195);
+      setTimeout(() => {
+        audioSynth.playTypewriterBell();
+        audioSynth.speakJapanese("すごい"); // amazing!
+      }, 350);
+
       const prevUpgrade = cardUpgrades[cardId] || { level: 1, exp: 0, stars: 0 };
       const nextStars = Math.min(5, prevUpgrade.stars + 1);
       
@@ -452,8 +504,24 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
         [cardId]: { level: prevUpgrade.level, exp: prevUpgrade.exp, stars: nextStars }
       }));
 
+      // Generate flying coins & stars
+      const newParticles: UpgradeParticle[] = Array.from({ length: 15 }).map((_, idx) => {
+        const isStar = idx % 2 === 0;
+        return {
+          id: Date.now() + idx,
+          startX: 230 + Math.random() * 50 - 25, // Above star up button
+          startY: 230 + Math.random() * 16 - 8,
+          endX: 160 + Math.random() * 80 - 40,   // Flying to star level bar
+          endY: 90 + Math.random() * 20 - 10,
+          delay: idx * 0.04,
+          char: isStar ? "⭐" : "🪙",
+        };
+      });
+      setParticles(newParticles);
+      setIsStarredClass(true);
+      setTimeout(() => setIsStarredClass(false), 850);
+
       setUpgradeMessage(`⭐ 成功突破！星级晋升至 ${nextStars} 星！`);
-      audioSynth.speakJapanese("すごい"); // amazing!
       setTimeout(() => setUpgradeMessage(""), 3000);
     }
   };
@@ -1507,7 +1575,33 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
               )}
 
               {activeDetailTab === "upgrade" && (
-                <div className="space-y-4 bg-white p-4 rounded-xl border border-stone-200 select-none">
+                <div className="relative space-y-4 bg-white p-4 rounded-xl border border-stone-200 select-none overflow-hidden">
+                  {/* Floating Particles Area */}
+                  <AnimatePresence>
+                    {particles.map((p) => (
+                      <motion.div
+                        key={p.id}
+                        initial={{ x: p.startX, y: p.startY, opacity: 1, scale: 0.5, rotate: 0 }}
+                        animate={{
+                          x: p.endX,
+                          y: p.endY,
+                          opacity: [1, 1, 0.8, 0],
+                          scale: [0.5, 1.4, 1.2, 0.6],
+                          rotate: Math.random() > 0.5 ? 360 : -360,
+                        }}
+                        exit={{ opacity: 0 }}
+                        transition={{
+                          duration: 0.85,
+                          delay: p.delay,
+                          ease: "easeOut",
+                        }}
+                        className="absolute pointer-events-none text-base z-30 select-none"
+                      >
+                        {p.char}
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+
                   <div className="text-center space-y-1">
                     <div className="text-xs text-stone-400 font-mono">CARD CULTIVATION ENGINE</div>
                     <h3 className="font-serif font-black text-stone-800 text-sm">闪卡太鼓淬炼 & 五星升华</h3>
@@ -1517,12 +1611,43 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   </div>
 
                   {/* Upgrades current status card */}
-                  <div className="p-3.5 bg-stone-50 rounded-xl border space-y-2 font-mono text-[11px]">
+                  <motion.div
+                    animate={
+                      isUpgradedClass
+                        ? {
+                            scale: [1, 1.04, 0.98, 1],
+                            borderColor: ["#e7e5e4", "#fbbf24", "#fbbf24", "#e7e5e4"],
+                            backgroundColor: ["#f5f5f4", "#fffbeb", "#f5f5f4"],
+                            boxShadow: [
+                              "0 0 0 rgba(0,0,0,0)",
+                              "0 0 15px rgba(251,191,36,0.5)",
+                              "0 0 0 rgba(0,0,0,0)"
+                            ]
+                          }
+                        : isStarredClass
+                        ? {
+                            scale: [1, 1.06, 0.96, 1.02, 1],
+                            borderColor: ["#e7e5e4", "#f59e0b", "#f59e0b", "#e7e5e4"],
+                            backgroundColor: ["#f5f5f4", "#fffdf5", "#f5f5f4"],
+                            boxShadow: [
+                              "0 0 0 rgba(0,0,0,0)",
+                              "0 0 20px rgba(245,158,11,0.6)",
+                              "0 0 0 rgba(0,0,0,0)"
+                            ]
+                          }
+                        : {}
+                    }
+                    transition={{ duration: 0.7, ease: "easeInOut" }}
+                    className="p-3.5 bg-stone-50 rounded-xl border border-stone-200 space-y-2 font-mono text-[11px]"
+                  >
                     <div className="flex justify-between items-center text-stone-700">
                       <span>当前修炼状态:</span>
-                      <span className="font-bold text-amber-700">
+                      <motion.span 
+                        animate={isUpgradedClass ? { scale: [1, 1.3, 1], color: ["#b45309", "#d97706", "#b45309"] } : {}}
+                        className="font-bold text-amber-700"
+                      >
                         Lv.{(cardUpgrades[selectedCard.id]?.level || 1)} · {getLevelTitle(cardUpgrades[selectedCard.id]?.level || 1)}
-                      </span>
+                      </motion.span>
                     </div>
 
                     {/* Progress Bar */}
@@ -1532,8 +1657,9 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                         <span>{(cardUpgrades[selectedCard.id]?.exp || 0)} / 100 EXP</span>
                       </div>
                       <div className="w-full bg-stone-200 h-2 rounded-full overflow-hidden">
-                        <div 
-                          className="bg-amber-500 h-full transition-all duration-300" 
+                        <motion.div 
+                          animate={isUpgradedClass ? { scaleX: [1, 1.1, 1] } : {}}
+                          className="bg-amber-500 h-full origin-left transition-all duration-300" 
                           style={{ width: `${cardUpgrades[selectedCard.id]?.exp || 0}%` }}
                         />
                       </div>
@@ -1541,11 +1667,14 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
 
                     <div className="flex justify-between items-center text-stone-700 pt-1 border-t border-dashed">
                       <span>星级等阶:</span>
-                      <span className="text-amber-500 text-xs tracking-tighter font-bold flex gap-0.5">
+                      <motion.span 
+                        animate={isStarredClass ? { scale: [1, 1.4, 1], rotate: [0, 15, -15, 0] } : {}}
+                        className="text-amber-500 text-xs tracking-tighter font-bold flex gap-0.5"
+                      >
                         {"★".repeat(cardUpgrades[selectedCard.id]?.stars || 0) + "☆".repeat(5 - (cardUpgrades[selectedCard.id]?.stars || 0))}
-                      </span>
+                      </motion.span>
                     </div>
-                  </div>
+                  </motion.div>
 
                   {upgradeMessage && (
                     <div className="p-2 bg-amber-50 border border-amber-200 text-amber-800 text-center text-xs font-mono rounded-lg animate-bounce">
@@ -1559,7 +1688,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                       type="button"
                       onClick={() => handleManualLevelUp(selectedCard.id)}
                       disabled={(cardUpgrades[selectedCard.id]?.level || 1) >= 5 && (cardUpgrades[selectedCard.id]?.exp || 0) >= 100}
-                      className="p-2.5 rounded-xl border border-stone-250 bg-white hover:bg-stone-50 text-stone-850 font-bold text-xs transition-colors cursor-pointer text-center space-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2.5 rounded-xl border border-stone-250 bg-white hover:bg-stone-50 text-stone-850 font-bold text-xs transition-all active:scale-95 cursor-pointer text-center space-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <div className="text-amber-600 font-black">⚡ 经验淬炼</div>
                       <div className="text-[9px] text-stone-500 font-mono font-medium">🪙 30 和币 (+35 EXP)</div>
@@ -1569,7 +1698,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                       type="button"
                       onClick={() => handleManualStarUp(selectedCard.id)}
                       disabled={(cardUpgrades[selectedCard.id]?.stars || 0) >= 5}
-                      className="p-2.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100/80 text-amber-950 font-bold text-xs transition-colors cursor-pointer text-center space-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100/80 text-amber-950 font-bold text-xs transition-all active:scale-95 cursor-pointer text-center space-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <div className="text-amber-700 font-black font-serif">⭐ 境界突破</div>
                       <div className="text-[9px] text-stone-650 font-mono font-medium">🪙 80 和币 (+1 星)</div>

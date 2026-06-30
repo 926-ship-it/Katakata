@@ -402,6 +402,32 @@ class RetroAudioSynth {
     osc.stop(this.ctx.currentTime + 0.2);
   }
 
+  // Retro 8-bit coin pickup sound effect (B5 then E6 rapid arpeggio)
+  playCoin() {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = "square";
+      osc.frequency.setValueAtTime(987.77, now);
+      osc.frequency.setValueAtTime(1318.51, now + 0.08);
+
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.4);
+    } catch (e) {}
+  }
+
   // Joyous retro arcade chord fanfare for completing the entire word spelling!
   playFanfare() {
     if (this.isMuted) return;
