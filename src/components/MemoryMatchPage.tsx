@@ -51,7 +51,7 @@ export const MemoryMatchPage: React.FC<MemoryMatchPageProps> = ({
   }, [isEnglishMode]);
 
   // Game States
-  const [difficulty, setDifficulty] = useState<"easy" | "hard">("easy"); // easy = 4x4 (8 pairs), hard = 6x6 (18 pairs)
+  const [difficulty, setDifficulty] = useState<"easy" | "hard">("easy"); // easy = 4 pairs (8 cards), hard = 5 pairs (10 cards, never exceeds 5 words)
   const [cards, setCards] = useState<MemoryCard[]>([]);
   const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
   const [moves, setMoves] = useState<number>(0);
@@ -121,8 +121,8 @@ export const MemoryMatchPage: React.FC<MemoryMatchPageProps> = ({
   const setupBoard = () => {
     audioSynth.playCarriageReturn();
     
-    // Determine card count: easy is 8 pairs, hard is 18 pairs
-    const pairsNeeded = difficulty === "easy" ? 8 : 18;
+    // Determine card count: easy is 4 pairs (4 words), hard is 5 pairs (5 words, never exceeds 5 words)
+    const pairsNeeded = difficulty === "easy" ? 4 : 5;
 
     // Filter cards already unlocked. Pad with standard cards to guarantee board count.
     const unlocked = activeDict.filter(item => collectedIds.includes(item.id));
@@ -251,8 +251,8 @@ export const MemoryMatchPage: React.FC<MemoryMatchPageProps> = ({
           if (allSolved) {
             // Instantly compute and award coins so user doesn't lose rewards
             const isEasy = difficulty === "easy";
-            const star3Bound = isEasy ? 12 : 28;
-            const star2Bound = isEasy ? 18 : 42;
+            const star3Bound = isEasy ? 6 : 8;
+            const star2Bound = isEasy ? 10 : 13;
             let starsCount = 1;
             if (moves <= star3Bound) {
               starsCount = 3;
@@ -290,8 +290,8 @@ export const MemoryMatchPage: React.FC<MemoryMatchPageProps> = ({
   // --- SCORE & STARS RATINGS EVALUATION ---
   const getRatingInfo = () => {
     const isEasy = difficulty === "easy";
-    const star3Bound = isEasy ? 12 : 28;
-    const star2Bound = isEasy ? 18 : 42;
+    const star3Bound = isEasy ? 6 : 8;
+    const star2Bound = isEasy ? 10 : 13;
 
     let starsCount = 1;
     if (moves <= star3Bound) {
@@ -382,7 +382,7 @@ export const MemoryMatchPage: React.FC<MemoryMatchPageProps> = ({
                   : "text-stone-400 hover:text-stone-700"
               }`}
             >
-              {narrativeStyle === "academic" ? "基础 4x4" : "初学 4x4"}
+              {narrativeStyle === "academic" ? "基础 4对" : "初学 4对 (8张)"}
             </button>
             <button
               onClick={() => setDifficulty("hard")}
@@ -392,7 +392,7 @@ export const MemoryMatchPage: React.FC<MemoryMatchPageProps> = ({
                   : "text-stone-400 hover:text-stone-700"
               }`}
             >
-              {narrativeStyle === "academic" ? "进阶 6x6" : "通晓 6x6"}
+              {narrativeStyle === "academic" ? "进阶 5对" : "通晓 5对 (10张)"}
             </button>
           </div>
 
@@ -434,7 +434,7 @@ export const MemoryMatchPage: React.FC<MemoryMatchPageProps> = ({
           <div className="flex justify-between items-center bg-stone-50 border p-3.5 rounded-xl font-mono text-xs text-stone-500 max-w-sm mx-auto shadow-inner select-none">
             <span className="flex items-center gap-1 font-serif text-stone-750 font-bold">
               <Grid className="w-4 h-4 text-amber-600" />
-              {narrativeStyle === "academic" ? "评测模式" : "当前难度"}: {difficulty === "easy" ? (narrativeStyle === "academic" ? "基础 (8对)" : "初学 (8对)") : (narrativeStyle === "academic" ? "进阶 (18对)" : "通晓 (18对)")}
+              {narrativeStyle === "academic" ? "评测模式" : "当前难度"}: {difficulty === "easy" ? (narrativeStyle === "academic" ? "基础 (4对)" : "初学 (4对)") : (narrativeStyle === "academic" ? "进阶 (5对)" : "通晓 (5对)")}
             </span>
             <span>
               已完成步数: <b className="text-stone-900 font-black">{moves}</b> 步
@@ -446,7 +446,7 @@ export const MemoryMatchPage: React.FC<MemoryMatchPageProps> = ({
             className={`grid gap-3.5 max-w-3xl mx-auto select-none ${
               difficulty === "easy" 
                 ? "grid-cols-4" 
-                : "grid-cols-4 sm:grid-cols-6"
+                : "grid-cols-4 sm:grid-cols-5"
             }`}
           >
             {cards.map((card, idx) => {
@@ -618,7 +618,7 @@ export const MemoryMatchPage: React.FC<MemoryMatchPageProps> = ({
 
             <button
               onClick={handleClaimCoins}
-              className="flex-1 py-3 rounded-xl bg-stone-900 hover:bg-stone-850 text-stone-50 font-black text-xs transition-colors cursor-pointer shadow flex items-center justify-center gap-1"
+              className="flex-1 py-3 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-50 font-black text-xs transition-colors cursor-pointer shadow flex items-center justify-center gap-1"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span>{narrativeStyle === "mythology" ? "收下和币并离开" : narrativeStyle === "cultural" ? "完成练习并返回" : "结束评测并返回"}</span>

@@ -372,7 +372,7 @@ export const CalligraphyCanvas: React.FC<CalligraphyCanvasProps> = ({ segments, 
         <div className="space-y-0.5">
           <div className="flex items-center gap-1.5">
             <PenTool className="w-4 h-4 text-rose-500 animate-pulse" />
-            <h4 className="text-xs font-mono font-black text-stone-850">
+            <h4 className="text-xs font-mono font-black text-stone-800">
               CALLIGRAPHY SCROLL FOR MULTI-SYLLABLES (假名连笔多字临摹帖)
             </h4>
           </div>

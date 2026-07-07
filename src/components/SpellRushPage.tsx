@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, Clock, Zap, RotateCcw, Volume2, VolumeX, AlertCircle, Award, Trophy } from "lucide-react";
 import { DictionaryItem, getDictionary } from "../data/dictionary";
 import { audioSynth } from "../utils/audio";
+import { recordPracticeBatch } from "../utils/srs";
 import { CardIllustration } from "./CardIllustration";
 import { NarrativeStyle, nTrans } from "../utils/narrative";
 
@@ -39,6 +40,7 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
   
   // Scoring & Stats
   const [score, setScore] = useState<number>(0); // count of correctly spelled words
+  const [practicedIds, setPracticedIds] = useState<string[]>([]);
   const [combo, setCombo] = useState<number>(0);
   const [maxCombo, setMaxCombo] = useState<number>(0);
   const [keysTyped, setKeysTyped] = useState<number>(0);
@@ -178,6 +180,7 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
         setTimeLeft(0);
         setGameState("summary");
         audioSynth.playTimeCompleted();
+        recordPracticeBatch(practicedIds);
         if (timerRef.current) clearInterval(timerRef.current);
       } else {
         setTimeLeft(difference);
@@ -188,7 +191,7 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [gameState, endTime]);
+  }, [gameState, endTime, practicedIds]);
 
   // Handle Keystrokes
   const handleTypewriterInput = (key: string) => {
@@ -237,6 +240,7 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
       if (currentSegmentIdx + 1 >= currentCard.segments.length) {
         // Full word correct!
         setScore(prev => prev + 1);
+        setPracticedIds(prev => prev.includes(currentCard.id) ? prev : [...prev, currentCard.id]);
         audioSynth.playFanfare();
 
         // Trigger dynamic score popup
@@ -628,11 +632,15 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
               </div>
 
               {/* Main Card graphic */}
-              <div className="flex flex-col items-center justify-center space-y-4 text-center py-4">
-                <div className="p-3 bg-[#fcfbf9] border-2 border-stone-250 rounded-2xl shadow-sm hover:scale-105 transition-all">
-                  <CardIllustration id={currentCard.id} category={currentCard.category} className="w-16 h-16" />
+              <div className="flex flex-col items-center justify-center space-y-2 text-center py-4">
+                {/* Embedded Card Illustration centerpiece */}
+                <div className="p-1.5 bg-white rounded-xl border border-stone-200 shadow-sm flex items-center justify-center w-20 h-20 mb-2 animate-fade-in">
+                  <CardIllustration
+                    id={currentCard.id}
+                    category={currentCard.category}
+                    className="w-14 h-14 opacity-100 contrast-105"
+                  />
                 </div>
-
                 <div className="space-y-1">
                   <h4 className="text-4xl font-serif font-black text-stone-950 tracking-wide">{currentCard.kanji}</h4>
                   <p className="text-xs text-stone-500 font-sans italic max-w-md">
@@ -754,7 +762,7 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
               </div>
 
               <div className="text-left space-y-1">
-                <h3 className="text-lg font-serif font-black text-stone-850">{gradeDetails.title}</h3>
+                <h3 className="text-lg font-serif font-black text-stone-800">{gradeDetails.title}</h3>
                 <p className="text-xs text-stone-500 leading-normal max-w-xs">{gradeDetails.desc}</p>
               </div>
             </div>
@@ -816,7 +824,7 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
 
             <button
               onClick={handleClaimRewards}
-              className="flex-1 py-3 rounded-xl bg-stone-900 hover:bg-stone-850 text-stone-50 font-black text-xs transition-colors cursor-pointer shadow flex items-center justify-center gap-1.5"
+              className="flex-1 py-3 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-50 font-black text-xs transition-colors cursor-pointer shadow flex items-center justify-center gap-1.5"
             >
               <Trophy className="w-3.5 h-3.5 text-amber-400" />
               <span>

@@ -13,8 +13,6 @@ interface CardLibraryPageProps {
   onGoBack: () => void;
   onImportData: (unlockedCards: string[], ptTimes: Record<string, number>, settings?: any, importedCoins?: number, importedUpgrades?: any) => void;
   isEnglishMode?: boolean;
-  customCards?: DictionaryItem[];
-  setCustomCards?: React.Dispatch<React.SetStateAction<DictionaryItem[]>>;
   coins?: number;
   setCoins?: React.Dispatch<React.SetStateAction<number>>;
   cardUpgrades?: Record<string, { level: number; exp: number; stars: number }>;
@@ -37,16 +35,14 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
   onGoBack,
   onImportData,
   isEnglishMode = false,
-  customCards = [],
-  setCustomCards,
   coins = 300,
   setCoins,
   cardUpgrades = {},
   setCardUpgrades,
 }) => {
   const activeDict = React.useMemo(() => {
-    return [...getDictionary(isEnglishMode), ...customCards];
-  }, [isEnglishMode, customCards]);
+    return getDictionary(isEnglishMode);
+  }, [isEnglishMode]);
 
   // Gamified Tabs: Binder (Collection) and Gacha (Summon Shrine)
   const [libraryTab, setLibraryTab] = useState<"binder" | "gacha">("binder");
@@ -401,6 +397,11 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
   // --- GAMIFIED UPGRADE & SUMMON HANDLERS ---
   const [upgradeMessage, setUpgradeMessage] = useState<string>("");
 
+  const toHanNumeral = (num: number) => {
+    const mapping: Record<number, string> = { 1: "壹", 2: "贰", 3: "叁", 4: "肆", 5: "伍", 0: "零" };
+    return mapping[num] || String(num);
+  };
+
   const getLevelTitle = (level: number) => {
     switch (level) {
       case 1: return "初学乍练";
@@ -435,7 +436,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
         if (nextLevel < 5) {
           nextLevel += 1;
           nextExp = nextExp - 100;
-          setUpgradeMessage(`🎉 恭喜！等级成功淬炼至 Lv.${nextLevel}！`);
+          setUpgradeMessage(`🎉 恭喜！等级成功淬炼至【等阶·${toHanNumeral(nextLevel)}】！`);
           setTimeout(() => {
             audioSynth.speakJapanese("おめでとう"); // congratulations
             audioSynth.playTypewriterBell(); // typewriter margin bell
@@ -443,7 +444,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
         } else {
           nextLevel = 5;
           nextExp = 100;
-          setUpgradeMessage("✨ 卡牌已达最高修炼等级 Lv.5！");
+          setUpgradeMessage("✨ 卡牌已达最高修炼等阶【等阶·伍】！");
         }
       } else {
         setUpgradeMessage("✨ 注入和币成功，经验值增加了 35 点！");
@@ -454,16 +455,16 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
         [cardId]: { level: nextLevel, exp: nextExp, stars: prevUpgrade.stars }
       }));
 
-      // Generate flying coins & sparkles
-      const newParticles: UpgradeParticle[] = Array.from({ length: 12 }).map((_, idx) => {
+      // Generate flying coins & sparkles from level-up button (bottom-left) to card face (top-center)
+      const newParticles: UpgradeParticle[] = Array.from({ length: 16 }).map((_, idx) => {
         const isSpark = idx % 2 === 0;
         return {
           id: Date.now() + idx,
-          startX: 60 + Math.random() * 50 - 25, // Above level up button
-          startY: 230 + Math.random() * 16 - 8,
-          endX: 160 + Math.random() * 80 - 40,   // Flying to status card/progress bar
-          endY: 55 + Math.random() * 20 - 10,
-          delay: idx * 0.04,
+          startX: 100 + Math.random() * 40 - 20, // Centered on level up button
+          startY: 530 + Math.random() * 20 - 10,
+          endX: 190 + Math.random() * 80 - 40,   // Flying to card face center
+          endY: 180 + Math.random() * 80 - 40,
+          delay: idx * 0.03,
           char: isSpark ? "✨" : "🪙",
         };
       });
@@ -500,20 +501,20 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
       const nextStars = Math.min(5, prevUpgrade.stars + 1);
       
       setCardUpgrades(prev => ({
-        ...prev,
+         ...prev,
         [cardId]: { level: prevUpgrade.level, exp: prevUpgrade.exp, stars: nextStars }
       }));
 
-      // Generate flying coins & stars
-      const newParticles: UpgradeParticle[] = Array.from({ length: 15 }).map((_, idx) => {
+      // Generate flying coins & stars from star-up button (bottom-right) to card face (top-center)
+      const newParticles: UpgradeParticle[] = Array.from({ length: 20 }).map((_, idx) => {
         const isStar = idx % 2 === 0;
         return {
           id: Date.now() + idx,
-          startX: 230 + Math.random() * 50 - 25, // Above star up button
-          startY: 230 + Math.random() * 16 - 8,
-          endX: 160 + Math.random() * 80 - 40,   // Flying to star level bar
-          endY: 90 + Math.random() * 20 - 10,
-          delay: idx * 0.04,
+          startX: 280 + Math.random() * 40 - 20, // Centered on star up button
+          startY: 530 + Math.random() * 20 - 10,
+          endX: 190 + Math.random() * 80 - 40,   // Flying to card face center
+          endY: 180 + Math.random() * 80 - 40,
+          delay: idx * 0.03,
           char: isStar ? "⭐" : "🪙",
         };
       });
@@ -850,7 +851,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                       audioSynth.speakJapanese(item.kanaStr);
                     }
                   }}
-                  className={`p-4 rounded-xl border-2 flex flex-col justify-between h-56 transition-all relative overflow-hidden select-none ${
+                  className={`p-3 sm:p-3.5 rounded-xl border-2 flex flex-col justify-between h-56 transition-all relative overflow-hidden select-none ${
                     isCollected ? "cursor-pointer shadow-sm" : "bg-stone-100/50 border-stone-200 opacity-60"
                   } ${cardBgClass}`}
                   style={{
@@ -866,10 +867,10 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   )}
 
                   {/* Japanese corner bracket markers */}
-                  <div className="absolute top-2 left-2 w-1.5 h-1.5 border-t border-l border-stone-850/30 pointer-events-none" />
-                  <div className="absolute top-2 right-2 w-1.5 h-1.5 border-t border-r border-stone-850/30 pointer-events-none" />
-                  <div className="absolute bottom-2 left-2 w-1.5 h-1.5 border-b border-l border-stone-850/30 pointer-events-none" />
-                  <div className="absolute bottom-2 right-2 w-1.5 h-1.5 border-b border-r border-stone-850/30 pointer-events-none" />
+                  <div className="absolute top-2 left-2 w-1.5 h-1.5 border-t border-l border-stone-800/30 pointer-events-none" />
+                  <div className="absolute top-2 right-2 w-1.5 h-1.5 border-t border-r border-stone-800/30 pointer-events-none" />
+                  <div className="absolute bottom-2 left-2 w-1.5 h-1.5 border-b border-l border-stone-800/30 pointer-events-none" />
+                  <div className="absolute bottom-2 right-2 w-1.5 h-1.5 border-b border-r border-stone-800/30 pointer-events-none" />
 
                   {/* Card top badge */}
                   <div className="flex items-center justify-between z-10">
@@ -912,13 +913,13 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   )}
 
                   {/* Central text layout */}
-                  <div className="text-center py-1 space-y-1.5 z-10 flex flex-col items-center justify-center">
-                    {/* Embedded Card Illustration */}
-                    <div className="mb-0.5">
+                  <div className="text-center py-1 space-y-1.5 z-10 flex flex-col items-center justify-center w-full">
+                    {/* Embedded Card Illustration in a beautiful frame */}
+                    <div className="p-1 bg-white/75 backdrop-blur-xs rounded-lg border border-stone-200/40 shadow-xs flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12">
                       <CardIllustration
                         id={item.id}
                         category={item.category}
-                        className={`w-11 h-11 transition-all ${isCollected ? "opacity-95 contrast-110" : "opacity-20 grayscale pointer-events-none"}`}
+                        className={`w-8 h-8 sm:w-9 sm:h-9 transition-all ${isCollected ? "opacity-95 contrast-110" : "opacity-20 grayscale pointer-events-none"}`}
                       />
                     </div>
 
@@ -932,7 +933,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                         </h3>
                         {/* Upgrade level badge */}
                         <div className="text-[8px] bg-stone-900/5 text-stone-600 px-1.5 py-0.2 rounded-full font-bold scale-90 -mt-1 select-none">
-                          Lv.{upgrade.level} · {getLevelTitle(upgrade.level)}
+                          等阶·{toHanNumeral(upgrade.level)} · {getLevelTitle(upgrade.level)}
                         </div>
                         <p className="text-[10px] font-mono text-stone-500 font-bold italic leading-none">
                           {isEnglishMode ? "" : `(${item.kanaStr})`}
@@ -1025,7 +1026,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
               </div>
               <button
                 onClick={() => handleGachaSummon("beginner")}
-                className="w-full py-2.5 rounded-xl bg-stone-900 hover:bg-stone-850 text-stone-50 font-black text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow"
+                className="w-full py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-50 font-black text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow"
               >
                 <span>召唤 1 次</span>
                 <span className="font-mono text-stone-400 opacity-90">🪙 60 和币</span>
@@ -1227,6 +1228,34 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
               exit={{ scale: 0.95 }}
               className="max-w-md w-full bg-stone-50 rounded-2xl border-2 border-stone-800 p-4 sm:p-6 space-y-4 relative shadow-2xl my-8 text-stone-900"
             >
+              {/* Modal-wide Flying Particles Area */}
+              <div className="absolute inset-0 pointer-events-none z-50 overflow-hidden rounded-2xl">
+                <AnimatePresence>
+                  {particles.map((p) => (
+                    <motion.div
+                      key={p.id}
+                      initial={{ x: p.startX, y: p.startY, opacity: 1, scale: 0.5, rotate: 0 }}
+                      animate={{
+                        x: p.endX,
+                        y: p.endY,
+                        opacity: [1, 1, 0.9, 0],
+                        scale: [0.5, 1.6, 1.3, 0.6],
+                        rotate: Math.random() > 0.5 ? 720 : -720,
+                      }}
+                      exit={{ opacity: 0 }}
+                      transition={{
+                        duration: 0.95,
+                        delay: p.delay,
+                        ease: "easeOut",
+                      }}
+                      className="absolute pointer-events-none text-xl select-none"
+                    >
+                      {p.char}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+
               <button
                 onClick={() => setSelectedCard(null)}
                 className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-stone-200 text-stone-600 transition-colors z-20"
@@ -1236,12 +1265,36 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
               </button>
 
               {/* Inside detail header: beautiful premium styling vertical TCG card view on top */}
-              <div 
-                className={`w-[260px] h-[360px] mx-auto p-5 rounded-2xl border-2 ${
+              <motion.div 
+                animate={
+                  isUpgradedClass
+                    ? {
+                        scale: [1, 1.08, 0.95, 1.04, 1],
+                        rotate: [0, -2.5, 2.5, -1.5, 1.5, 0],
+                        boxShadow: [
+                          `0 6px 20px ${selectedCard.glowColor}`,
+                          `0 15px 40px rgba(251, 191, 36, 0.85)`,
+                          `0 6px 20px ${selectedCard.glowColor}`
+                        ]
+                      }
+                    : isStarredClass
+                    ? {
+                        scale: [1, 1.12, 0.92, 1.06, 1],
+                        rotate: [0, -4, 4, -2, 2, 0],
+                        boxShadow: [
+                          `0 6px 20px ${selectedCard.glowColor}`,
+                          `0 20px 50px rgba(245, 158, 11, 0.95)`,
+                          `0 6px 20px ${selectedCard.glowColor}`
+                        ]
+                      }
+                    : {}
+                }
+                transition={{ duration: 0.85, ease: "easeOut" }}
+                className={`w-[260px] h-[370px] mx-auto p-4 rounded-2xl border-2 flex flex-col justify-between relative overflow-hidden select-none ${
                   selectedCard.rarity === "SSR"
-                    ? "bg-gradient-to-tr from-pink-300 via-purple-300 via-indigo-200 via-emerald-200 via-yellow-200 to-rose-200 border-amber-400 shadow-xl shadow-purple-500/20"
+                    ? "bg-gradient-to-tr from-pink-300 via-purple-300 via-indigo-200 via-emerald-200 via-yellow-200 to-rose-200 border-amber-400 text-stone-950 shadow-xl shadow-purple-500/20"
                     : `bg-gradient-to-br ${selectedCard.bgGradient} ${selectedCard.borderColor}`
-                } text-center flex flex-col justify-between relative overflow-hidden`}
+                }`}
                 style={{ boxShadow: `0 6px 20px ${selectedCard.glowColor}` }}
               >
                 {/* Holographic Premium Foil Card Sheen Overlay */}
@@ -1249,10 +1302,19 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   <div className="holo-sheen animate-holo-sheen" />
                 )}
 
+                {/* Antique voucher dashed inner sub-border */}
+                <div className="absolute inset-1.5 border border-dashed border-stone-800/10 rounded-lg pointer-events-none" />
+
+                {/* Japanese corner bracket markers */}
+                <div className="absolute top-2 left-2 w-1.5 h-1.5 border-t border-l border-stone-800/30 pointer-events-none" />
+                <div className="absolute top-2 right-2 w-1.5 h-1.5 border-t border-r border-stone-800/30 pointer-events-none" />
+                <div className="absolute bottom-2 left-2 w-1.5 h-1.5 border-b border-l border-stone-800/30 pointer-events-none" />
+                <div className="absolute bottom-2 right-2 w-1.5 h-1.5 border-b border-r border-stone-800/30 pointer-events-none" />
+
                 {/* Card Top Header */}
                 <div className="flex items-center justify-between z-10 w-full">
                   <span 
-                    className="text-[9px] font-mono font-black border px-1.5 py-0.5 rounded-sm tracking-widest"
+                    className="text-[9px] font-mono font-black border px-1.5 py-0.5 rounded-sm tracking-widest scale-90"
                     style={{
                       backgroundColor: selectedCard.rarity === "SSR" ? "#fee2e2" : selectedCard.rarity === "SR" ? "#ffedd5" : selectedCard.rarity === "R" ? "#e0f2fe" : "#f1f5f9",
                       color: selectedCard.rarity === "SSR" ? "#b91c1c" : selectedCard.rarity === "SR" ? "#c2410c" : selectedCard.rarity === "R" ? "#0284c7" : "#475569",
@@ -1261,29 +1323,36 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   >
                     {selectedCard.rarity}
                   </span>
-                  <span className="text-[9px] font-mono text-stone-500 font-bold">
-                    #{selectedCard.id.toUpperCase()}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[8px] text-amber-500 font-bold tracking-tighter">
+                      {"★".repeat(cardUpgrades[selectedCard.id]?.stars || 0) + "☆".repeat(5 - (cardUpgrades[selectedCard.id]?.stars || 0))}
+                    </span>
+                    <span className="text-[9px] font-mono text-stone-500 font-bold scale-90">
+                      #{selectedCard.id.toUpperCase()}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Illustration and Main Kanji */}
-                <div className="space-y-3 z-10 flex flex-col items-center">
-                  <div className="p-2.5 bg-white/70 backdrop-blur-sm border border-stone-200/50 rounded-2xl shadow-sm">
+                <div className="space-y-2 z-10 flex flex-col items-center">
+                  {/* Beautiful big picture window on card face */}
+                  <div className="p-2 bg-gradient-to-b from-white/95 to-white/80 border border-amber-350/30 rounded-2xl shadow-md w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-radial-gradient from-amber-500/5 to-transparent pointer-events-none" />
                     <CardIllustration
                       id={selectedCard.id}
                       category={selectedCard.category}
-                      className="w-12 h-12"
+                      className="w-16 h-16 sm:w-20 sm:h-20 pointer-events-none transition-transform duration-300 group-hover:scale-110"
                     />
                   </div>
                   
-                  <div className="space-y-1">
+                  <div className="space-y-0.5 text-center">
                     <h2 
-                      className="text-3xl font-black text-stone-950 font-serif leading-none tracking-wide"
+                      className="text-2xl sm:text-3xl font-black text-stone-950 font-serif leading-none tracking-wide"
                       style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
                     >
                       {selectedCard.kanji}
                     </h2>
-                    <div className="flex justify-center gap-1.5 text-[10px] text-stone-600 font-medium">
+                    <div className="flex justify-center gap-1 text-[9px] text-stone-650 font-medium">
                       <span>{isEnglishMode ? "单词:" : "假名:"} <b>{isEnglishMode ? selectedCard.kanji : selectedCard.kanaStr}</b></span>
                       <span className="text-stone-300">|</span>
                       <span>{isEnglishMode ? "拼写:" : "罗马音:"} <b>{selectedCard.segments.map(s => s.displayRomaji).join("")}</b></span>
@@ -1292,27 +1361,27 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                 </div>
 
                 {/* Voice button and breakdown segments at bottom */}
-                <div className="space-y-3 z-10 w-full">
+                <div className="space-y-2 z-10 w-full">
                   <div className="flex justify-center">
                     <button
                       onClick={() => audioSynth.speakJapanese(selectedCard.kanaStr)}
-                      className="px-3 py-1 rounded-full bg-stone-900/10 hover:bg-stone-900/20 text-stone-850 transition-all text-[10px] font-bold flex items-center gap-1 cursor-pointer shadow-sm animate-pulse"
+                      className="px-3 py-1 rounded-full bg-stone-900/10 hover:bg-stone-900/20 text-stone-800 transition-all text-[9px] font-bold flex items-center gap-1 cursor-pointer shadow-xs animate-pulse"
                     >
                       <Volume2 className="w-3 h-3 text-stone-700" />
                       <span>{isEnglishMode ? "听原声朗读" : "原声播音"}</span>
                     </button>
                   </div>
 
-                  <div className="flex gap-1 justify-center flex-wrap">
+                  <div className="flex gap-0.5 justify-center flex-wrap scale-95 origin-center">
                     {selectedCard.segments.map((s, idx) => (
-                      <div key={idx} className="bg-stone-900/5 px-1.5 py-0.5 rounded text-[10px] flex flex-col items-center">
+                      <div key={idx} className="bg-stone-900/5 px-1.5 py-0.5 rounded text-[9px] flex flex-col items-center min-w-[32px]">
                         <span className="font-serif font-black">{s.text || s.kana}</span>
-                        <span className="font-mono text-[8px] text-stone-500 scale-90">{s.displayRomaji}</span>
+                        <span className="font-mono text-[7px] text-stone-500 scale-90">{s.displayRomaji}</span>
                       </div>
                     ))}
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Tab Selector */}
               <div className="flex border-b border-stone-200">
@@ -1512,7 +1581,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                                   className={`p-2.5 max-w-[82%] text-xs leading-relaxed rounded-2xl ${
                                     isUser
                                       ? "bg-stone-900 text-stone-50 rounded-tr-none shadow-sm font-sans"
-                                      : "bg-white border border-stone-250 text-stone-850 rounded-tl-none shadow-xs font-sans"
+                                      : "bg-white border border-stone-250 text-stone-800 rounded-tl-none shadow-xs font-sans"
                                   }`}
                                 >
                                   <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -1576,32 +1645,6 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
 
               {activeDetailTab === "upgrade" && (
                 <div className="relative space-y-4 bg-white p-4 rounded-xl border border-stone-200 select-none overflow-hidden">
-                  {/* Floating Particles Area */}
-                  <AnimatePresence>
-                    {particles.map((p) => (
-                      <motion.div
-                        key={p.id}
-                        initial={{ x: p.startX, y: p.startY, opacity: 1, scale: 0.5, rotate: 0 }}
-                        animate={{
-                          x: p.endX,
-                          y: p.endY,
-                          opacity: [1, 1, 0.8, 0],
-                          scale: [0.5, 1.4, 1.2, 0.6],
-                          rotate: Math.random() > 0.5 ? 360 : -360,
-                        }}
-                        exit={{ opacity: 0 }}
-                        transition={{
-                          duration: 0.85,
-                          delay: p.delay,
-                          ease: "easeOut",
-                        }}
-                        className="absolute pointer-events-none text-base z-30 select-none"
-                      >
-                        {p.char}
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-
                   <div className="text-center space-y-1">
                     <div className="text-xs text-stone-400 font-mono">CARD CULTIVATION ENGINE</div>
                     <h3 className="font-serif font-black text-stone-800 text-sm">闪卡太鼓淬炼 & 五星升华</h3>
@@ -1646,7 +1689,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                         animate={isUpgradedClass ? { scale: [1, 1.3, 1], color: ["#b45309", "#d97706", "#b45309"] } : {}}
                         className="font-bold text-amber-700"
                       >
-                        Lv.{(cardUpgrades[selectedCard.id]?.level || 1)} · {getLevelTitle(cardUpgrades[selectedCard.id]?.level || 1)}
+                        等阶·{toHanNumeral(cardUpgrades[selectedCard.id]?.level || 1)} · {getLevelTitle(cardUpgrades[selectedCard.id]?.level || 1)}
                       </motion.span>
                     </div>
 
@@ -1688,7 +1731,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                       type="button"
                       onClick={() => handleManualLevelUp(selectedCard.id)}
                       disabled={(cardUpgrades[selectedCard.id]?.level || 1) >= 5 && (cardUpgrades[selectedCard.id]?.exp || 0) >= 100}
-                      className="p-2.5 rounded-xl border border-stone-250 bg-white hover:bg-stone-50 text-stone-850 font-bold text-xs transition-all active:scale-95 cursor-pointer text-center space-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2.5 rounded-xl border border-stone-250 bg-white hover:bg-stone-50 text-stone-800 font-bold text-xs transition-all active:scale-95 cursor-pointer text-center space-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <div className="text-amber-600 font-black">⚡ 经验淬炼</div>
                       <div className="text-[9px] text-stone-500 font-mono font-medium">🪙 30 和币 (+35 EXP)</div>
@@ -1706,7 +1749,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   </div>
 
                   <p className="text-[9px] text-stone-450 leading-relaxed text-center font-sans">
-                    💡 提示：闪卡满级为 Lv.5，升星可突破当前卡牌的视觉底色光圈，更能温故获得倍率加成！
+                    💡 提示：闪卡满等阶为【等阶·伍】，突破境界可点亮卡牌星级光环，更能温故获得倍率加成！
                   </p>
                 </div>
               )}

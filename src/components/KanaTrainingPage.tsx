@@ -533,7 +533,7 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
 
                 <div className="p-4 rounded-xl border border-stone-250 bg-white space-y-3 shadow-inner">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-stone-850 flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
                       <Layers className="w-4 h-4 text-stone-600" />
                       <span>发音键位视觉辅助</span>
                     </span>
@@ -579,7 +579,7 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
                       key={idx}
                       className="px-2 py-1 rounded border border-stone-200/70 bg-stone-50 text-xs flex items-center gap-1.5 select-none"
                     >
-                      <span className="font-serif font-black text-stone-850">
+                      <span className="font-serif font-black text-stone-800">
                         {kanaType === "katakana" ? k.katakana : k.hiragana}
                       </span>
                       <span className="font-mono text-[9px] text-stone-400">{k.romaji}</span>
@@ -715,7 +715,7 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
                           isTyped
                             ? "border-amber-500 bg-amber-50 text-amber-900"
                             : isActive
-                            ? "border-stone-850 bg-stone-100 text-stone-900 animate-pulse scale-105 shadow-sm"
+                            ? "border-stone-800 bg-stone-100 text-stone-900 animate-pulse scale-105 shadow-sm"
                             : "border-stone-200 bg-white text-stone-300"
                         }`}
                       >
@@ -821,14 +821,14 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
               
               <div className="p-3 bg-white rounded-xl border border-stone-300/80 shadow-sm">
                 <span className="text-[10px] font-mono text-stone-400 block uppercase">拼写熟数 SIZE</span>
-                <span className="text-2xl font-serif font-black text-stone-850 mt-1 block">
+                <span className="text-2xl font-serif font-black text-stone-800 mt-1 block">
                   {correctCount} <span className="text-xs text-stone-400 font-sans">个</span>
                 </span>
               </div>
 
               <div className="p-3 bg-white rounded-xl border border-stone-300/80 shadow-sm">
                 <span className="text-[10px] font-mono text-stone-400 block uppercase">准确率 ACCURACY</span>
-                <span className="text-2xl font-serif font-black text-stone-850 mt-1 block">
+                <span className="text-2xl font-serif font-black text-stone-800 mt-1 block">
                   {correctCount + errorCount > 0 
                     ? Math.round((correctCount / (correctCount + errorCount)) * 100) 
                     : 100}%
@@ -847,7 +847,7 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
 
               <div className="p-3 bg-white rounded-xl border border-stone-300/80 shadow-sm">
                 <span className="text-[10px] font-mono text-stone-400 block uppercase">平均耗时 SECS/KANA</span>
-                <span className="text-2xl font-serif font-black text-stone-850 mt-1 block">
+                <span className="text-2xl font-serif font-black text-stone-800 mt-1 block">
                   {correctCount > 0 ? ((elapsedTimeMs / 1000) / correctCount).toFixed(1) : 0} <span className="text-xs text-stone-400 font-sans">秒</span>
                 </span>
                 <span className="text-[8.5px] font-mono text-stone-400 block mt-0.5">

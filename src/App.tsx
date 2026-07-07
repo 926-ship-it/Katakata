@@ -8,15 +8,26 @@ import { MascotComponent } from "./components/MascotComponent";
 import { SpellRushPage } from "./components/SpellRushPage";
 import { MemoryMatchPage } from "./components/MemoryMatchPage";
 import { KanaTrainingPage } from "./components/KanaTrainingPage";
+import { OnlineTimer } from "./components/OnlineTimer";
 import { DictionaryItem } from "./data/dictionary";
 import { audioSynth } from "./utils/audio";
+import { recordPracticeBatch } from "./utils/srs";
 import { uiTranslate } from "./utils/lang";
 import { NarrativeStyle, nTrans } from "./utils/narrative";
 
 type ScreenState = "start" | "training" | "library" | "unlocked_ceremony" | "spell_rush" | "memory_match" | "kana_training";
 
+export function toHanNumerals(num: number): string {
+  const chars = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+  return String(num).split("").map(digit => {
+    const n = Number(digit);
+    return isNaN(n) ? digit : chars[n];
+  }).join("");
+}
+
 export default function App() {
   const [currentPage, setCurrentPage] = useState<ScreenState>("start");
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [collectedIds, setCollectedIds] = useState<string[]>([]);
   const [practiceTimes, setPracticeTimes] = useState<Record<string, number>>({});
   
@@ -105,44 +116,9 @@ export default function App() {
     } catch (_) {}
   }, [narrativeStyle]);
 
-  const [onlineSeconds, setOnlineSeconds] = useState<number>(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setOnlineSeconds((prev) => prev + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const formatOnlineTime = (totalSecs: number, isEng: boolean) => {
-    const hrs = Math.floor(totalSecs / 3600);
-    const mins = Math.floor((totalSecs % 3600) / 60);
-    const secs = totalSecs % 60;
-
-    if (isEng) {
-      if (hrs > 0) return `${hrs}h ${mins}m ${secs}s`;
-      if (mins > 0) return `${mins}m ${secs}s`;
-      return `${secs}s`;
-    } else {
-      if (hrs > 0) return `${hrs}小时${mins}分${secs}秒`;
-      if (mins > 0) return `${mins}分${secs}秒`;
-      return `${secs}秒`;
-    }
-  };
-
   // Selection for active training
   const [activeCards, setActiveCards] = useState<DictionaryItem[]>([]);
   const [activeDurationMs, setActiveDurationMs] = useState<number>(3 * 60 * 1000);
-
-  // Custom uploaded/pasted user dictionary cards (decommissioned & purged as requested)
-  const [customCards, setCustomCards] = useState<DictionaryItem[]>([]);
-
-  // Purge any existing custom cards from local storage immediately to ensure privacy & cleanliness
-  useEffect(() => {
-    try {
-      localStorage.removeItem("fifty_sound_custom_cards");
-    } catch (_) {}
-  }, []);
   
   // Last newly unlocked cards representation for ceremony modal
   const [ceremonyCards, setCeremonyCards] = useState<DictionaryItem[]>([]);
@@ -277,6 +253,14 @@ export default function App() {
       console.warn("localStorage restricted", e);
     }
 
+    // Record SRS spaced repetition progress
+    try {
+      const cardIds = activeCards.map(c => c.id);
+      recordPracticeBatch(cardIds);
+    } catch (e) {
+      console.error("Failed to record SRS batch", e);
+    }
+
     // Earn coins and Card XP / Leveling upgrades (D)
     const baseCoins = rounds * 20;
     const accBonus = accuracy && accuracy >= 80 ? Math.floor((accuracy - 50) * 0.8) : 0;
@@ -408,7 +392,7 @@ export default function App() {
                     setSlideDirection(-1);
                     setActiveCeremonyIdx((prev) => (prev - 1 + ceremonyCards.length) % ceremonyCards.length);
                   }}
-                  className="w-10 h-10 rounded-full border border-stone-700 bg-stone-850 hover:bg-stone-800 text-stone-100 flex items-center justify-center transition-all duration-200 cursor-pointer shadow hover:scale-105 active:scale-95 focus:outline-none z-10"
+                  className="w-10 h-10 rounded-full border border-stone-700 bg-stone-800 hover:bg-stone-800 text-stone-100 flex items-center justify-center transition-all duration-200 cursor-pointer shadow hover:scale-105 active:scale-95 focus:outline-none z-10"
                   aria-label="Previous card"
                 >
                   <ChevronLeft className="w-6 h-6 text-amber-500" />
@@ -522,7 +506,7 @@ export default function App() {
                     setSlideDirection(1);
                     setActiveCeremonyIdx((prev) => (prev + 1) % ceremonyCards.length);
                   }}
-                  className="w-10 h-10 rounded-full border border-stone-700 bg-stone-850 hover:bg-stone-800 text-stone-100 flex items-center justify-center transition-all duration-200 cursor-pointer shadow hover:scale-105 active:scale-95 focus:outline-none z-10"
+                  className="w-10 h-10 rounded-full border border-stone-700 bg-stone-800 hover:bg-stone-800 text-stone-100 flex items-center justify-center transition-all duration-200 cursor-pointer shadow hover:scale-105 active:scale-95 focus:outline-none z-10"
                   aria-label="Next card"
                 >
                   <ChevronRight className="w-6 h-6 text-amber-500" />
@@ -577,187 +561,246 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-100 text-stone-800 font-sans pb-12 transition-colors">
+    <div className="min-h-screen bg-paper bg-japanese-pattern text-ink font-sans pb-12 transition-colors">
       {/* Upper Navigation Header */}
-      <header className="bg-white border-b border-stone-200 sticky top-0 z-40 select-none">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-3 md:gap-0">
+      <header className="bg-[#F3EFE3] border-b border-stone-300 sticky top-0 z-40 select-none">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div 
-            onClick={() => { if (currentPage !== "training") setCurrentPage("start"); }} 
-            className="flex items-center gap-2 cursor-pointer shrink-0"
+            onClick={() => { if (currentPage !== "training") { setCurrentPage("start"); setIsDrawerOpen(false); } }} 
+            className="flex items-center gap-1.5 cursor-pointer shrink-0 font-serif font-black tracking-widest text-stone-900 text-sm md:text-base uppercase"
           >
-            <div className="w-8 h-8 rounded-lg bg-stone-900 border border-stone-800 flex items-center justify-center text-stone-100 text-sm font-serif font-black">
-              カ
-            </div>
-            <div>
-              <span className="font-serif font-black tracking-tight text-stone-900">Katakata「カタカタ」</span>
-              <span className="text-[9px] font-mono block text-stone-400 -mt-1 font-bold">50-SOUNDS COLLECTIVE TRAINING</span>
-            </div>
+            <span>KATAKATA 假名图鉴</span>
           </div>
 
-          {/* Controls Hub for Audio Synth, Ambient BGM, and Mascot Companion */}
-          <div className="flex items-center gap-1.5 border-t border-b md:border-t-0 md:border-b-0 border-r-0 border-l-0 md:border-l md:border-r border-stone-200 py-1.5 md:py-0 md:px-3 mx-2 shrink-0 flex-wrap justify-center">
-            {/* Master Silence Switch */}
-            <button
-              onClick={() => {
-                const next = !isMuted;
-                setIsMuted(next);
-                audioSynth.playCardSlide();
-              }}
-              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                isMuted 
-                  ? "bg-rose-50 border-rose-300 text-rose-600 shadow-sm" 
-                  : "bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100"
-              }`}
-              title={isMuted ? "已静音所有声效 - 点击开启" : "音效正常 - 点击静音"}
-            >
-              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-            </button>
-
-            {/* Ambient Chill Zen BGM Switch */}
-            <button
-              onClick={() => {
-                const next = !bgmEnabled;
-                setBgmEnabled(next);
-                audioSynth.playCardSlide();
-              }}
-              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                bgmEnabled && !isMuted
-                  ? "bg-amber-50 border-amber-300 text-amber-700 shadow-sm animate-pulse" 
-                  : "bg-stone-50 border-stone-200 text-stone-400 hover:bg-stone-100"
-              }`}
-              title={bgmEnabled ? "和风禅意背景背景音已开启 - 点击关闭" : "背景背景音已关闭 - 点击开启"}
-            >
-              <Music className="w-4 h-4" />
-            </button>
-
-            {/* Mascot Companion switch */}
-            <button
-              onClick={() => {
-                const next = !showMascot;
-                setShowMascot(next);
-                audioSynth.playCardSlide();
-              }}
-              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                showMascot 
-                  ? "bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm" 
-                  : "bg-stone-50 border-stone-200 text-stone-400 hover:bg-stone-100"
-              }`}
-              title={showMascot ? "守护灵福狸酱已召唤 - 点击收回" : "召唤守护灵福狸酱"}
-            >
-              <Smile className="w-4 h-4" />
-            </button>
-
-            {/* Pronunciation Voice Switcher (女声/男声/童声/外星人/老人) */}
-            <div className="flex items-center gap-1 bg-stone-50 border border-stone-200 px-1.5 py-1 rounded-lg shadow-sm">
-              <Mic className="w-3.5 h-3.5 text-stone-400 animate-pulse" />
-              <select
-                value={voiceType}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setVoiceType(val);
-                  audioSynth.playCardSlide();
-                  // Speak a short confirmation test word so the user hears the audio swap instantly
-                  setTimeout(() => {
-                    if (val === "male") {
-                      audioSynth.speakJapanese("はじめまして"); // Nice to meet you (male voice)
-                    } else if (val === "child") {
-                      audioSynth.speakJapanese("にほんご"); // Japanese Language (child/mascot voice)
-                    } else if (val === "alien") {
-                      audioSynth.speakJapanese("われわれは"); // "We are..." (Sci-Fi alien trope test speech)
-                    } else if (val === "elderly") {
-                      audioSynth.speakJapanese("ようこそ"); // Welcome (wise elderly style)
-                    } else {
-                      audioSynth.speakJapanese("さくら"); // Sakura/Cherry Blossom (standard female voice)
-                    }
-                  }, 120);
-                }}
-                className="text-[10px] font-mono font-bold text-stone-700 bg-transparent outline-none border-none py-0.5 cursor-pointer max-w-[90px] sm:max-w-none"
-                title={isEnglishMode ? "Select Japanese pronunciation presenter voice type" : "选择五十音导师朗读发音类型"}
-              >
-                <option value="female">{isEnglishMode ? "Female Voice" : "女声导师"}</option>
-                <option value="male">{isEnglishMode ? "Male Voice" : "男声导师"}</option>
-                <option value="child">{isEnglishMode ? "Child Companion" : "童声伴读"}</option>
-                <option value="alien">{isEnglishMode ? "Alien Echo" : "外星人声"}</option>
-                <option value="elderly">{isEnglishMode ? "Elderly Wisdom" : "智慧老人"}</option>
-              </select>
-            </div>
-
-            {/* Inclusive Narrative & Vocabulary Style Switcher */}
-            <div className="flex items-center gap-1 bg-stone-50 border border-stone-200 px-1.5 py-1 rounded-lg shadow-sm">
-              <span className="text-xs select-none">🎭</span>
-              <select
-                value={narrativeStyle}
-                onChange={(e) => {
-                  setNarrativeStyle(e.target.value as NarrativeStyle);
+          <div className="flex items-center gap-4 md:gap-6 shrink-0 font-serif text-xs md:text-sm text-stone-700">
+            {/* Premium Mode Segmented Toggle Switch (Highly Visible & Responsive) */}
+            <div className="flex items-center bg-stone-200/60 p-0.5 rounded-full border border-stone-300 shadow-inner select-none">
+              <button
+                onClick={() => {
+                  if (!isEnglishMode) return;
+                  setIsEnglishMode(false);
                   audioSynth.playCardSlide();
                 }}
-                className="text-[10px] font-mono font-bold text-stone-700 bg-transparent outline-none border-none py-0.5 cursor-pointer max-w-[90px] sm:max-w-none"
-                title={isEnglishMode ? "Select theme terminology narrative style" : "选择语境与术语风格（对无信仰者友好选择）"}
+                className={`px-2.5 py-1 rounded-full text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
+                  !isEnglishMode
+                    ? "bg-[#C4482A] text-white shadow-xs font-black scale-102"
+                    : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
+                }`}
               >
-                <option value="cultural">🏮 {isEnglishMode ? "Cultural Style" : "人文古风"}</option>
-                <option value="mythology">⛩️ {isEnglishMode ? "Mythology Style" : "神道传说"}</option>
-                <option value="academic">🏫 {isEnglishMode ? "Academic Style" : "现代学术"}</option>
-              </select>
+                <span>🇯🇵</span>
+                <span className="hidden sm:inline">假名</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (isEnglishMode) return;
+                  setIsEnglishMode(true);
+                  audioSynth.playCardSlide();
+                }}
+                className={`px-2.5 py-1 rounded-full text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
+                  isEnglishMode
+                    ? "bg-stone-900 text-[#F3EFE3] shadow-xs font-black scale-102"
+                    : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
+                }`}
+              >
+                <span>🔤</span>
+                <span className="hidden sm:inline">EN</span>
+              </button>
             </div>
-          </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {/* ⏱️ Online Session Timer */}
-            <div 
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-stone-50 border border-stone-200 shadow-sm text-stone-700"
-              title={isEnglishMode ? "Current online duration of this session" : `本次网页在线时间：${nTrans("onlineTime", narrativeStyle)}`}
-            >
-              <Clock className="w-3.5 h-3.5 text-stone-500 animate-pulse" />
-              <span className="text-xs font-mono font-bold text-stone-600 flex items-center gap-1">
-                <span className="opacity-70 text-[9px] font-sans font-normal">{nTrans("onlineTime", narrativeStyle)}:</span>
-                <span>{formatOnlineTime(onlineSeconds, isEnglishMode)}</span>
-              </span>
-            </div>
-
-            {currentPage !== "training" && (
+            {currentPage !== "training" ? (
               <>
-                {/* 🪙 Gamified Coins Counter */}
-                <div 
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 shadow-sm text-stone-850"
-                  title={narrativeStyle === "mythology" ? "我的和币：在集卡藏馆中用于召唤卡包或强化卡牌等级" : narrativeStyle === "cultural" ? "我的岁币：在集卡藏馆中用于兑换卡包或提升卡牌等级" : "我的积分：在卡牌库中用于解锁卡包和评估等级"}
+                <button
+                  onClick={() => { setCurrentPage("start"); setIsDrawerOpen(false); }}
+                  className={`cursor-pointer hover:text-[#C4482A] transition-colors ${currentPage === "start" ? "text-stone-950 font-black border-b-2 border-stone-900 pb-0.5" : "text-stone-600"}`}
                 >
-                  <span className="text-xs select-none">🪙</span>
-                  <span className="text-xs font-mono font-black text-amber-800">{coins} {nTrans("coinName", narrativeStyle)}</span>
+                  练习
+                </button>
+                <button
+                  onClick={() => { setCurrentPage("library"); setIsDrawerOpen(false); }}
+                  className={`cursor-pointer hover:text-[#C4482A] transition-colors ${currentPage === "library" ? "text-stone-950 font-black border-b-2 border-stone-900 pb-0.5" : "text-stone-600"}`}
+                >
+                  收藏
+                </button>
+                <div className="flex items-center gap-1 text-stone-700 select-none">
+                  <span>岁币</span>
+                  <span className="font-bold text-[#C4482A]">{toHanNumerals(coins)}</span>
                 </div>
-
-                <button
-                  onClick={() => setCurrentPage("start")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                    currentPage === "start" 
-                      ? "bg-stone-900 text-stone-50" 
-                      : "text-stone-600 hover:bg-stone-100"
-                  }`}
-                >
-                  <Home className="w-3.5 h-3.5" />
-                  <span>{uiTranslate("🏫 练习大厅", isEnglishMode, "练习大厅")}</span>
-                </button>
-                <button
-                  onClick={() => setCurrentPage("library")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                    currentPage === "library" 
-                      ? "bg-stone-900 text-stone-50" 
-                      : "text-stone-600 hover:bg-stone-100"
-                  }`}
-                >
-                  <BookOpen className="w-3.5 h-3.5 text-amber-600" />
-                  <span>{uiTranslate("个人收藏馆", isEnglishMode, "个人收藏馆")}</span>
-                </button>
               </>
-            )}
-            {currentPage === "training" && (
-              <div className="px-3 py-1 bg-amber-50 border border-amber-300 rounded-lg text-xs font-mono font-bold text-amber-700 flex items-center gap-1 animate-pulse">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>{isEnglishMode ? "Deep Practice Active..." : "锁定深度熟化练习中..."}</span>
+            ) : (
+              <div className="px-3 py-1 bg-amber-50 border border-amber-300 rounded text-xs font-mono font-bold text-amber-700 flex items-center gap-1 animate-pulse">
+                <span>锁定深度熟化中...</span>
               </div>
             )}
+
+            <button
+              onClick={() => setIsDrawerOpen(prev => !prev)}
+              className="p-1 text-stone-850 hover:text-[#C4482A] transition-colors text-lg md:text-xl font-bold focus:outline-none cursor-pointer"
+              title="设置与工具"
+            >
+              ☰
+            </button>
           </div>
         </div>
       </header>
+
+      {/* Elegant Wabi-Sabi Slide-Over Drawer */}
+      <AnimatePresence>
+        {isDrawerOpen && (
+          <>
+            {/* Drawer Backdrop overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.4 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsDrawerOpen(false)}
+              className="fixed inset-0 bg-stone-950/40 z-40 cursor-pointer"
+            />
+            
+            {/* Drawer Body */}
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 h-full w-full max-w-md bg-[#F3EFE3] border-l border-stone-300 z-50 p-6 shadow-2xl flex flex-col justify-between overflow-y-auto"
+            >
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b border-stone-300 pb-3">
+                  <h3 className="font-serif font-black text-stone-900 text-lg uppercase tracking-wider">秘藏和风阁设定</h3>
+                  <button 
+                    onClick={() => setIsDrawerOpen(false)}
+                    className="text-stone-400 hover:text-stone-900 text-lg font-black transition-colors cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Sound & Music Group */}
+                <div className="space-y-3">
+                  <h4 className="font-serif font-bold text-stone-800 text-xs uppercase tracking-widest text-[#C4482A]">声乐雅韵 / Audio & BGM</h4>
+                  <div className="flex items-center justify-between p-3 rounded bg-white/50 border border-stone-200">
+                    <span className="text-xs font-serif text-stone-700">主音量开关 (Master Silence)</span>
+                    <button
+                      onClick={() => {
+                        setIsMuted(!isMuted);
+                        audioSynth.playCardSlide();
+                      }}
+                      className={`px-3 py-1 text-xs rounded border transition-all cursor-pointer ${
+                        isMuted 
+                          ? "bg-rose-50 border-rose-300 text-rose-600" 
+                          : "bg-stone-100 border-stone-300 text-stone-800 hover:bg-stone-200"
+                      }`}
+                    >
+                      {isMuted ? "已静音" : "开启"}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded bg-white/50 border border-stone-200">
+                    <span className="text-xs font-serif text-stone-700">禅意背景音乐 (Ambient Zen BGM)</span>
+                    <button
+                      onClick={() => {
+                        setBgmEnabled(!bgmEnabled);
+                        audioSynth.playCardSlide();
+                      }}
+                      className={`px-3 py-1 text-xs rounded border transition-all cursor-pointer ${
+                        bgmEnabled && !isMuted
+                          ? "bg-amber-50 border-amber-300 text-amber-800 animate-pulse" 
+                          : "bg-stone-100 border-stone-300 text-stone-400 hover:bg-stone-200"
+                      }`}
+                    >
+                      {bgmEnabled ? "和乐开启" : "静音"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Companion Mascot Group */}
+                <div className="space-y-3">
+                  <h4 className="font-serif font-bold text-stone-800 text-xs uppercase tracking-widest text-[#C4482A]">契约守护灵 / Mascot Companion</h4>
+                  <div className="flex items-center justify-between p-3 rounded bg-white/50 border border-stone-200">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-serif text-stone-700">召唤守护灵福狸酱</span>
+                      <span className="text-[10px] text-stone-400 font-sans">互动反馈 & 快捷功能</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowMascot(!showMascot);
+                        audioSynth.playCardSlide();
+                      }}
+                      className={`px-3 py-1 text-xs rounded border transition-all cursor-pointer ${
+                        showMascot 
+                          ? "bg-emerald-50 border-emerald-300 text-emerald-800" 
+                          : "bg-stone-100 border-stone-300 text-stone-400 hover:bg-stone-200"
+                      }`}
+                    >
+                      {showMascot ? "福狸在侧" : "藏纳柜中"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Teacher Voice Group */}
+                <div className="space-y-3">
+                  <h4 className="font-serif font-bold text-stone-800 text-xs uppercase tracking-widest text-[#C4482A]">假名导师 / Pronunciation Voice</h4>
+                  <div className="p-3 rounded bg-white/50 border border-stone-200 flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-serif text-stone-700">声优音色</span>
+                      <select
+                        value={voiceType}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setVoiceType(val);
+                          audioSynth.playCardSlide();
+                        }}
+                        className="text-xs font-serif text-stone-800 bg-white border border-stone-300 rounded px-2 py-1 outline-none cursor-pointer"
+                      >
+                        <option value="female">女声导师</option>
+                        <option value="male">男声导师</option>
+                        <option value="child">童声伴读</option>
+                        <option value="alien">外星人声</option>
+                        <option value="elderly">智慧老人</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Narrative Style Group */}
+                <div className="space-y-3">
+                  <h4 className="font-serif font-bold text-stone-800 text-xs uppercase tracking-widest text-[#C4482A]">世界观学术语 / Theme Narrative Style</h4>
+                  <div className="p-3 rounded bg-white/50 border border-stone-200 flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-serif text-stone-700">文风背景</span>
+                      <select
+                        value={narrativeStyle}
+                        onChange={(e) => {
+                          setNarrativeStyle(e.target.value as NarrativeStyle);
+                          audioSynth.playCardSlide();
+                        }}
+                        className="text-xs font-serif text-stone-800 bg-white border border-stone-300 rounded px-2 py-1 outline-none cursor-pointer"
+                      >
+                        <option value="cultural">🏮 人文古风</option>
+                        <option value="mythology">⛩️ 神道传说</option>
+                        <option value="academic">🏫 现代学术</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Online Timer */}
+                <div className="space-y-3">
+                  <h4 className="font-serif font-bold text-stone-800 text-xs uppercase tracking-widest text-[#C4482A]">本次课时计时 / Session Live Duration</h4>
+                  <div className="p-3 rounded bg-white/50 border border-stone-200 flex items-center justify-between">
+                    <span className="text-xs font-serif text-stone-700">当前修行时长</span>
+                    <OnlineTimer isEnglishMode={isEnglishMode} narrativeStyle={narrativeStyle} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Decorative Drawer stamp or footer */}
+              <div className="border-t border-stone-300 pt-4 mt-6 text-center text-[10px] text-stone-400 font-mono">
+                KATAKATA SYSTEM CONFIG PANEL V1.2
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Pages Container with smooth animations */}
       <main className="max-w-4xl mx-auto px-4 py-8">
@@ -781,8 +824,6 @@ export default function App() {
                 practiceMode={practiceMode}
                 setPracticeMode={setPracticeMode}
                 isEnglishMode={isEnglishMode}
-                customCards={customCards}
-                setCustomCards={setCustomCards}
                 narrativeStyle={narrativeStyle}
               />
             </motion.div>
@@ -829,8 +870,6 @@ export default function App() {
                 onGoBack={() => setCurrentPage("start")}
                 onImportData={handleImportData}
                 isEnglishMode={isEnglishMode}
-                customCards={customCards}
-                setCustomCards={setCustomCards}
                 coins={coins}
                 setCoins={setCoins}
                 cardUpgrades={cardUpgrades}
@@ -924,7 +963,7 @@ export default function App() {
       <footer className="text-center text-stone-400 py-6 text-xs font-mono max-w-xl mx-auto space-y-1.5 border-t border-stone-200 select-none">
         <p>©Katakata「カタカタ」五十音集卡练习 2026 EDITION. POWERED BY GOOGLE DEEPMIND GEMINI & REACT.</p>
         <p className="text-[10px] text-stone-300">
-          DESIGNED FOR CLASSICAL JAPANESE ROMAJI LEARNING RETENTION. ALL INTELLECTUALS SECURE.
+          DESIGNED FOR CLASSICAL JAPANESE ROMAJI LEARNING RETENTION. ALL INTELLECTUAL PROPERTY SECURED.
         </p>
       </footer>
     </div>

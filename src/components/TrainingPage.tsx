@@ -513,16 +513,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                   </h3>
                 </div>
 
-                {/* Animated Physical Card Illustration */}
-                <div className="p-1.5 sm:p-2.5 bg-gradient-to-b from-stone-50 to-stone-100/50 rounded-xl sm:rounded-2xl border border-stone-200 shadow-sm relative overflow-hidden flex items-center justify-center">
-                  <div className="absolute inset-0 bg-radial-gradient from-white/80 to-transparent pointer-events-none" />
-                  <CardIllustration
-                    id={item.id}
-                    category={item.category}
-                    className="w-10 h-10 sm:w-14 sm:h-14 pointer-events-none relative z-10 animate-bounce-slow"
-                  />
-                </div>
-
                 {/* Practice Mode Conditional Rendering */}
                 {practiceMode === "handwriting" ? (
                   <div className="w-full space-y-4">
@@ -875,7 +865,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                         setRomajiProgress("");
                         setTimerFinished(false);
                       }}
-                      className="flex-1 py-3 px-4 rounded-xl bg-stone-900 hover:bg-stone-850 text-stone-100 font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-1"
+                      className="flex-1 py-3 px-4 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-100 font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-1"
                     >
                       <RefreshCw className="w-4 h-4" />
                       <span>重新开始</span>
@@ -930,7 +920,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     setEndTime(Date.now() + timeLeftMs);
                     setShowQuitConfirm(false);
                   }}
-                  className="flex-1 py-3 px-4 rounded-xl border border-stone-300 bg-stone-100 hover:bg-stone-205 text-stone-850 font-bold text-xs font-sans transition-all cursor-pointer select-none"
+                  className="flex-1 py-3 px-4 rounded-xl border border-stone-300 bg-stone-100 hover:bg-stone-205 text-stone-800 font-bold text-xs font-sans transition-all cursor-pointer select-none"
                 >
                   🛡️ 留在这里，继续拼写
                 </button>
