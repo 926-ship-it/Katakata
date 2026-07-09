@@ -11,6 +11,7 @@ interface SpellRushPageProps {
   collectedIds: string[];
   onGoBack: () => void;
   isEnglishMode?: boolean;
+  isKatakanaMode?: boolean;
   coins: number;
   setCoins: React.Dispatch<React.SetStateAction<number>>;
   narrativeStyle: NarrativeStyle;
@@ -20,13 +21,14 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
   collectedIds,
   onGoBack,
   isEnglishMode = false,
+  isKatakanaMode = false,
   coins,
   setCoins,
   narrativeStyle,
 }) => {
   const activeDict = React.useMemo(() => {
-    return getDictionary(isEnglishMode);
-  }, [isEnglishMode]);
+    return getDictionary(isEnglishMode, isKatakanaMode);
+  }, [isEnglishMode, isKatakanaMode]);
 
   // Determine game card pool: collected cards if we have at least 6, otherwise fallback to the whole dict
   const gamePool = React.useMemo(() => {

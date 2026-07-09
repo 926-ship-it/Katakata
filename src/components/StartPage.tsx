@@ -12,12 +12,13 @@ interface StartPageProps {
   onGoToLibrary: () => void;
   onGoToSpellRush: () => void;
   onGoToMemoryMatch: () => void;
-  onGoToKanaTraining: () => void;
+  onGoToKanaTraining: (type?: "hiragana" | "katakana" | "both") => void;
   collectedIds: string[];
   practiceTimes: Record<string, number>;
   practiceMode: "typing" | "handwriting";
   setPracticeMode: (mode: "typing" | "handwriting") => void;
   isEnglishMode?: boolean;
+  isKatakanaMode?: boolean;
   narrativeStyle: NarrativeStyle;
 }
 
@@ -32,13 +33,14 @@ export const StartPage: React.FC<StartPageProps> = ({
   practiceMode,
   setPracticeMode,
   isEnglishMode = false,
+  isKatakanaMode = false,
   narrativeStyle,
 }) => {
   const [customCards, setCustomCards] = useState<DictionaryItem[]>([]);
 
   const activeDict = React.useMemo(() => {
-    return getDictionary(isEnglishMode);
-  }, [isEnglishMode]);
+    return getDictionary(isEnglishMode, isKatakanaMode);
+  }, [isEnglishMode, isKatakanaMode]);
 
   const srsSummary = React.useMemo(() => {
     return getReviewSummary(collectedIds);
@@ -527,7 +529,7 @@ export const StartPage: React.FC<StartPageProps> = ({
                 {dueCardIds.length > 0 ? (
                   <button
                     onClick={() => {
-                      const data = getDictionary(isEnglishMode);
+                      const data = getDictionary(isEnglishMode, isKatakanaMode);
                       const dueCards = data.filter(item => dueCardIds.includes(item.id));
                       onStartTraining(dueCards, customTimerMinutes * 60 * 1000);
                     }}
@@ -640,19 +642,32 @@ export const StartPage: React.FC<StartPageProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
           {/* Track 1: 风雅学宫 (Handwriting/typing single character exercise) */}
           <div 
-            onClick={onGoToKanaTraining}
-            className="group cursor-pointer hover:bg-stone-200/20 p-4 border border-transparent hover:border-stone-300 rounded transition-all duration-300 relative select-none"
+            className="group p-4 border border-stone-300/40 hover:border-stone-300 rounded transition-all duration-300 relative select-none bg-stone-50/30"
           >
             <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-300/40 mb-3 font-serif">
               <span className="text-[#C4482A] font-black text-sm">壹</span>
               <span className="text-stone-500 font-bold">熟记</span>
             </div>
-            <h3 className="font-serif font-black text-stone-900 text-lg tracking-wider group-hover:text-[#C4482A] transition-colors">
+            <h3 className="font-serif font-black text-stone-900 text-lg tracking-wider">
               风雅学宫
             </h3>
             <p className="text-xs text-stone-500 font-sans mt-2 tracking-wide leading-relaxed">
-              五十音单字高频练习,巩固地基
+              五十音单字高频练习，巩固地基
             </p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onGoToKanaTraining("hiragana")}
+                className="py-1.5 px-2 rounded border border-stone-300 hover:border-[#C4482A] hover:bg-[#C4482A] hover:text-white transition-all text-[11px] font-serif font-bold text-stone-700 bg-white shadow-xs cursor-pointer text-center"
+              >
+                平假名熟化
+              </button>
+              <button
+                onClick={() => onGoToKanaTraining("katakana")}
+                className="py-1.5 px-2 rounded border border-stone-300 hover:border-amber-600 hover:bg-amber-600 hover:text-white transition-all text-[11px] font-serif font-bold text-stone-700 bg-white shadow-xs cursor-pointer text-center"
+              >
+                片假名训练区
+              </button>
+            </div>
           </div>
 
           {/* Track 2: 时钟疾驰 (Speed run romanization race) */}

@@ -13,6 +13,7 @@ interface CardLibraryPageProps {
   onGoBack: () => void;
   onImportData: (unlockedCards: string[], ptTimes: Record<string, number>, settings?: any, importedCoins?: number, importedUpgrades?: any) => void;
   isEnglishMode?: boolean;
+  isKatakanaMode?: boolean;
   coins?: number;
   setCoins?: React.Dispatch<React.SetStateAction<number>>;
   cardUpgrades?: Record<string, { level: number; exp: number; stars: number }>;
@@ -35,14 +36,15 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
   onGoBack,
   onImportData,
   isEnglishMode = false,
+  isKatakanaMode = false,
   coins = 300,
   setCoins,
   cardUpgrades = {},
   setCardUpgrades,
 }) => {
   const activeDict = React.useMemo(() => {
-    return getDictionary(isEnglishMode);
-  }, [isEnglishMode]);
+    return getDictionary(isEnglishMode, isKatakanaMode);
+  }, [isEnglishMode, isKatakanaMode]);
 
   // Gamified Tabs: Binder (Collection) and Gacha (Summon Shrine)
   const [libraryTab, setLibraryTab] = useState<"binder" | "gacha">("binder");

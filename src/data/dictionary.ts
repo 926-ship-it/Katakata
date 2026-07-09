@@ -2393,33 +2393,55 @@ export const ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
   }
 };
 
-export function getDictionary(isEnglishMode: boolean): DictionaryItem[] {
-  if (!isEnglishMode) {
-    return DICTIONARY;
-  }
-  
-  return DICTIONARY.map(item => {
-    const overlay = ENGLISH_OVERLAYS[item.id];
-    if (!overlay) return item;
-    
-    // Split the English word into segments of individual characters
-    const segments = overlay.word.split("").map((char) => {
-      const isSpace = char === " ";
+export function hiraganaToKatakana(str: string): string {
+  if (!str) return "";
+  return str.replace(/[\u3041-\u3096]/g, (char) => {
+    return String.fromCharCode(char.charCodeAt(0) + 0x60);
+  });
+}
+
+export function getDictionary(isEnglishMode: boolean, isKatakanaMode?: boolean): DictionaryItem[] {
+  if (isEnglishMode) {
+    return DICTIONARY.map(item => {
+      const overlay = ENGLISH_OVERLAYS[item.id];
+      if (!overlay) return item;
+      
+      // Split the English word into segments of individual characters
+      const segments = overlay.word.split("").map((char) => {
+        const isSpace = char === " ";
+        return {
+          kana: char,
+          romaji: isSpace ? [" "] : [char.toLowerCase()],
+          displayRomaji: char,
+        };
+      });
+      
       return {
-        kana: char,
-        romaji: isSpace ? [" "] : [char.toLowerCase()],
-        displayRomaji: char,
+        ...item,
+        kanji: overlay.word,
+        kanaStr: overlay.word,
+        categoryName: overlay.categoryName,
+        meaning: overlay.meaning,
+        segments: segments,
       };
     });
-    
-    return {
-      ...item,
-      kanji: overlay.word,
-      kanaStr: overlay.word,
-      categoryName: overlay.categoryName,
-      meaning: overlay.meaning,
-      segments: segments,
-    };
-  });
+  }
+  
+  if (isKatakanaMode) {
+    return DICTIONARY.map(item => {
+      const convertedKanaStr = hiraganaToKatakana(item.kanaStr);
+      const convertedSegments = item.segments.map(seg => ({
+        ...seg,
+        kana: hiraganaToKatakana(seg.kana),
+      }));
+      return {
+        ...item,
+        kanaStr: convertedKanaStr,
+        segments: convertedSegments,
+      };
+    });
+  }
+  
+  return DICTIONARY;
 }
 

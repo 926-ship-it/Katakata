@@ -101,6 +101,14 @@ export default function App() {
     }
   });
 
+  const [isKatakanaMode, setIsKatakanaMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("fifty_sound_katakana_mode") === "true";
+    } catch (_) {
+      return false;
+    }
+  });
+
   const [narrativeStyle, setNarrativeStyle] = useState<NarrativeStyle>(() => {
     try {
       const val = localStorage.getItem("fifty_sound_narrative_style");
@@ -119,6 +127,7 @@ export default function App() {
   // Selection for active training
   const [activeCards, setActiveCards] = useState<DictionaryItem[]>([]);
   const [activeDurationMs, setActiveDurationMs] = useState<number>(3 * 60 * 1000);
+  const [trainingKanaType, setTrainingKanaType] = useState<"hiragana" | "katakana" | "both">("hiragana");
   
   // Last newly unlocked cards representation for ceremony modal
   const [ceremonyCards, setCeremonyCards] = useState<DictionaryItem[]>([]);
@@ -134,6 +143,14 @@ export default function App() {
       console.warn("localStorage restricted", e);
     }
   }, [isEnglishMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("fifty_sound_katakana_mode", String(isKatakanaMode));
+    } catch (e) {
+      console.warn("localStorage restricted", e);
+    }
+  }, [isKatakanaMode]);
 
   useEffect(() => {
     audioSynth.setMute(isMuted);
@@ -573,37 +590,55 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4 md:gap-6 shrink-0 font-serif text-xs md:text-sm text-stone-700">
-            {/* Premium Mode Segmented Toggle Switch (Highly Visible & Responsive) */}
+            {/* Premium Mode Segmented Toggle Switch (Highly Visible & Responsive 3-Way Mode) */}
             <div className="flex items-center bg-stone-200/60 p-0.5 rounded-full border border-stone-300 shadow-inner select-none">
               <button
                 onClick={() => {
-                  if (!isEnglishMode) return;
                   setIsEnglishMode(false);
+                  setIsKatakanaMode(false);
                   audioSynth.playCardSlide();
                 }}
-                className={`px-2.5 py-1 rounded-full text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
-                  !isEnglishMode
+                className={`px-2 md:px-2.5 py-1 rounded-full text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
+                  !isEnglishMode && !isKatakanaMode
                     ? "bg-[#C4482A] text-white shadow-xs font-black scale-102"
                     : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
                 }`}
+                title="平假名模式"
               >
                 <span>🇯🇵</span>
-                <span className="hidden sm:inline">假名</span>
+                <span className="hidden xs:inline">平假</span>
               </button>
               <button
                 onClick={() => {
-                  if (isEnglishMode) return;
                   setIsEnglishMode(true);
+                  setIsKatakanaMode(false);
                   audioSynth.playCardSlide();
                 }}
-                className={`px-2.5 py-1 rounded-full text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
+                className={`px-2 md:px-2.5 py-1 rounded-full text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
                   isEnglishMode
                     ? "bg-stone-900 text-[#F3EFE3] shadow-xs font-black scale-102"
                     : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
                 }`}
+                title="英文模式"
               >
                 <span>🔤</span>
-                <span className="hidden sm:inline">EN</span>
+                <span className="hidden xs:inline">EN</span>
+              </button>
+              <button
+                onClick={() => {
+                  setIsEnglishMode(false);
+                  setIsKatakanaMode(true);
+                  audioSynth.playCardSlide();
+                }}
+                className={`px-2 md:px-2.5 py-1 rounded-full text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
+                  !isEnglishMode && isKatakanaMode
+                    ? "bg-amber-600 text-white shadow-xs font-black scale-102"
+                    : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
+                }`}
+                title="片假名模式"
+              >
+                <span>⛩️</span>
+                <span className="hidden xs:inline">片假</span>
               </button>
             </div>
 
@@ -818,12 +853,16 @@ export default function App() {
                 onGoToLibrary={() => setCurrentPage("library")}
                 onGoToSpellRush={() => setCurrentPage("spell_rush")}
                 onGoToMemoryMatch={() => setCurrentPage("memory_match")}
-                onGoToKanaTraining={() => setCurrentPage("kana_training")}
+                onGoToKanaTraining={(type) => {
+                  setTrainingKanaType(type || "hiragana");
+                  setCurrentPage("kana_training");
+                }}
                 collectedIds={collectedIds}
                 practiceTimes={practiceTimes}
                 practiceMode={practiceMode}
                 setPracticeMode={setPracticeMode}
                 isEnglishMode={isEnglishMode}
+                isKatakanaMode={isKatakanaMode}
                 narrativeStyle={narrativeStyle}
               />
             </motion.div>
@@ -852,6 +891,7 @@ export default function App() {
                   setActiveCards([]);
                 }}
                 isEnglishMode={isEnglishMode}
+                isKatakanaMode={isKatakanaMode}
               />
             </motion.div>
           )}
@@ -870,6 +910,7 @@ export default function App() {
                 onGoBack={() => setCurrentPage("start")}
                 onImportData={handleImportData}
                 isEnglishMode={isEnglishMode}
+                isKatakanaMode={isKatakanaMode}
                 coins={coins}
                 setCoins={setCoins}
                 cardUpgrades={cardUpgrades}
@@ -902,6 +943,7 @@ export default function App() {
                 collectedIds={collectedIds}
                 onGoBack={() => setCurrentPage("start")}
                 isEnglishMode={isEnglishMode}
+                isKatakanaMode={isKatakanaMode}
                 coins={coins}
                 setCoins={setCoins}
                 narrativeStyle={narrativeStyle}
@@ -921,6 +963,7 @@ export default function App() {
                 collectedIds={collectedIds}
                 onGoBack={() => setCurrentPage("start")}
                 isEnglishMode={isEnglishMode}
+                isKatakanaMode={isKatakanaMode}
                 coins={coins}
                 setCoins={setCoins}
                 narrativeStyle={narrativeStyle}
@@ -941,6 +984,7 @@ export default function App() {
                 narrativeStyle={narrativeStyle}
                 coins={coins}
                 setCoins={setCoins}
+                defaultKanaType={trainingKanaType}
               />
             </motion.div>
           )}

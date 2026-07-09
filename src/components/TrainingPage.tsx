@@ -16,6 +16,7 @@ interface TrainingPageProps {
   practiceMode?: "typing" | "handwriting";
   onKeyStrike?: (action: "correct" | "error" | "complete") => void;
   isEnglishMode?: boolean;
+  isKatakanaMode?: boolean;
 }
 
 export const TrainingPage: React.FC<TrainingPageProps> = ({
@@ -26,6 +27,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   practiceMode = "typing",
   onKeyStrike,
   isEnglishMode = false,
+  isKatakanaMode = false,
 }) => {
   // Loop sequential indices
   const [currentItemIdx, setCurrentItemIdx] = useState<number>(0);

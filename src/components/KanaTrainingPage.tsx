@@ -146,6 +146,7 @@ interface KanaTrainingPageProps {
   narrativeStyle: NarrativeStyle;
   coins: number;
   setCoins: React.Dispatch<React.SetStateAction<number>>;
+  defaultKanaType?: "hiragana" | "katakana" | "both";
 }
 
 export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
@@ -153,9 +154,14 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
   narrativeStyle,
   coins,
   setCoins,
+  defaultKanaType = "hiragana",
 }) => {
   // Config selection states
-  const [kanaType, setKanaType] = useState<"hiragana" | "katakana" | "both">("hiragana");
+  const [kanaType, setKanaType] = useState<"hiragana" | "katakana" | "both">(defaultKanaType);
+
+  useEffect(() => {
+    setKanaType(defaultKanaType);
+  }, [defaultKanaType]);
   const [selectedRows, setSelectedRows] = useState<string[]>(["a"]); // default starts with 'a' row
   const [sessionLength, setSessionLength] = useState<number>(15); // practice pool size (10, 15, 25, 40, all)
   const [showHelper, setShowHelper] = useState<boolean>(true); // show romaji key helper

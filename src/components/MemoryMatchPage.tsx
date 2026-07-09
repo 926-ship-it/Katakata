@@ -10,6 +10,7 @@ interface MemoryMatchPageProps {
   collectedIds: string[];
   onGoBack: () => void;
   isEnglishMode?: boolean;
+  isKatakanaMode?: boolean;
   coins: number;
   setCoins: React.Dispatch<React.SetStateAction<number>>;
   narrativeStyle: NarrativeStyle;
@@ -42,13 +43,14 @@ export const MemoryMatchPage: React.FC<MemoryMatchPageProps> = ({
   collectedIds,
   onGoBack,
   isEnglishMode = false,
+  isKatakanaMode = false,
   coins,
   setCoins,
   narrativeStyle,
 }) => {
   const activeDict = React.useMemo(() => {
-    return getDictionary(isEnglishMode);
-  }, [isEnglishMode]);
+    return getDictionary(isEnglishMode, isKatakanaMode);
+  }, [isEnglishMode, isKatakanaMode]);
 
   // Game States
   const [difficulty, setDifficulty] = useState<"easy" | "hard">("easy"); // easy = 4 pairs (8 cards), hard = 5 pairs (10 cards, never exceeds 5 words)
