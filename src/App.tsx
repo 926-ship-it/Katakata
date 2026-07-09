@@ -581,15 +581,16 @@ export default function App() {
     <div className="min-h-screen bg-paper bg-japanese-pattern text-ink font-sans pb-12 transition-colors">
       {/* Upper Navigation Header */}
       <header className="bg-[#F3EFE3] border-b border-stone-300 sticky top-0 z-40 select-none">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-1 sm:gap-2">
           <div 
             onClick={() => { if (currentPage !== "training") { setCurrentPage("start"); setIsDrawerOpen(false); } }} 
-            className="flex items-center gap-1.5 cursor-pointer shrink-0 font-serif font-black tracking-widest text-stone-900 text-sm md:text-base uppercase"
+            className="flex items-center gap-1 cursor-pointer shrink-0 font-serif font-black tracking-wider sm:tracking-widest text-stone-900 text-xs sm:text-sm md:text-base uppercase"
           >
-            <span>KATAKATA 假名图鉴</span>
+            <span className="hidden sm:inline">KATAKATA </span>
+            <span className="text-[#C4482A]">假名图鉴</span>
           </div>
 
-          <div className="flex items-center gap-4 md:gap-6 shrink-0 font-serif text-xs md:text-sm text-stone-700">
+          <div className="flex items-center gap-1.5 xs:gap-2.5 sm:gap-4 md:gap-6 shrink-0 font-serif text-[11px] sm:text-xs md:text-sm text-stone-700">
             {/* Premium Mode Segmented Toggle Switch (Highly Visible & Responsive 3-Way Mode) */}
             <div className="flex items-center bg-stone-200/60 p-0.5 rounded-full border border-stone-300 shadow-inner select-none">
               <button
@@ -598,7 +599,7 @@ export default function App() {
                   setIsKatakanaMode(false);
                   audioSynth.playCardSlide();
                 }}
-                className={`px-2 md:px-2.5 py-1 rounded-full text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
+                className={`px-1.5 xs:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-0.5 xs:gap-1 ${
                   !isEnglishMode && !isKatakanaMode
                     ? "bg-[#C4482A] text-white shadow-xs font-black scale-102"
                     : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
@@ -614,7 +615,7 @@ export default function App() {
                   setIsKatakanaMode(false);
                   audioSynth.playCardSlide();
                 }}
-                className={`px-2 md:px-2.5 py-1 rounded-full text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
+                className={`px-1.5 xs:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-0.5 xs:gap-1 ${
                   isEnglishMode
                     ? "bg-stone-900 text-[#F3EFE3] shadow-xs font-black scale-102"
                     : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
@@ -630,7 +631,7 @@ export default function App() {
                   setIsKatakanaMode(true);
                   audioSynth.playCardSlide();
                 }}
-                className={`px-2 md:px-2.5 py-1 rounded-full text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
+                className={`px-1.5 xs:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-0.5 xs:gap-1 ${
                   !isEnglishMode && isKatakanaMode
                     ? "bg-amber-600 text-white shadow-xs font-black scale-102"
                     : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
@@ -646,24 +647,25 @@ export default function App() {
               <>
                 <button
                   onClick={() => { setCurrentPage("start"); setIsDrawerOpen(false); }}
-                  className={`cursor-pointer hover:text-[#C4482A] transition-colors ${currentPage === "start" ? "text-stone-950 font-black border-b-2 border-stone-900 pb-0.5" : "text-stone-600"}`}
+                  className={`cursor-pointer hover:text-[#C4482A] transition-colors py-0.5 ${currentPage === "start" ? "text-stone-950 font-black border-b-2 border-stone-900" : "text-stone-600"}`}
                 >
                   练习
                 </button>
                 <button
                   onClick={() => { setCurrentPage("library"); setIsDrawerOpen(false); }}
-                  className={`cursor-pointer hover:text-[#C4482A] transition-colors ${currentPage === "library" ? "text-stone-950 font-black border-b-2 border-stone-900 pb-0.5" : "text-stone-600"}`}
+                  className={`cursor-pointer hover:text-[#C4482A] transition-colors py-0.5 ${currentPage === "library" ? "text-stone-950 font-black border-b-2 border-stone-900" : "text-stone-600"}`}
                 >
                   收藏
                 </button>
-                <div className="flex items-center gap-1 text-stone-700 select-none">
-                  <span>岁币</span>
-                  <span className="font-bold text-[#C4482A]">{toHanNumerals(coins)}</span>
+                <div className="flex items-center gap-0.5 sm:gap-1 text-stone-700 select-none">
+                  <span className="hidden xs:inline">岁币</span>
+                  <span className="xs:hidden">🪙</span>
+                  <span className="font-bold text-[#C4482A] text-xs sm:text-sm">{toHanNumerals(coins)}</span>
                 </div>
               </>
             ) : (
-              <div className="px-3 py-1 bg-amber-50 border border-amber-300 rounded text-xs font-mono font-bold text-amber-700 flex items-center gap-1 animate-pulse">
-                <span>锁定深度熟化中...</span>
+              <div className="px-2 py-0.5 bg-amber-50 border border-amber-300 rounded text-[10px] font-mono font-bold text-amber-700 flex items-center gap-0.5 animate-pulse">
+                <span>锁定熟练中...</span>
               </div>
             )}
 

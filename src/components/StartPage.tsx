@@ -511,6 +511,16 @@ export const StartPage: React.FC<StartPageProps> = ({
               </h1>
             </div>
 
+            {/* Tagline/Subtitle for mobile only */}
+            <div className="md:hidden mt-4 pl-4 flex items-center gap-3 select-none">
+              <span className="px-2 py-0.5 bg-[#C4482A] text-[#F3EFE3] text-[10px] font-serif rounded rotate-[-2deg] shadow-xs shrink-0">
+                秘藏
+              </span>
+              <span className="font-serif text-xs tracking-widest text-stone-850 leading-relaxed">
+                {isEnglishMode ? "和风洋词熟化 · 英文打字图鉴" : "五十音集卡练习 · 打字图鉴"}
+              </span>
+            </div>
+
             {/* Daily Practice Start Button & Custom Settings */}
             <div className="flex flex-col gap-4 pl-4 pt-6 md:pt-8 z-20 relative">
               <div className="flex items-center gap-5 flex-wrap">
@@ -618,7 +628,7 @@ export const StartPage: React.FC<StartPageProps> = ({
           </div>
 
           {/* Right Column: Double Ornament Circle & Vertical texts */}
-          <div className="md:col-span-5 flex items-center justify-center relative min-h-[220px]">
+          <div className="hidden md:flex md:col-span-5 items-center justify-center relative min-h-[220px]">
             {/* Large Concentric circles removed as requested to keep the layout minimal and premium */}
 
             {/* Double columns vertical text running right-to-left replaced with single div */}
