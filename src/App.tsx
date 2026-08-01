@@ -586,8 +586,8 @@ export default function App() {
             onClick={() => { if (currentPage !== "training") { setCurrentPage("start"); setIsDrawerOpen(false); } }} 
             className="flex items-center gap-1 cursor-pointer shrink-0 font-serif font-black tracking-wider sm:tracking-widest text-stone-900 text-xs sm:text-sm md:text-base uppercase"
           >
-            <span className="hidden sm:inline">KATAKATA </span>
-            <span className="text-[#C4482A]">假名图鉴</span>
+            <span className="text-[#C4482A] font-bold">五十音</span>
+            <span className="text-stone-800">图鉴</span>
           </div>
 
           <div className="flex items-center gap-1.5 xs:gap-2.5 sm:gap-4 md:gap-6 shrink-0 font-serif text-[11px] sm:text-xs md:text-sm text-stone-700">
