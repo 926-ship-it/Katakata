@@ -181,6 +181,115 @@ class RetroAudioSynth {
     }
   }
 
+  // Speaks the entire completed word IMMEDIATELY with zero delay, hard-canceling any in-flight syllables
+  speakFullWord(text: string) {
+    if (this.isMuted || !text || text.trim() === "") return;
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    try {
+      // Unpause if suspended
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+
+      // Hard cancel any lingering syllable speech immediately so full word plays instantly!
+      window.speechSynthesis.cancel();
+
+      const cleanText = text.trim();
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      const isEnglish = /^[a-zA-Z\s\.\-\'\,\!\?\(\)]+$/.test(cleanText);
+      utterance.lang = isEnglish ? "en-US" : "ja-JP";
+
+      if (this.voiceType === "male") {
+        utterance.rate = isEnglish ? 0.95 : 0.88;
+        utterance.pitch = isEnglish ? 0.90 : 0.82;
+      } else if (this.voiceType === "child") {
+        utterance.rate = 1.05;
+        utterance.pitch = 1.30;
+      } else if (this.voiceType === "alien") {
+        utterance.rate = 1.35;
+        utterance.pitch = 1.80;
+      } else if (this.voiceType === "elderly") {
+        utterance.rate = 0.75;
+        utterance.pitch = 0.65;
+      } else {
+        utterance.rate = isEnglish ? 0.95 : 0.90;
+        utterance.pitch = isEnglish ? 1.00 : 1.02;
+      }
+
+      const voices = window.speechSynthesis.getVoices();
+      let targetVoice = null;
+      if (isEnglish) {
+        if (this.voiceType === "male" || this.voiceType === "elderly") {
+          targetVoice = voices.find((v) => {
+            const name = v.name.toLowerCase();
+            const lang = v.lang.toLowerCase();
+            return (lang === "en-us" || lang.startsWith("en")) &&
+              (name.includes("male") || name.includes("man") || name.includes("guy") || name.includes("david") || name.includes("mark") || name.includes("daniel"));
+          });
+        } else {
+          targetVoice = voices.find((v) => {
+            const name = v.name.toLowerCase();
+            const lang = v.lang.toLowerCase();
+            return (lang === "en-us" || lang.startsWith("en")) &&
+              (name.includes("female") || name.includes("woman") || name.includes("girl") || name.includes("zira") || name.includes("samantha"));
+          });
+        }
+        if (!targetVoice) {
+          targetVoice = voices.find((v) => v.lang.toLowerCase().startsWith("en"));
+        }
+      } else {
+        if (this.voiceType === "male") {
+          targetVoice = voices.find((v) => {
+            const name = v.name.toLowerCase();
+            const lang = v.lang.toLowerCase();
+            return (lang === "ja-jp" || lang.startsWith("ja")) &&
+              (name.includes("ichiro") || name.includes("otoya") || name.includes("male") || name.includes("man") || name.includes("guy"));
+          });
+        } else if (this.voiceType === "child") {
+          targetVoice = voices.find((v) => {
+            const name = v.name.toLowerCase();
+            const lang = v.lang.toLowerCase();
+            return (lang === "ja-jp" || lang.startsWith("ja")) &&
+              (name.includes("ayumi") || name.includes("haruka") || name.includes("sakura") || name.includes("child"));
+          });
+        } else if (this.voiceType === "elderly") {
+          targetVoice = voices.find((v) => {
+            const name = v.name.toLowerCase();
+            const lang = v.lang.toLowerCase();
+            return (lang === "ja-jp" || lang.startsWith("ja")) &&
+              (name.includes("ichiro") || name.includes("otoya") || name.includes("keiji"));
+          });
+        } else {
+          targetVoice = voices.find((v) => {
+            const name = v.name.toLowerCase();
+            const lang = v.lang.toLowerCase();
+            return (lang === "ja-jp" || lang.startsWith("ja")) &&
+              (name.includes("kyoko") || name.includes("nanami") || name.includes("female") || name.includes("woman") || name.includes("ayumi"));
+          });
+        }
+        if (!targetVoice) {
+          targetVoice = voices.find((v) => v.lang === "ja-JP" || v.lang.toLowerCase().startsWith("ja"));
+        }
+      }
+
+      if (targetVoice) {
+        utterance.voice = targetVoice;
+      }
+
+      this.lastSpeakTime = Date.now();
+
+      // Immediate play - micro delay (8ms) ensures window.speechSynthesis.cancel() cleanly registers in browser engines
+      setTimeout(() => {
+        if (!this.isMuted) {
+          window.speechSynthesis.speak(utterance);
+        }
+      }, 8);
+    } catch (err) {
+      console.warn("Full word speech synthesis failed:", err);
+    }
+  }
+
   // Soft crisp typewriter key click synthesis with wood/metal resonance
   playTyping() {
     if (this.isMuted) return;

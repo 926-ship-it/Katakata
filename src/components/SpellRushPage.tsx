@@ -232,9 +232,6 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
       // Play pitch-rising tone
       playComboTone(newCombo);
 
-      // Speak syllable
-      audioSynth.speakJapanese(segment.kana);
-
       // Reset progress
       setRomajiProgress("");
 
@@ -244,6 +241,9 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
         setScore(prev => prev + 1);
         setPracticedIds(prev => prev.includes(currentCard.id) ? prev : [...prev, currentCard.id]);
         audioSynth.playFanfare();
+
+        // Speak full word immediately with zero delay!
+        audioSynth.speakFullWord(currentCard.kanaStr);
 
         // Trigger dynamic score popup
         const pointsAwarded = 10 + Math.min(10, Math.floor(newCombo / 2));
@@ -255,11 +255,6 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
         };
         setScorePopups(prev => [...prev, newPopup]);
 
-        // Speak full word
-        setTimeout(() => {
-          audioSynth.speakJapanese(currentCard.kanaStr, false);
-        }, 180);
-
         // Fetch next card
         let nextCard = currentCard;
         while (nextCard.id === currentCard.id && gamePool.length > 1) {
@@ -268,6 +263,8 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
         setCurrentCard(nextCard);
         setCurrentSegmentIdx(0);
       } else {
+        // Speak intermediate syllable
+        audioSynth.speakJapanese(segment.kana);
         // Go to next segment
         setCurrentSegmentIdx(prev => prev + 1);
       }

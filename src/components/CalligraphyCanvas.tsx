@@ -353,6 +353,7 @@ export const CalligraphyCanvas: React.FC<CalligraphyCanvasProps> = ({ segments, 
           setGlobalVerdict("pass");
           if (onPassChange) onPassChange(true);
           audioSynth.playFanfare();
+          audioSynth.speakFullWord(segments.map((s) => s.kana).join(""));
         } else {
           setGlobalVerdict("attempted");
           if (onPassChange) onPassChange(false);

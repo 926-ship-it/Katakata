@@ -1,3 +1,6 @@
+import { CELEBRITY_DICTIONARY, CELEBRITY_ENGLISH_OVERLAYS } from "./celebrityData";
+import { KPOP_RIVALRY_DICTIONARY, KPOP_RIVALRY_ENGLISH_OVERLAYS } from "./kpopAndRivalryData";
+
 export interface KanaSegment {
   kana: string;
   romaji: string[]; // List of acceptable romajis, e.g., ["shi", "si"]
@@ -19,7 +22,7 @@ export interface DictionaryItem {
   segments: KanaSegment[];
 }
 
-export const DICTIONARY: DictionaryItem[] = [
+const BASE_DICTIONARY: DictionaryItem[] = [
   {
     id: "sato",
     kanji: "佐藤",
@@ -1879,13 +1882,19 @@ export const DICTIONARY: DictionaryItem[] = [
   }
 ];
 
+export const DICTIONARY: DictionaryItem[] = [
+  ...BASE_DICTIONARY,
+  ...CELEBRITY_DICTIONARY,
+  ...KPOP_RIVALRY_DICTIONARY
+];
+
 export interface EnglishOverlay {
   word: string;
   categoryName: string;
   meaning: string;
 }
 
-export const ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
+const BASE_ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
   sato: {
     word: "Richard",
     categoryName: "西式人名",
@@ -2391,6 +2400,12 @@ export const ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
     categoryName: "文学与民风",
     meaning: "和歌雅致少女。在日本《万叶集》等古乐民风中，对清丽、纯真而富有生机之大和少女的诗意称誉，代表最古朴天然的青春之美。"
   }
+};
+
+export const ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
+  ...BASE_ENGLISH_OVERLAYS,
+  ...CELEBRITY_ENGLISH_OVERLAYS,
+  ...KPOP_RIVALRY_ENGLISH_OVERLAYS
 };
 
 export function hiraganaToKatakana(str: string): string {

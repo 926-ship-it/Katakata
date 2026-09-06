@@ -1,5 +1,8 @@
 // Clean translation system for English mode in Katakata
-export const LANG_MAPPING: Record<string, { title: string; categoryName: string; meaning: string }> = {
+import { CELEBRITY_ENGLISH_OVERLAYS } from "../data/celebrityData";
+import { KPOP_RIVALRY_ENGLISH_OVERLAYS } from "../data/kpopAndRivalryData";
+
+const BASE_LANG_MAPPING: Record<string, { title: string; categoryName: string; meaning: string }> = {
   sato: {
     title: "Sato (Family Name)",
     categoryName: "Japanese Names",
@@ -250,6 +253,23 @@ export const LANG_MAPPING: Record<string, { title: string; categoryName: string;
     categoryName: "Nature & Scenery",
     meaning: "The adorable Shiba Inu dog breed. High-spirited, loyal, and worldwide icon of healing smiles."
   }
+};
+
+const CELEB_MAPPINGS = Object.entries({
+  ...CELEBRITY_ENGLISH_OVERLAYS,
+  ...KPOP_RIVALRY_ENGLISH_OVERLAYS
+}).reduce<Record<string, { title: string; categoryName: string; meaning: string }>>((acc, [k, v]) => {
+  acc[k] = {
+    title: v.word,
+    categoryName: v.categoryName,
+    meaning: v.meaning
+  };
+  return acc;
+}, {});
+
+export const LANG_MAPPING: Record<string, { title: string; categoryName: string; meaning: string }> = {
+  ...BASE_LANG_MAPPING,
+  ...CELEB_MAPPINGS
 };
 
 // UI translation helper

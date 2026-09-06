@@ -210,9 +210,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       setCombo(nextCombo);
       if (nextCombo > maxCombo) setMaxCombo(nextCombo);
 
-      // Speak the individual syllable completed!
-      audioSynth.speakJapanese(segment.kana);
-      
       // Standard XP reward
       triggerXpGain(3, "XP");
       
@@ -220,12 +217,12 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       if (nextCombo >= 5 && nextCombo % 5 === 0) {
         triggerXpGain(Math.floor(nextCombo / 5) * 2, "Combo! 🔥");
       }
-      
+
       setRomajiProgress("");
       
       // Advance segment index or complete whole word
       if (currentSegmentIdx + 1 >= item.segments.length) {
-        // Entire Japanese phrase spelled correctly!
+        // Entire phrase/word spelled correctly!
         setWordCorrect(true);
         audioSynth.playFanfare();
         if (onKeyStrike) onKeyStrike("complete");
@@ -233,12 +230,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         // Reward major word-complete bonus!
         triggerXpGain(10 + item.segments.length * 2, "Word Mastery ✨");
         
-        // Read out the entire name/phrase with a gorgeous micro-delay
-        setTimeout(() => {
-          audioSynth.speakJapanese(item.kanaStr, false);
-        }, 450);
+        // RAPID PRONUNCIATION: Immediately speak the entire word with zero delay!
+        audioSynth.speakFullWord(item.kanaStr);
         
-        // Show calligraphic stroke red tracing overlay for a feedback period, then proceed to next round
+        // Show completion feedback overlay, allowing user to hear full pronunciation before advancing
         setTimeout(() => {
           setCompletedRounds(prev => prev + 1);
           setSlideDirection(1);
@@ -247,8 +242,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
           setCurrentSegmentIdx(0);
           setRomajiProgress("");
           setWordCorrect(false);
-        }, 1200);
+        }, 1350);
       } else {
+        // Speak the individual intermediate syllable completed
+        audioSynth.speakJapanese(segment.kana);
         setCurrentSegmentIdx(currentSegmentIdx + 1);
         if (onKeyStrike) onKeyStrike("correct");
       }
