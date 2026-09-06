@@ -102,34 +102,34 @@ export const StartPage: React.FC<StartPageProps> = ({
   // Kana syllable splitting algorithm for manual addition
   const splitKanaIntoSyllables = (kana: string) => {
     const syllables: { kana: string; romaji: string[]; displayRomaji: string }[] = [];
-    const KANA_MAP: Record<string, string> = {
-      "あ": "a", "い": "i", "う": "u", "え": "e", "お": "o",
-      "か": "ka", "き": "ki", "く": "ku", "け": "ke", "こ": "ko",
-      "さ": "sa", "し": "shi", "す": "su", "せ": "se", "そ": "so",
-      "た": "ta", "ち": "chi", "つ": "tsu", "て": "te", "と": "to",
-      "な": "na", "に": "ni", "ぬ": "nu", "ね": "ne", "の": "no",
-      "は": "ha", "ひ": "hi", "ふ": "fu", "へ": "he", "ほ": "ho",
-      "ま": "ma", "み": "mi", "む": "mu", "め": "me", "も": "mo",
-      "や": "ya", "ゆ": "yu", "よ": "yo",
-      "ら": "ra", "り": "ri", "る": "ru", "れ": "re", "ろ": "ro",
-      "わ": "wa", "を": "wo", "ん": "n",
-      "が": "ga", "ぎ": "gi", "ぐ": "gu", "げ": "ge", "ご": "go",
-      "ざ": "za", "じ": "ji", "ず": "zu", "ぜ": "ze", "ぞ": "zo",
-      "だ": "da", "ぢ": "ji", "づ": "zu", "de": "de", "ど": "do",
-      "ば": "ba", "び": "bi", "ぶ": "bu", "べ": "be", "ぼ": "bo",
-      "ぱ": "pa", "ぴ": "pi", "ぷ": "pu", "ぺ": "pe", "ぽ": "po",
-      "きゃ": "kya", "きゅ": "kyu", "きょ": "kyo",
-      "しゃ": "sha", "しゅ": "shu", "しょ": "sho",
-      "ちゃ": "cha", "ちゅ": "chu", "ちょ": "cho",
-      "にゃ": "nya", "niゅ": "nyu", "にょ": "nyo",
-      "ひゃ": "hya", "ひゅ": "hyu", "ひょ": "hyo",
-      "みゃ": "mya", "みゅ": "myu", "みょ": "myo",
-      "りゃ": "rya", "りゅ": "ryu", "りょ": "ryo",
-      "ぎゃ": "gya", "ぎゅ": "gyu", "ぎょ": "gyo",
-      "じゃ": "ja", "じゅ": "ju", "じょ": "jo",
-      "びゃ": "bya", "びゅ": "byu", "びょ": "byo",
-      "ぴゃ": "pya", "ぴゅ": "pyu", "ぴょ": "pyo",
-      "っ": "t", "ー": "-", " ": " "
+    const KANA_MULTI_MAP: Record<string, string[]> = {
+      "あ": ["a"], "い": ["i"], "う": ["u"], "え": ["e"], "お": ["o"],
+      "か": ["ka"], "き": ["ki"], "く": ["ku"], "け": ["ke"], "こ": ["ko"],
+      "さ": ["sa"], "し": ["shi", "si"], "す": ["su"], "せ": ["se"], "そ": ["so"],
+      "た": ["ta"], "ち": ["chi", "ti"], "つ": ["tsu", "tu"], "て": ["te"], "と": ["to"],
+      "な": ["na"], "に": ["ni"], "ぬ": ["nu"], "ね": ["ne"], "の": ["no"],
+      "は": ["ha", "wa"], "ひ": ["hi"], "ふ": ["fu", "hu"], "へ": ["he"], "ほ": ["ho"],
+      "ま": ["ma"], "み": ["mi"], "む": ["mu"], "め": ["me"], "も": ["mo"],
+      "や": ["ya"], "ゆ": ["yu"], "よ": ["yo"],
+      "ら": ["ra"], "り": ["ri"], "る": ["ru"], "れ": ["re"], "ろ": ["ro"],
+      "わ": ["wa"], "を": ["wo", "o"], "ん": ["n", "nn"],
+      "が": ["ga"], "ぎ": ["gi"], "ぐ": ["gu"], "げ": ["ge"], "ご": ["go"],
+      "ざ": ["za"], "じ": ["ji", "zi"], "ず": ["zu"], "ぜ": ["ze"], "ぞ": ["zo"],
+      "だ": ["da"], "ぢ": ["ji", "di"], "づ": ["zu", "du"], "で": ["de"], "ど": ["do"],
+      "ば": ["ba"], "び": ["bi"], "ぶ": ["bu"], "べ": ["be"], "ぼ": ["bo"],
+      "ぱ": ["pa"], "ぴ": ["pi"], "ぷ": ["pu"], "ぺ": ["pe"], "ぽ": ["po"],
+      "きゃ": ["kya"], "きゅ": ["kyu"], "きょ": ["kyo"],
+      "しゃ": ["sha", "sya"], "しゅ": ["shu", "syu"], "しょ": ["sho", "syo"],
+      "ちゃ": ["cha", "tya"], "ちゅ": ["chu", "tyu"], "ちょ": ["cho", "tyo"],
+      "にゃ": ["nya"], "にゅ": ["nyu"], "にょ": ["nyo"],
+      "ひゃ": ["hya"], "ひゅ": ["hyu"], "ひょ": ["hyo"],
+      "みゃ": ["mya"], "みゅ": ["myu"], "みょ": ["myo"],
+      "りゃ": ["rya"], "りゅ": ["ryu"], "りょ": ["ryo"],
+      "ぎゃ": ["gya"], "ぎゅ": ["gyu"], "ぎょ": ["gyo"],
+      "じゃ": ["ja", "zya"], "じゅ": ["ju", "zyu"], "じょ": ["jo", "zyo"],
+      "びゃ": ["bya"], "びゅ": ["byu"], "びょ": ["byo"],
+      "ぴゃ": ["pya"], "ぴゅ": ["pyu"], "ぴょ": ["pyo"],
+      "っ": ["t", "k", "s", "p"], "ー": ["-"], " ": [" "]
     };
 
     let i = 0;
@@ -140,19 +140,19 @@ export const StartPage: React.FC<StartPageProps> = ({
       
       if (["ゃ", "ゅ", "ょ"].includes(nextChar)) {
         const combined = char + nextChar;
-        const rom = KANA_MAP[combined] || (KANA_MAP[char] ? KANA_MAP[char] + nextChar : combined);
+        const romList = KANA_MULTI_MAP[combined] || [combined];
         syllables.push({
           kana: combined,
-          romaji: [rom],
-          displayRomaji: rom
+          romaji: romList,
+          displayRomaji: romList[0]
         });
         i += 2;
       } else {
-        const rom = KANA_MAP[char] || char;
+        const romList = KANA_MULTI_MAP[char] || [char];
         syllables.push({
           kana: char,
-          romaji: [rom],
-          displayRomaji: rom
+          romaji: romList,
+          displayRomaji: romList[0]
         });
         i += 1;
       }
@@ -268,10 +268,16 @@ export const StartPage: React.FC<StartPageProps> = ({
       const uniqueId = "custom-fulltext-" + Date.now() + "-" + index + "-" + Math.random().toString(36).substr(2, 5);
       
       // Clean punctuation for typing safety, but keep original for display.
-      const cleanLineForTyping = line
-        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'，。？！、；：（）“”‘’【】「」]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+      // In English mode, retain '.', '-', '_', and '\'' so words like "heated.rivalry" or contractions type accurately!
+      const cleanLineForTyping = isEnglishMode
+        ? line
+            .replace(/[,\/#!$%\^&\*;:{}=`~()?"，。？！、；：（）“”‘’【】「」]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+        : line
+            .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'，。？！、；：（）“”‘’【】「」]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
 
       let generatedSegments: { kana: string; romaji: string[]; displayRomaji: string }[] = [];
       

@@ -182,24 +182,44 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
     if (practiceMode === "handwriting") return;
     if (isPaused || timerFinished || wordCorrect) return;
 
-    // Only listen to standard alphabetic keys, space, numbers, hyphen or underscore
-    const isValidKey = /^[a-z0-9]$/.test(key) || key === " " || key === "-" || key === "_";
+    // Normalize full-width or alternative dots / hyphens / quotes from various keyboards & IMEs
+    let normalizedKey = key;
+    if (normalizedKey === "。" || normalizedKey === "·" || normalizedKey === "・") {
+      normalizedKey = ".";
+    }
+    if (normalizedKey === "—" || normalizedKey === "–") {
+      normalizedKey = "-";
+    }
+    if (normalizedKey === "’" || normalizedKey === "‘") {
+      normalizedKey = "'";
+    }
+
+    // Accept alphabetic, numeric, space, and valid punctuation: dot (.), hyphen (-), underscore (_), apostrophe, slash, etc.
+    const isValidKey = /^[a-z0-9]$/.test(normalizedKey) || 
+      normalizedKey === " " || 
+      normalizedKey === "." || 
+      normalizedKey === "-" || 
+      normalizedKey === "_" || 
+      normalizedKey === "'" || 
+      normalizedKey === "," || 
+      normalizedKey === "/" || 
+      normalizedKey === "&";
     if (!isValidKey) return;
 
     // De-duplicate rapid duplicate events (e.g. from keydown + onChange firing together within 30ms)
     const now = Date.now();
     if (lastProcessedKeyRef.current && 
-        lastProcessedKeyRef.current.key === key && 
+        lastProcessedKeyRef.current.key === normalizedKey && 
         now - lastProcessedKeyRef.current.time < 30) {
       return;
     }
-    lastProcessedKeyRef.current = { key, time: now };
+    lastProcessedKeyRef.current = { key: normalizedKey, time: now };
 
-    setPressedKey(key === " " ? "SPACE" : key.toUpperCase());
+    setPressedKey(normalizedKey === " " ? "SPACE" : (normalizedKey === "." ? "." : normalizedKey.toUpperCase()));
     setTimeout(() => setPressedKey(null), 150);
 
     const segment = item.segments[currentSegmentIdx];
-    const proposedString = romajiProgress + key;
+    const proposedString = romajiProgress + normalizedKey;
 
     // Check if proposedString is a prefix match of any acceptable romaji
     const isPrefixOfAny = segment.romaji.some(r => r.startsWith(proposedString));
@@ -309,7 +329,11 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         e.preventDefault();
       }
 
-      const key = e.key === " " ? " " : e.key.toLowerCase();
+      let key = e.key;
+      // Allow dot, punctuation, or lowercase letter
+      if (key !== " " && key !== "." && key !== "-" && key !== "_" && key !== "'" && key !== "。" && key !== "·" && key !== "・") {
+        key = key.toLowerCase();
+      }
       processInputKeyRef.current(key);
     };
 
@@ -343,7 +367,13 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
     // Provide neat prompt of expected correct letter keys to tap
     const currentExpecteds = currentSegment.romaji.map(r => r.substring(romajiProgress.length));
     return isEnglishMode 
-      ? `Press: ${currentExpecteds.map(x => `[${x[0] === " " ? "SPACE" : (x[0] || "").toUpperCase()}]`).join(" or ")}`
+      ? `Press: ${currentExpecteds.map(x => {
+          const char = x[0] || "";
+          if (char === " ") return "[SPACE]";
+          if (char === ".") return "[DOT .]";
+          if (char === "-") return "[HYPHEN -]";
+          return `[${char.toUpperCase()}]`;
+        }).join(" or ")}`
       : `当前假名拼写预期: ${currentExpecteds.map(x => `[${x[0] || ""}]`).join(" 或 ")}`;
   };
 
@@ -708,7 +738,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
               ))}
 
               {isEnglishMode && (
-                <div className="flex justify-center mt-1">
+                <div className="flex justify-center items-center gap-1.5 sm:gap-2 mt-1">
                   <motion.button
                     whileTap={{ scale: 0.95 }}
                     animate={{
@@ -728,6 +758,48 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     }`}
                   >
                     Space
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    animate={{
+                      scale: pressedKey === "." ? 0.95 : 1,
+                      y: pressedKey === "." ? 2 : 0,
+                    }}
+                    onClick={() => {
+                      processInputKey(".");
+                      setTimeout(() => inputRef.current?.focus(), 10);
+                    }}
+                    title="Dot / Period (.)"
+                    className={`w-8 sm:w-10 h-5.5 sm:h-7 flex items-center justify-center rounded text-xs font-mono font-bold transition-all select-none border cursor-pointer ${
+                      pressedKey === "."
+                        ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"
+                        : (!isPaused && !timerFinished && !wordCorrect && currentSegment.romaji.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === "."))
+                        ? "bg-emerald-950 text-emerald-400 border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse"
+                        : "bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-750"
+                    }`}
+                  >
+                    .
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    animate={{
+                      scale: pressedKey === "-" ? 0.95 : 1,
+                      y: pressedKey === "-" ? 2 : 0,
+                    }}
+                    onClick={() => {
+                      processInputKey("-");
+                      setTimeout(() => inputRef.current?.focus(), 10);
+                    }}
+                    title="Hyphen (-)"
+                    className={`w-8 sm:w-10 h-5.5 sm:h-7 flex items-center justify-center rounded text-xs font-mono font-bold transition-all select-none border cursor-pointer ${
+                      pressedKey === "-"
+                        ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"
+                        : (!isPaused && !timerFinished && !wordCorrect && currentSegment.romaji.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === "-"))
+                        ? "bg-emerald-950 text-emerald-400 border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse"
+                        : "bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-750"
+                    }`}
+                  >
+                    -
                   </motion.button>
                 </div>
               )}

@@ -639,7 +639,7 @@ const BASE_DICTIONARY: DictionaryItem[] = [
     borderColor: "border-indigo-400 border-2 shadow-indigo-250",
     bgGradient: "from-indigo-50 to-violet-100",
     segments: [
-      { kana: "は", romaji: ["ha"], displayRomaji: "ha" },
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" },
       { kana: "い", romaji: ["i"], displayRomaji: "i" },
       { kana: "く", romaji: ["ku"], displayRomaji: "ku" }
     ]
@@ -675,7 +675,7 @@ const BASE_DICTIONARY: DictionaryItem[] = [
     borderColor: "border-pink-500 border-2 shadow-pink-550 animate-pulse",
     bgGradient: "from-pink-50 to-indigo-150 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))]",
     segments: [
-      { kana: "は", romaji: ["ha"], displayRomaji: "ha" },
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" },
       { kana: "な", romaji: ["na"], displayRomaji: "na" },
       { kana: "び", romaji: ["bi"], displayRomaji: "bi" }
     ]
@@ -766,7 +766,7 @@ const BASE_DICTIONARY: DictionaryItem[] = [
     bgGradient: "from-zinc-50 to-stone-50",
     segments: [
       { kana: "ご", romaji: ["go"], displayRomaji: "go" },
-      { kana: "は", romaji: ["ha"], displayRomaji: "ha" },
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" },
       { kana: "ん", romaji: ["n"], displayRomaji: "n" }
     ]
   },
@@ -1166,7 +1166,7 @@ const BASE_DICTIONARY: DictionaryItem[] = [
     borderColor: "border-sky-300",
     bgGradient: "from-sky-50 to-blue-50",
     segments: [
-      { kana: "は", romaji: ["ha"], displayRomaji: "ha" },
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" },
       { kana: "る", romaji: ["ru"], displayRomaji: "ru" },
       { kana: "と", romaji: ["to"], displayRomaji: "to" }
     ]
@@ -1760,7 +1760,7 @@ const BASE_DICTIONARY: DictionaryItem[] = [
       { kana: "ん", romaji: ["n"], displayRomaji: "n" },
       { kana: "こ", romaji: ["ko"], displayRomaji: "ko" },
       { kana: "う", romaji: ["u"], displayRomaji: "u" },
-      { kana: "は", romaji: ["ha"], displayRomaji: "ha" },
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" },
       { kana: "な", romaji: ["na"], displayRomaji: "na" },
       { kana: "び", romaji: ["bi"], displayRomaji: "bi" }
     ]

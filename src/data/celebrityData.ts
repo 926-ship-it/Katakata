@@ -76,7 +76,7 @@ export const CELEBRITY_DICTIONARY: DictionaryItem[] = [
     borderColor: "border-purple-400 border-2 shadow-purple-300",
     bgGradient: "from-purple-50 to-violet-100",
     segments: [
-      { kana: "は", romaji: ["ha"], displayRomaji: "ha" },
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" },
       { kana: "し", romaji: ["shi", "si"], displayRomaji: "shi" },
       { kana: "も", romaji: ["mo"], displayRomaji: "mo" },
       { kana: "と", romaji: ["to"], displayRomaji: "to" },
@@ -142,7 +142,7 @@ export const CELEBRITY_DICTIONARY: DictionaryItem[] = [
     segments: [
       { kana: "い", romaji: ["i"], displayRomaji: "i" },
       { kana: "し", romaji: ["shi", "si"], displayRomaji: "shi" },
-      { kana: "は", romaji: ["ha"], displayRomaji: "ha" },
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" },
       { kana: "ら", romaji: ["ra"], displayRomaji: "ra" },
       { kana: "さ", romaji: ["sa"], displayRomaji: "sa" },
       { kana: "と", romaji: ["to"], displayRomaji: "to" },
@@ -206,7 +206,7 @@ export const CELEBRITY_DICTIONARY: DictionaryItem[] = [
     borderColor: "border-amber-500 border-2 shadow-amber-500/80 animate-pulse",
     bgGradient: "from-amber-50 to-yellow-100 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))]",
     segments: [
-      { kana: "は", romaji: ["ha"], displayRomaji: "ha" },
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" },
       { kana: "に", romaji: ["ni"], displayRomaji: "ni" },
       { kana: "ゅ", romaji: ["yu"], displayRomaji: "yu" },
       { kana: "う", romaji: ["u"], displayRomaji: "u" },
@@ -228,7 +228,7 @@ export const CELEBRITY_DICTIONARY: DictionaryItem[] = [
     borderColor: "border-sky-300",
     bgGradient: "from-sky-50 to-indigo-100",
     segments: [
-      { kana: "は", romaji: ["ha"], displayRomaji: "ha" },
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" },
       { kana: "ま", romaji: ["ma"], displayRomaji: "ma" },
       { kana: "べ", romaji: ["be"], displayRomaji: "be" },
       { kana: "み", romaji: ["mi"], displayRomaji: "mi" },
@@ -388,7 +388,7 @@ export const CELEBRITY_DICTIONARY: DictionaryItem[] = [
     borderColor: "border-sky-300",
     bgGradient: "from-sky-50 to-indigo-100",
     segments: [
-      { kana: "は", romaji: ["ha"], displayRomaji: "ha" },
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" },
       { kana: "じ", romaji: ["ji", "zi"], displayRomaji: "ji" },
       { kana: "め", romaji: ["me"], displayRomaji: "me" },
       { kana: "し", romaji: ["shi", "si"], displayRomaji: "shi" },
@@ -655,7 +655,7 @@ export const CELEBRITY_DICTIONARY: DictionaryItem[] = [
       { kana: "あ", romaji: ["a"], displayRomaji: "a" },
       { kana: "や", romaji: ["ya"], displayRomaji: "ya" },
       { kana: "せ", romaji: ["se"], displayRomaji: "se" },
-      { kana: "は", romaji: ["ha"], displayRomaji: "ha" },
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" },
       { kana: "る", romaji: ["ru"], displayRomaji: "ru" },
       { kana: "か", romaji: ["ka"], displayRomaji: "ka" }
     ]
@@ -721,7 +721,7 @@ export const CELEBRITY_DICTIONARY: DictionaryItem[] = [
     segments: [
       { kana: "よ", romaji: ["yo"], displayRomaji: "yo" },
       { kana: "こ", romaji: ["ko"], displayRomaji: "ko" },
-      { kana: "は", romaji: ["ha"], displayRomaji: "ha" },
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" },
       { kana: "ま", romaji: ["ma"], displayRomaji: "ma" },
       { kana: "り", romaji: ["ri"], displayRomaji: "ri" },
       { kana: "ゅ", romaji: ["yu"], displayRomaji: "yu" },
@@ -795,7 +795,7 @@ export const CELEBRITY_DICTIONARY: DictionaryItem[] = [
       { kana: "ま", romaji: ["ma"], displayRomaji: "ma" },
       { kana: "ま", romaji: ["ma"], displayRomaji: "ma" },
       { kana: "さ", romaji: ["sa"], displayRomaji: "sa" },
-      { kana: "は", romaji: ["ha"], displayRomaji: "ha" },
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" },
       { kana: "る", romaji: ["ru"], displayRomaji: "ru" }
     ]
   },

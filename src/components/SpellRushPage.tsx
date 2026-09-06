@@ -104,13 +104,25 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
         return;
       }
 
-      // Otherwise (the input somehow lost focus), we process the a-z typing keys globally
-      const key = e.key;
+      // Otherwise (the input somehow lost focus), we process the typing keys globally
+      let key = e.key;
+      if (key === "。" || key === "·" || key === "・") key = ".";
+      if (key === "—" || key === "–") key = "-";
+      if (key === "’" || key === "‘") key = "'";
+
       const lowerKey = key.toLowerCase();
-      const isValidKey = /^[a-z0-9]$/.test(lowerKey) || lowerKey === "-" || lowerKey === "_";
+      const isValidKey = /^[a-z0-9]$/.test(lowerKey) || 
+        lowerKey === " " || 
+        lowerKey === "." || 
+        lowerKey === "-" || 
+        lowerKey === "_" || 
+        lowerKey === "'" || 
+        lowerKey === "," || 
+        lowerKey === "/" || 
+        lowerKey === "&";
       
       if (isValidKey) {
-        handleTypewriterInput(key);
+        handleTypewriterInput(lowerKey);
       }
     };
 
@@ -204,8 +216,20 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
   const handleTypewriterInput = (key: string) => {
     if (gameState !== "playing" || !currentCard || isWordPronouncing) return;
 
-    const lowerKey = key.toLowerCase();
-    const isValidKey = /^[a-z0-9]$/.test(lowerKey) || lowerKey === " " || lowerKey === "-" || lowerKey === "_";
+    let lowerKey = key.toLowerCase();
+    if (lowerKey === "。" || lowerKey === "·" || lowerKey === "・") lowerKey = ".";
+    if (lowerKey === "—" || lowerKey === "–") lowerKey = "-";
+    if (lowerKey === "’" || lowerKey === "‘") lowerKey = "'";
+
+    const isValidKey = /^[a-z0-9]$/.test(lowerKey) || 
+      lowerKey === " " || 
+      lowerKey === "." || 
+      lowerKey === "-" || 
+      lowerKey === "_" || 
+      lowerKey === "'" || 
+      lowerKey === "," || 
+      lowerKey === "/" || 
+      lowerKey === "&";
     if (!isValidKey) return;
 
     // Throttle duplicate keystrokes

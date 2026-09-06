@@ -46,10 +46,10 @@ const KANA_DATASET: KanaItem[] = [
   { hiragana: "ね", katakana: "ネ", romaji: "ne", row: "na", rowName: "な行" },
   { hiragana: "の", katakana: "ノ", romaji: "no", row: "na", rowName: "な行" },
   // は行 (Ha)
-  { hiragana: "は", katakana: "ハ", romaji: "ha", row: "ha", rowName: "は行" },
+  { hiragana: "は", katakana: "ハ", romaji: "ha", alternatives: ["wa"], row: "ha", rowName: "は行" },
   { hiragana: "ひ", katakana: "ヒ", romaji: "hi", row: "ha", rowName: "は行" },
   { hiragana: "ふ", katakana: "フ", romaji: "fu", alternatives: ["hu"], row: "ha", rowName: "は行" },
-  { hiragana: "へ", katakana: "ヘ", romaji: "he", row: "ha", rowName: "は行" },
+  { hiragana: "へ", katakana: "ヘ", romaji: "he", alternatives: ["e"], row: "ha", rowName: "は行" },
   { hiragana: "ほ", katakana: "ホ", romaji: "ho", row: "ha", rowName: "は行" },
   // ま行 (Ma)
   { hiragana: "ま", katakana: "マ", romaji: "ma", row: "ma", rowName: "ま行" },
@@ -86,7 +86,6 @@ const KANA_DATASET: KanaItem[] = [
   { hiragana: "だ", katakana: "ダ", romaji: "da", row: "voiced", rowName: "浊音/半浊" },
   { hiragana: "ぢ", katakana: "ヂ", romaji: "ji", alternatives: ["di"], row: "voiced", rowName: "浊音/半浊" },
   { hiragana: "づ", katakana: "ヅ", romaji: "zu", alternatives: ["du"], row: "voiced", rowName: "浊音/半浊" },
-  { hiragana: "de", katakana: "デ", romaji: "de", row: "voiced", rowName: "浊音/半浊" }, // Wait, correct hiragana for で is で
   { hiragana: "で", katakana: "デ", romaji: "de", row: "voiced", rowName: "浊音/半浊" },
   { hiragana: "ど", katakana: "ド", romaji: "do", row: "voiced", rowName: "浊音/半浊" },
   { hiragana: "ば", katakana: "バ", romaji: "ba", row: "voiced", rowName: "浊音/半浊" },
@@ -113,7 +112,6 @@ const KANA_DATASET: KanaItem[] = [
   { hiragana: "にゃ", katakana: "ニャ", romaji: "nya", row: "contracted", rowName: "拗音" },
   { hiragana: "にゅ", katakana: "ニュ", romaji: "nyu", row: "contracted", rowName: "拗音" },
   { hiragana: "にょ", katakana: "ニョ", romaji: "nyo", row: "contracted", rowName: "拗音" },
-  { hiragana: "ひゃ", katakana: "ヒゃ", romaji: "hya", row: "contracted", rowName: "拗音" }, // Correct katakana for ひゃ is ヒャ
   { hiragana: "ひゃ", katakana: "ヒャ", romaji: "hya", row: "contracted", rowName: "拗音" },
   { hiragana: "ひゅ", katakana: "ヒュ", romaji: "hyu", row: "contracted", rowName: "拗音" },
   { hiragana: "ひょ", katakana: "ヒョ", romaji: "hyo", row: "contracted", rowName: "拗音" },
@@ -135,7 +133,7 @@ const ROW_GROUPS = [
   { id: "ha", label: "は行 (ha, hi, fu, he, ho)" },
   { id: "ma", label: "ま行 (ma, mi, mu, me, mo)" },
   { id: "ya", label: "や行 (ya, yu, yo)" },
-  { id: "ra", label: "ら行 (ra, ri, ru, re, r0)" },
+  { id: "ra", label: "ら行 (ra, ri, ru, re, ro)" },
   { id: "wa", label: "わ行 (wa, wo, n)" },
   { id: "voiced", label: "浊音/半浊 (ga, za, ba, pa...)" },
   { id: "contracted", label: "拗音 (kya, sha, cha...)" },

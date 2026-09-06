@@ -69,7 +69,7 @@ export const KPOP_RIVALRY_DICTIONARY: DictionaryItem[] = [
     kanaStr: "みやわきさくら",
     category: "name",
     categoryName: "K-POP偶像",
-    meaning: "LE SSERAFIM成员‘Sakura’（小樱花/宫胁咲良）。从HKT48、AKB48、IZ*ONE至LE SSERAFIM三次传奇出道，坚韧不拔的现象级全球偶像。",
+    meaning: "LE SSERAFIM成员‘Sakura’（小樱花/宫胁咲良）。从HKT48、AKB48、IZ*ONE至LE SSERAFIM三次传奇出道，坚韧不拔的现象级全球偶像。（假名：みやわきさくら，注：‘脇’读作 wa）。",
     rarity: "SSR",
     rarityName: "神珍 (SSR)",
     glowColor: "rgba(217, 119, 6, 0.6)",
@@ -91,7 +91,7 @@ export const KPOP_RIVALRY_DICTIONARY: DictionaryItem[] = [
     kanaStr: "なかむらかずは",
     category: "name",
     categoryName: "K-POP偶像",
-    meaning: "LE SSERAFIM成员‘Kazuha’（中村一叶）。曾于荷兰国立芭蕾舞学院深造，以端庄清丽的古典神颜与惊人核心力量圈粉无数。",
+    meaning: "LE SSERAFIM成员‘Kazuha’（中村一叶）。曾于荷兰国立芭蕾舞学院深造，以端庄清丽的古典神颜与惊人核心力量圈粉无数。（假名：なかむらかずは，注：‘葉’读作 ha，打字兼容 ha / wa 均可正确识别）。",
     rarity: "SR",
     rarityName: "卓越 (SR)",
     glowColor: "rgba(168, 85, 247, 0.4)",
@@ -104,7 +104,7 @@ export const KPOP_RIVALRY_DICTIONARY: DictionaryItem[] = [
       { kana: "ら", romaji: ["ra"], displayRomaji: "ra" },
       { kana: "か", romaji: ["ka"], displayRomaji: "ka" },
       { kana: "ず", romaji: ["zu", "du"], displayRomaji: "zu" },
-      { kana: "は", romaji: ["ha"], displayRomaji: "ha" }
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" }
     ]
   },
   {
@@ -299,6 +299,50 @@ export const KPOP_RIVALRY_DICTIONARY: DictionaryItem[] = [
       { kana: "し", romaji: ["shi", "si"], displayRomaji: "shi" },
       { kana: "ろ", romaji: ["ro"], displayRomaji: "ro" }
     ]
+  },
+  {
+    id: "watanabe_haruto",
+    kanji: "渡辺温斗",
+    kanaStr: "わたなべはると",
+    category: "name",
+    categoryName: "K-POP偶像",
+    meaning: "TREASURE日本籍主Rapper‘Haruto’（渡边温斗）。低音炮魅力十足，生于福冈。姓氏‘渡辺’首音为 wa，名字‘温斗’首音为 ha，是精准区分与掌握 wa 和 ha 的完美代表！（假名：わたなべはると，注：‘渡’读 wa，‘温’读 ha，打字兼容 ha/wa）。",
+    rarity: "SR",
+    rarityName: "卓越 (SR)",
+    glowColor: "rgba(168, 85, 247, 0.4)",
+    borderColor: "border-purple-400 border-2 shadow-purple-300",
+    bgGradient: "from-purple-50 to-violet-100",
+    segments: [
+      { kana: "わ", romaji: ["wa"], displayRomaji: "wa" },
+      { kana: "た", romaji: ["ta"], displayRomaji: "ta" },
+      { kana: "な", romaji: ["na"], displayRomaji: "na" },
+      { kana: "べ", romaji: ["be"], displayRomaji: "be" },
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" },
+      { kana: "る", romaji: ["ru"], displayRomaji: "ru" },
+      { kana: "と", romaji: ["to"], displayRomaji: "to" }
+    ]
+  },
+  {
+    id: "hokazono_iroha",
+    kanji: "外園いろは",
+    kanaStr: "ほかぞのいろは",
+    category: "name",
+    categoryName: "K-POP偶像",
+    meaning: "ILLIT日本籍成员‘Iroha’（外薗彩羽/外园伊吕波）。曾为JYP练习生，自幼习舞、律动绝佳的忙内主舞。（假名：ほかぞのいろは，注：名字末尾‘は’读 ha，打字兼容 ha / wa 均可通过）。",
+    rarity: "SR",
+    rarityName: "卓越 (SR)",
+    glowColor: "rgba(168, 85, 247, 0.4)",
+    borderColor: "border-purple-400 border-2 shadow-purple-300",
+    bgGradient: "from-purple-50 to-violet-100",
+    segments: [
+      { kana: "ほ", romaji: ["ho"], displayRomaji: "ho" },
+      { kana: "か", romaji: ["ka"], displayRomaji: "ka" },
+      { kana: "ぞ", romaji: ["zo"], displayRomaji: "zo" },
+      { kana: "の", romaji: ["no"], displayRomaji: "no" },
+      { kana: "い", romaji: ["i"], displayRomaji: "i" },
+      { kana: "ろ", romaji: ["ro"], displayRomaji: "ro" },
+      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" }
+    ]
   }
 ];
 
@@ -369,8 +413,18 @@ export const KPOP_RIVALRY_ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
     meaning: "百年杯。冰球职业大联盟终极至尊冠军奖杯，Shane Hollander与Ilya Rozanov一生竞逐与彼此证明的荣耀丰碑。"
   },
   sakamoto_mashiro: {
-    word: "Game Changers",
+    word: "Game.Changers",
     categoryName: "Heated Rivalry",
-    meaning: "《改写局势》（Game Changers）。Rachel Reid构筑的冰球浪漫史诗系列全集，铭刻冰面上的热血冲撞与灵魂相契的深情羁绊。"
+    meaning: "《改写局势》（Game.Changers）。Rachel Reid构筑的冰球浪漫史诗系列全集，带点号（.）经典书名拼写。"
+  },
+  watanabe_haruto: {
+    word: "heated.rivalry",
+    categoryName: "Heated Rivalry",
+    meaning: "《Heated Rivalry》（宿敌烈焰）带点号（.）核心主题拼写！支持英文点号（.）输入，完美练习标点键盘联动。"
+  },
+  hokazono_iroha: {
+    word: "Shane.H & Ilya.R",
+    categoryName: "Heated Rivalry",
+    meaning: "肖恩与伊利亚（Shane.H & Ilya.R）。宿敌双子星缩写拼写，包含点号（.）、连字符及空格。"
   }
 };
