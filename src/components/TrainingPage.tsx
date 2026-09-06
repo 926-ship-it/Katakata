@@ -259,7 +259,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         // RAPID PRONUNCIATION: Immediately speak the entire word with zero delay!
         // CRITICAL REQUIREMENT: Do NOT advance to next word until pronunciation has completely finished!
         audioSynth.speakFullWord(item.kanaStr, () => {
-          // Reading finished! Micro-pause (250ms) for natural acoustics, then advance to next word
+          // Reading finished! Crisp micro-pause (120ms) for natural acoustics, then advance to next word
           setTimeout(() => {
             setIsPronouncing(false);
             setCompletedRounds(prev => prev + 1);
@@ -269,11 +269,11 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
             setCurrentSegmentIdx(0);
             setRomajiProgress("");
             setWordCorrect(false);
-          }, 250);
+          }, 120);
         });
       } else {
-        // Speak the individual intermediate syllable completed
-        audioSynth.speakJapanese(segment.kana);
+        // Speak the individual intermediate syllable completed INSTANTLY
+        audioSynth.speakKanaInstant(segment.kana);
         setCurrentSegmentIdx(currentSegmentIdx + 1);
         if (onKeyStrike) onKeyStrike("correct");
       }

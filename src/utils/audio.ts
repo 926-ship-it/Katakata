@@ -44,22 +44,43 @@ class RetroAudioSynth {
     return this.voiceType;
   }
 
+  // Speaks an individual kana or syllable instantly with zero lag and optimized brisk rate
+  speakKanaInstant(text: string) {
+    if (this.isMuted || !text || text.trim() === "") return;
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      try {
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+        window.speechSynthesis.cancel();
+
+        const cleanText = text.trim();
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        const isEnglish = /^[a-zA-Z\s\.\-\'\,\!\?\(\)]+$/.test(cleanText);
+        utterance.lang = isEnglish ? "en-US" : "ja-JP";
+        utterance.rate = isEnglish ? 1.05 : 1.15; // Snappy, crisp and agile response
+        utterance.pitch = this.voiceType === "male" ? 0.85 : (this.voiceType === "child" ? 1.35 : 1.05);
+
+        const voices = window.speechSynthesis.getVoices();
+        const targetVoice = voices.find((v) => {
+          const lang = v.lang.toLowerCase();
+          return isEnglish ? (lang === "en-us" || lang.startsWith("en")) : (lang === "ja-jp" || lang.startsWith("ja"));
+        });
+        if (targetVoice) {
+          utterance.voice = targetVoice;
+        }
+
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn("Instant kana speech synthesis failed:", err);
+      }
+    }
+  }
+
   // Speaks Japanese syllable or full word using SpeechSynthesis API (with automatic English detection for English Mode)
   speakJapanese(text: string, cancelActive: boolean = true) {
     if (this.isMuted || !text || text.trim() === "") return;
-    
-    // Intelligent Speed Typing Voice Protection:
-    // If the user is typing extremely fast (e.g. interval between syllable completed is less than 350ms),
-    // and this is an individual syllable (cancelActive is true and length is small), we skip speaking
-    // the intermediate syllable. This prevents the browser's TTS system from lagging or clogging up,
-    // keeping the typewriter sound 100% crispy, and then playing the final complete word perfectly at the end!
-    const now = Date.now();
-    const isShortSyllable = text.length <= 3;
-    if (cancelActive && isShortSyllable && (now - this.lastSpeakTime < 380)) {
-      this.lastSpeakTime = now;
-      return;
-    }
-    this.lastSpeakTime = now;
+    this.lastSpeakTime = Date.now();
 
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       try {
@@ -73,20 +94,20 @@ class RetroAudioSynth {
         
         // Custom pitch/rate based on selected speaker gender/type
         if (this.voiceType === "male") {
-          utterance.rate = isEnglish ? 0.90 : 0.80; // slightly slower, authoritative cadence
-          utterance.pitch = isEnglish ? 0.90 : 0.76; // deeper masculine register
+          utterance.rate = isEnglish ? 1.00 : 1.05; // clear, authoritative cadence
+          utterance.pitch = isEnglish ? 0.90 : 0.82; // deeper masculine register
         } else if (this.voiceType === "child") {
-          utterance.rate = 1.05; // bouncy and energetic
-          utterance.pitch = 1.42; // high-pitched cute anime guide
+          utterance.rate = 1.15; // bouncy and energetic
+          utterance.pitch = 1.38; // high-pitched cute anime guide
         } else if (this.voiceType === "alien") {
           utterance.rate = 1.45; // ultra-fast cyber alien
           utterance.pitch = 1.95; // maximum high pitch electronic squeal
         } else if (this.voiceType === "elderly") {
-          utterance.rate = 0.60; // very slow, wise grandpa pace
-          utterance.pitch = 0.55; // deep, weathered hoarse quality
+          utterance.rate = 0.85; // steady wise grandpa pace
+          utterance.pitch = 0.65; // deep, weathered hoarse quality
         } else {
           // female (default)
-          utterance.rate = isEnglish ? 0.95 : 0.88; // gentle, elegant instructional pace
+          utterance.rate = isEnglish ? 1.05 : 1.12; // snappy, crisp, immediate feedback
           utterance.pitch = isEnglish ? 1.00 : 1.05; // bright, high contrast clarity
         }
 
@@ -215,19 +236,19 @@ class RetroAudioSynth {
       utterance.lang = isEnglish ? "en-US" : "ja-JP";
 
       if (this.voiceType === "male") {
-        utterance.rate = isEnglish ? 0.95 : 0.88;
+        utterance.rate = isEnglish ? 1.02 : 1.05;
         utterance.pitch = isEnglish ? 0.90 : 0.82;
       } else if (this.voiceType === "child") {
-        utterance.rate = 1.05;
+        utterance.rate = 1.15;
         utterance.pitch = 1.30;
       } else if (this.voiceType === "alien") {
         utterance.rate = 1.35;
         utterance.pitch = 1.80;
       } else if (this.voiceType === "elderly") {
-        utterance.rate = 0.75;
+        utterance.rate = 0.85;
         utterance.pitch = 0.65;
       } else {
-        utterance.rate = isEnglish ? 0.95 : 0.90;
+        utterance.rate = isEnglish ? 1.05 : 1.10;
         utterance.pitch = isEnglish ? 1.00 : 1.02;
       }
 

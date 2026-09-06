@@ -261,10 +261,8 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
     setStartTime(Date.now());
 
     // Promptly speak its kana sound!
-    setTimeout(() => {
-      const activeKana = kanaType === "katakana" ? first.katakana : first.hiragana;
-      audioSynth.speakJapanese(activeKana);
-    }, 150);
+    const activeKana = kanaType === "katakana" ? first.katakana : first.hiragana;
+    audioSynth.speakKanaInstant(activeKana);
   };
 
   // Auto focus input
@@ -289,6 +287,10 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
     const isPrefixOfAlts = currentItem.alternatives?.some(alt => alt.startsWith(potentialRomaji));
 
     if (isMatchExact) {
+      // 1. Instantly speak the completed kana with 0ms delay!
+      const completedKana = currentType === "katakana" ? currentItem.katakana : currentItem.hiragana;
+      audioSynth.speakKanaInstant(completedKana);
+
       // Correct Match Completed!
       setCorrectCount(prev => prev + 1);
       setCombo(prev => {
@@ -314,12 +316,6 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
         } else {
           setCurrentType(kanaType);
         }
-
-        // Voice pronunciation immediately
-        setTimeout(() => {
-          const currentText = currentType === "katakana" ? nextItem.katakana : nextItem.hiragana;
-          audioSynth.speakJapanese(currentText);
-        }, 120);
       } else {
         // Round Finished!
         setElapsedTimeMs(Date.now() - startTime);
@@ -345,7 +341,7 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
       
       // Voice guidance to remind them
       const currentText = currentType === "katakana" ? currentItem.katakana : currentItem.hiragana;
-      audioSynth.speakJapanese(currentText);
+      audioSynth.speakKanaInstant(currentText);
     }
   };
 
@@ -640,7 +636,7 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
                 <button
                   onClick={() => {
                     const activeText = currentType === "katakana" ? currentItem.katakana : currentItem.hiragana;
-                    audioSynth.speakJapanese(activeText);
+                    audioSynth.speakKanaInstant(activeText);
                   }}
                   className="p-1.5 rounded-full bg-stone-100 border border-stone-250 hover:bg-stone-200 transition-all text-stone-700 cursor-pointer shadow-sm active:scale-95"
                   title="Speak"
