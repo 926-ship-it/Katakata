@@ -6,6 +6,7 @@ class RetroAudioSynth {
   private isMuted: boolean = false;
   private voiceType: string = "female"; // "female" | "male" | "child"
   private lastSpeakTime: number = 0;
+  private activeFullWordUtterance: SpeechSynthesisUtterance | null = null;
 
   private bgmInterval: any = null;
   private droneOsc1: OscillatorNode | null = null;
@@ -181,13 +182,24 @@ class RetroAudioSynth {
     }
   }
 
-  // Speaks the entire completed word IMMEDIATELY with zero delay, hard-canceling any in-flight syllables
-  speakFullWord(text: string) {
-    if (this.isMuted || !text || text.trim() === "") return;
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  // Speaks the entire completed word IMMEDIATELY with zero delay, hard-canceling any in-flight syllables.
+  // Invokes onEnd when the pronunciation has finished playing so the UI does not advance prematurely!
+  speakFullWord(text: string, onEnd?: () => void) {
+    if (!text || text.trim() === "") {
+      if (onEnd) onEnd();
+      return;
+    }
+
+    if (this.isMuted || typeof window === "undefined" || !("speechSynthesis" in window)) {
+      if (onEnd) {
+        // When muted or unsupported, provide a natural 600ms grace window before advancing
+        setTimeout(() => onEnd(), 600);
+      }
+      return;
+    }
 
     try {
-      // Unpause if suspended
+      // Unpause if suspended by browser auto-play/inactivity policies
       if (window.speechSynthesis.paused) {
         window.speechSynthesis.resume();
       }
@@ -197,6 +209,8 @@ class RetroAudioSynth {
 
       const cleanText = text.trim();
       const utterance = new SpeechSynthesisUtterance(cleanText);
+      this.activeFullWordUtterance = utterance; // Prevent garbage collection in V8/WebKit engines
+      
       const isEnglish = /^[a-zA-Z\s\.\-\'\,\!\?\(\)]+$/.test(cleanText);
       utterance.lang = isEnglish ? "en-US" : "ja-JP";
 
@@ -279,14 +293,46 @@ class RetroAudioSynth {
 
       this.lastSpeakTime = Date.now();
 
-      // Immediate play - micro delay (8ms) ensures window.speechSynthesis.cancel() cleanly registers in browser engines
+      let hasTriggered = false;
+      let safetyWatchdog: any = null;
+
+      const triggerCompletion = () => {
+        if (hasTriggered) return;
+        hasTriggered = true;
+        if (safetyWatchdog) clearTimeout(safetyWatchdog);
+        this.activeFullWordUtterance = null;
+        if (onEnd) {
+          onEnd();
+        }
+      };
+
+      utterance.onend = () => {
+        triggerCompletion();
+      };
+
+      utterance.onerror = (e) => {
+        console.warn("Full word speech synthesis error/interrupted:", e);
+        triggerCompletion();
+      };
+
+      // Safety watchdog: ensure callback is always reached even if browser drops onend
+      // Calculates based on length: 450ms per character + 1200ms minimum window
+      const maxEstimatedMs = Math.min(8000, Math.max(1400, cleanText.length * 450 + 1200));
+      safetyWatchdog = setTimeout(() => {
+        triggerCompletion();
+      }, maxEstimatedMs);
+
+      // Immediate play - micro delay (8ms) ensures preceding window.speechSynthesis.cancel() cleanly finishes
       setTimeout(() => {
         if (!this.isMuted) {
           window.speechSynthesis.speak(utterance);
+        } else {
+          triggerCompletion();
         }
       }, 8);
     } catch (err) {
       console.warn("Full word speech synthesis failed:", err);
+      if (onEnd) onEnd();
     }
   }
 

@@ -55,6 +55,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   const [currentSegmentIdx, setCurrentSegmentIdx] = useState<number>(0);
   const [romajiProgress, setRomajiProgress] = useState<string>("");
   const [wordCorrect, setWordCorrect] = useState<boolean>(false); // Triggers final word completion "描红" trace view
+  const [isPronouncing, setIsPronouncing] = useState<boolean>(false); // Tracks whether full word audio is currently playing
   const [errorFlash, setErrorFlash] = useState<boolean>(false);
   const [handwritingPassed, setHandwritingPassed] = useState<boolean>(false);
 
@@ -228,6 +229,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       if (currentSegmentIdx + 1 >= item.segments.length) {
         // Entire phrase/word spelled correctly!
         setWordCorrect(true);
+        setIsPronouncing(true);
         audioSynth.playFanfare();
         if (onKeyStrike) onKeyStrike("complete");
 
@@ -235,18 +237,20 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         triggerXpGain(10 + item.segments.length * 2, "Word Mastery ✨");
         
         // RAPID PRONUNCIATION: Immediately speak the entire word with zero delay!
-        audioSynth.speakFullWord(item.kanaStr);
-        
-        // Show completion feedback overlay, allowing user to hear full pronunciation before advancing
-        setTimeout(() => {
-          setCompletedRounds(prev => prev + 1);
-          setSlideDirection(1);
-          audioSynth.playCarriageReturn();
-          setCurrentItemIdx((prevIdx) => (prevIdx + 1) % items.length);
-          setCurrentSegmentIdx(0);
-          setRomajiProgress("");
-          setWordCorrect(false);
-        }, 1350);
+        // CRITICAL REQUIREMENT: Do NOT advance to next word until pronunciation has completely finished!
+        audioSynth.speakFullWord(item.kanaStr, () => {
+          // Reading finished! Micro-pause (250ms) for natural acoustics, then advance to next word
+          setTimeout(() => {
+            setIsPronouncing(false);
+            setCompletedRounds(prev => prev + 1);
+            setSlideDirection(1);
+            audioSynth.playCarriageReturn();
+            setCurrentItemIdx((prevIdx) => (prevIdx + 1) % items.length);
+            setCurrentSegmentIdx(0);
+            setRomajiProgress("");
+            setWordCorrect(false);
+          }, 250);
+        });
       } else {
         // Speak the individual intermediate syllable completed
         audioSynth.speakJapanese(segment.kana);
@@ -327,8 +331,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
   // Helper to determine active alphabet guidelines
   const getExpectedPrefixHelp = () => {
-    if (wordCorrect) {
-      return isEnglishMode ? "All spelled correctly!" : "全部拼对，正在进行假名描红！";
+    if (wordCorrect || isPronouncing) {
+      return isEnglishMode 
+        ? "🔊 Spelling Complete! Reading full word pronunciation (auto-advancing after reading)..." 
+        : "🔊 全部拼写正确！正在朗读完整词汇读音（朗读完毕后自动切换下一词）...";
     }
     if (isPaused) {
       return isEnglishMode ? "Practice paused. Press Space or [Resume] to continue." : "训练暂停中，按下 [暂停/继续] 或空格继续";
@@ -470,7 +476,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
           {/* Slide Left Button */}
           <button
             onClick={() => {
-              if (items.length <= 1) return;
+              if (items.length <= 1 || isPronouncing || wordCorrect) return;
               setSlideDirection(-1);
               audioSynth.playCarriageReturn();
               setCurrentItemIdx((prev) => (prev - 1 + items.length) % items.length);
@@ -478,9 +484,9 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
               setRomajiProgress("");
               setWordCorrect(false);
             }}
-            disabled={items.length <= 1}
+            disabled={items.length <= 1 || isPronouncing || wordCorrect}
             className={`p-2.5 rounded-full border border-stone-300 bg-white text-stone-600 transition-all z-10 ${
-              items.length <= 1
+              items.length <= 1 || isPronouncing || wordCorrect
                 ? "opacity-25 cursor-not-allowed"
                 : "hover:bg-amber-100 hover:text-amber-900 active:scale-95 shadow-sm cursor-pointer"
             }`}
@@ -634,7 +640,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
           {/* Slide Right Button */}
           <button
             onClick={() => {
-              if (items.length <= 1) return;
+              if (items.length <= 1 || isPronouncing || wordCorrect) return;
               setSlideDirection(1);
               audioSynth.playCarriageReturn();
               setCurrentItemIdx((prev) => (prev + 1) % items.length);
@@ -642,9 +648,9 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
               setRomajiProgress("");
               setWordCorrect(false);
             }}
-            disabled={items.length <= 1}
+            disabled={items.length <= 1 || isPronouncing || wordCorrect}
             className={`p-2.5 rounded-full border border-stone-300 bg-white text-stone-600 transition-all z-10 ${
-              items.length <= 1
+              items.length <= 1 || isPronouncing || wordCorrect
                 ? "opacity-25 cursor-not-allowed"
                 : "hover:bg-amber-100 hover:text-amber-900 active:scale-95 shadow-sm cursor-pointer"
             }`}

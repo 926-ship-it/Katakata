@@ -56,6 +56,7 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
   const [currentSegmentIdx, setCurrentSegmentIdx] = useState<number>(0);
   const [romajiProgress, setRomajiProgress] = useState<string>("");
   const [isShaking, setIsShaking] = useState<boolean>(false);
+  const [isWordPronouncing, setIsWordPronouncing] = useState<boolean>(false);
   const [muted, setMuted] = useState<boolean>(() => audioSynth.getMuted());
 
   // Timer States
@@ -201,7 +202,7 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
 
   // Handle Keystrokes
   const handleTypewriterInput = (key: string) => {
-    if (gameState !== "playing" || !currentCard) return;
+    if (gameState !== "playing" || !currentCard || isWordPronouncing) return;
 
     const lowerKey = key.toLowerCase();
     const isValidKey = /^[a-z0-9]$/.test(lowerKey) || lowerKey === " " || lowerKey === "-" || lowerKey === "_";
@@ -246,9 +247,6 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
         setPracticedIds(prev => prev.includes(currentCard.id) ? prev : [...prev, currentCard.id]);
         audioSynth.playFanfare();
 
-        // Speak full word immediately with zero delay!
-        audioSynth.speakFullWord(currentCard.kanaStr);
-
         // Trigger dynamic score popup
         const pointsAwarded = 10 + Math.min(10, Math.floor(newCombo / 2));
         const newPopup = {
@@ -259,13 +257,18 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
         };
         setScorePopups(prev => [...prev, newPopup]);
 
-        // Fetch next card
-        let nextCard = currentCard;
-        while (nextCard.id === currentCard.id && gamePool.length > 1) {
-          nextCard = gamePool[Math.floor(Math.random() * gamePool.length)];
-        }
-        setCurrentCard(nextCard);
-        setCurrentSegmentIdx(0);
+        // Lock inputs and speak full word immediately; advance ONLY after reading completes!
+        setIsWordPronouncing(true);
+        audioSynth.speakFullWord(currentCard.kanaStr, () => {
+          setIsWordPronouncing(false);
+          // Fetch next card
+          let nextCard = currentCard;
+          while (nextCard.id === currentCard.id && gamePool.length > 1) {
+            nextCard = gamePool[Math.floor(Math.random() * gamePool.length)];
+          }
+          setCurrentCard(nextCard);
+          setCurrentSegmentIdx(0);
+        });
       } else {
         // Speak intermediate syllable
         audioSynth.speakJapanese(segment.kana);

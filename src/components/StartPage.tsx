@@ -78,13 +78,13 @@ export const StartPage: React.FC<StartPageProps> = ({
 
   // Config states
   const [showAdvancedPanel, setShowAdvancedPanel] = useState<boolean>(false);
-  const [sessionLimit, setSessionLimit] = useState<number>(3); // How many items they want to practice or unlock 
+  const [sessionLimit, setSessionLimit] = useState<number>(10); // How many items they want to practice or unlock 
   const [durationMinutes, setDurationMinutes] = useState<number>(3); // Customizable minutes: 1, 3, 5, 10, or custom
   const [customMinutesText, setCustomMinutesText] = useState<string>("");
   const [showCustomTime, setShowCustomTime] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
-  const [customCardCount, setCustomCardCount] = useState<number>(3);
+  const [customCardCount, setCustomCardCount] = useState<number>(5);
   const [customTimerMinutes, setCustomTimerMinutes] = useState<number>(3);
 
   // Custom Document Parser States
@@ -390,48 +390,47 @@ export const StartPage: React.FC<StartPageProps> = ({
     return item.category === selectedCategory;
   });
 
-  // Automatically keep CARD selections synchronized with sessionLimit with randomized additions
+  // On initial mount or dictionary switch, keep valid selected cards; if none, initialize with first 5 cards
   React.useEffect(() => {
     setSelectedCardIds((prev) => {
-      const poolIds = filteredDict.map(item => item.id);
-      
-      // Filter visible on current pool list
-      let currentValid = prev.filter(id => poolIds.includes(id));
-      
-      if (currentValid.length > sessionLimit) {
-        return currentValid.slice(0, sessionLimit);
+      const poolIds = activeDict.map(item => item.id);
+      const valid = prev.filter(id => poolIds.includes(id));
+      if (valid.length > 0) {
+        return valid;
       }
-      
-      if (currentValid.length < sessionLimit) {
-        const needed = sessionLimit - currentValid.length;
-        const remaining = poolIds.filter(id => !currentValid.includes(id));
-        // Shuffle remaining to ensure selections feel truly randomized and fresh
-        const shuffledRemaining = [...remaining].sort(() => Math.random() - 0.5);
-        const extra = shuffledRemaining.slice(0, needed);
-        return [...currentValid, ...extra];
-      }
-      
-      return currentValid;
+      return poolIds.slice(0, Math.min(5, poolIds.length));
     });
-  }, [sessionLimit, selectedCategory]);
+  }, [activeDict]);
 
-  const handleRandomizeSelection = () => {
+  const handleSelectAllInView = () => {
+    if (filteredDict.length === 0) return;
+    const allIds = filteredDict.map(item => item.id);
+    setSelectedCardIds((prev) => Array.from(new Set([...prev, ...allIds])));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedCardIds([]);
+  };
+
+  const handleSelectCount = (count: number) => {
     if (filteredDict.length === 0) return;
     const shuffled = [...filteredDict].sort(() => Math.random() - 0.5);
-    const selected = shuffled.slice(0, Math.min(sessionLimit, shuffled.length)).map(item => item.id);
+    const selected = shuffled.slice(0, Math.min(count, shuffled.length)).map(item => item.id);
     setSelectedCardIds(selected);
   };
 
+  const handleRandomizeSelection = () => {
+    if (filteredDict.length === 0) return;
+    const targetCount = Math.max(selectedCardIds.length, 5);
+    handleSelectCount(targetCount);
+  };
+
+  // Allow users to freely toggle any card on or off with NO artificial limit/cap!
   const handleToggleCheckbox = (id: string) => {
     setSelectedCardIds((prev) => {
       if (prev.includes(id)) {
-        if (prev.length <= 1) return prev; // Keep at least one checked
         return prev.filter((x) => x !== id);
       } else {
-        if (prev.length >= sessionLimit) {
-          // CAP at limit and rotate (FIFO)
-          return [...prev.slice(1), id];
-        }
         return [...prev, id];
       }
     });
@@ -559,7 +558,7 @@ export const StartPage: React.FC<StartPageProps> = ({
               {/* Minimalistic Selectors for card count and timer */}
               <div className="flex items-center gap-6 text-xs font-serif text-stone-750 flex-wrap mt-1">
                 {/* Custom Card Count selector */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-stone-500">练习张数</span>
                   <div className="flex items-center border border-stone-400/80 bg-[#f2ede0]/40 rounded-sm overflow-hidden shadow-sm">
                     <button
@@ -575,7 +574,7 @@ export const StartPage: React.FC<StartPageProps> = ({
                       max={100}
                       value={customCardCount}
                       onChange={(e) => {
-                        const val = parseInt(e.target.value) || 3;
+                        const val = parseInt(e.target.value) || 5;
                         setCustomCardCount(Math.min(100, Math.max(1, val)));
                       }}
                       className="w-10 text-center bg-transparent focus:outline-none font-bold text-stone-800"
@@ -589,6 +588,35 @@ export const StartPage: React.FC<StartPageProps> = ({
                     </button>
                   </div>
                   <span className="text-stone-400">张</span>
+
+                  {/* Fast selection chips */}
+                  <div className="flex items-center gap-1 ml-1">
+                    {[5, 10, 20, 50].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setCustomCardCount(Math.min(activeDict.length, num))}
+                        className={`px-2 py-0.5 rounded text-[11px] font-sans border transition-all cursor-pointer ${
+                          customCardCount === num
+                            ? "bg-stone-900 text-stone-50 border-stone-900 font-bold"
+                            : "bg-white/80 hover:bg-stone-200 text-stone-700 border-stone-300"
+                        }`}
+                      >
+                        {num}张
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setCustomCardCount(activeDict.length)}
+                      className={`px-2 py-0.5 rounded text-[11px] font-sans border transition-all cursor-pointer ${
+                        customCardCount === activeDict.length
+                          ? "bg-stone-900 text-stone-50 border-stone-900 font-bold"
+                          : "bg-white/80 hover:bg-stone-200 text-stone-700 border-stone-300"
+                      }`}
+                    >
+                      全部
+                    </button>
+                  </div>
                 </div>
 
                 {/* Custom Timer Selector (1-30 mins) */}
@@ -1343,6 +1371,64 @@ export const StartPage: React.FC<StartPageProps> = ({
             ))}
           </div>
 
+          {/* Multi-word Quick Selection & Batch Action Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mt-3 py-2 px-3 bg-stone-100/80 border border-stone-250 rounded-xl text-xs select-none">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <span className="font-bold text-stone-750 font-serif flex items-center gap-1 mr-1">
+                <span>勾选联训:</span>
+              </span>
+              <button
+                type="button"
+                onClick={handleSelectAllInView}
+                className="px-2.5 py-1 rounded bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-medium transition-colors cursor-pointer shadow-2xs"
+                title="全选当前分类下的所有单词"
+              >
+                全选本类 ({filteredDict.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectCount(5)}
+                className="px-2.5 py-1 rounded bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-medium transition-colors cursor-pointer shadow-2xs"
+              >
+                选 5 词
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectCount(10)}
+                className="px-2.5 py-1 rounded bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-medium transition-colors cursor-pointer shadow-2xs"
+              >
+                选 10 词
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectCount(20)}
+                className="px-2.5 py-1 rounded bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-medium transition-colors cursor-pointer shadow-2xs"
+              >
+                选 20 词
+              </button>
+              <button
+                type="button"
+                onClick={handleClearSelection}
+                className="px-2 py-1 rounded bg-stone-200 hover:bg-stone-300 text-stone-600 transition-colors cursor-pointer"
+              >
+                清空
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-stone-500 font-mono text-[11px]">
+                已勾选:
+              </span>
+              <span className={`px-2 py-0.5 rounded-full font-mono font-black text-xs ${
+                selectedCardIds.length > 0 
+                  ? "bg-amber-500 text-stone-950 shadow-xs" 
+                  : "bg-stone-300 text-stone-600"
+              }`}>
+                {selectedCardIds.length} 词
+              </span>
+            </div>
+          </div>
+
           {/* Custom Document & Parsing Workspace */}
           {selectedCategory === "custom" && (
             <motion.div
@@ -1554,11 +1640,11 @@ export const StartPage: React.FC<StartPageProps> = ({
           )}
 
           {/* Active selection combination bar */}
-          {selectedCardIds.length > 0 && (
+          {selectedCardIds.length > 0 ? (
             <div className="mt-4 p-4 bg-amber-500 text-stone-950 rounded-2xl border border-amber-600 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md select-none">
               <div className="space-y-0.5 text-left">
                 <div className="text-[10px] font-mono font-black text-amber-950 tracking-wider">
-                  已激活的联合训练词单 ({selectedCardIds.length}/{sessionLimit})
+                  已激活的联合训练词单（共勾选 {selectedCardIds.length} 词）
                 </div>
                 <div className="text-sm font-bold">
                   已在下方勾选{" "}
@@ -1573,7 +1659,9 @@ export const StartPage: React.FC<StartPageProps> = ({
                         return item?.kanji || "";
                       })
                       .filter(Boolean)
+                      .slice(0, 12)
                       .join("、")}
+                    {selectedCardIds.length > 12 && ` 等 ${selectedCardIds.length} 词`}
                   </span>
                 </div>
               </div>
@@ -1584,7 +1672,7 @@ export const StartPage: React.FC<StartPageProps> = ({
                   className="w-full sm:w-auto px-4 py-3 bg-stone-100 hover:bg-stone-200 text-stone-900 border border-stone-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
                   title={isEnglishMode ? "Randomly select another set of cards" : "随机换一批训练卡片"}
                 >
-                  <span>🎲 {isEnglishMode ? "Shuffle" : "换一批"}</span>
+                  <span>🎲 {isEnglishMode ? "Shuffle" : "随机换一批"}</span>
                 </button>
                 <button
                   onClick={handleStartGroupTraining}
@@ -1594,6 +1682,19 @@ export const StartPage: React.FC<StartPageProps> = ({
                   <span>{isEnglishMode ? `开启 ${selectedCardIds.length} 词连环拼写熟化 ＞` : `开启 ${selectedCardIds.length} 字连环拼音熟化 ＞`}</span>
                 </button>
               </div>
+            </div>
+          ) : (
+            <div className="mt-4 p-4 bg-stone-100 text-stone-700 rounded-2xl border border-dashed border-stone-300 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <div className="text-stone-500 font-serif">
+                提示：当前尚未勾选任何词汇，请在下方点击卡片复选框自由勾选，或点击右侧一键随机选词
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSelectCount(5)}
+                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold text-xs rounded-lg transition-colors cursor-pointer shrink-0"
+              >
+                一键勾选 5 词
+              </button>
             </div>
           )}
 
