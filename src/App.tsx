@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Sparkles, Trophy, BookOpen, Volume2, VolumeX, Key, HelpCircle, Gamepad2, Info, ChevronLeft, ChevronRight, Music, Smile, Mic, Home, Clock } from "lucide-react";
+import { Sparkles, Trophy, BookOpen, Volume2, VolumeX, Key, HelpCircle, Gamepad2, Info, ChevronLeft, ChevronRight, Music, Smile, Mic, Home, Clock, Maximize2, Minimize2 } from "lucide-react";
 import { StartPage } from "./components/StartPage";
 import { TrainingPage } from "./components/TrainingPage";
 import { CardLibraryPage } from "./components/CardLibraryPage";
@@ -123,6 +123,99 @@ export default function App() {
       localStorage.setItem("fifty_sound_narrative_style", narrativeStyle);
     } catch (_) {}
   }, [narrativeStyle]);
+
+  // Fullscreen immersion mode states
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [hideInAppHeader, setHideInAppHeader] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("fifty_sound_hide_header_fs") === "true";
+    } catch (_) {
+      return false;
+    }
+  });
+  const [fsToast, setFsToast] = useState<string>("");
+
+  const showToast = (msg: string) => {
+    setFsToast(msg);
+    setTimeout(() => {
+      setFsToast((current) => (current === msg ? "" : current));
+    }, 3600);
+  };
+
+  const toggleFullscreen = async () => {
+    const doc = document as any;
+    const docEl = document.documentElement as any;
+    const isCurrentlyFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+
+    if (!isCurrentlyFs) {
+      try {
+        if (docEl.requestFullscreen) {
+          await docEl.requestFullscreen();
+        } else if (docEl.webkitRequestFullscreen) {
+          await docEl.webkitRequestFullscreen();
+        } else if (docEl.mozRequestFullScreen) {
+          await docEl.mozRequestFullScreen();
+        } else if (docEl.msRequestFullscreen) {
+          await docEl.msRequestFullscreen();
+        }
+        setIsFullscreen(true);
+        audioSynth.playCardSlide();
+        showToast("已开启系统级全屏！域名与工具栏已隐藏 (按 Esc 或 F11 退出)");
+      } catch (err) {
+        console.warn("Fullscreen request warning (sandbox/iframe):", err);
+        // Fallback for sandboxed preview iframe: still provide distraction-free in-app zen view
+        setIsFullscreen(true);
+        audioSynth.playCardSlide();
+        showToast("已开启纯净全屏！(如需隐藏系统地址栏，请在新标签页打开或按 F11)");
+      }
+    } else {
+      try {
+        if (doc.exitFullscreen) {
+          await doc.exitFullscreen();
+        } else if (doc.webkitExitFullscreen) {
+          await doc.webkitExitFullscreen();
+        } else if (doc.mozCancelFullScreen) {
+          await doc.mozCancelFullScreen();
+        } else if (doc.msExitFullscreen) {
+          await doc.msExitFullscreen();
+        }
+      } catch (err) {
+        console.warn("Exit fullscreen error:", err);
+      }
+      setIsFullscreen(false);
+      audioSynth.playCardSlide();
+      showToast("已退出全屏模式");
+    }
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      const doc = document as any;
+      const isCurrentlyFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+      setIsFullscreen(isCurrentlyFs);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "F11") {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFsChange);
+    document.addEventListener("webkitfullscreenchange", handleFsChange);
+    document.addEventListener("mozfullscreenchange", handleFsChange);
+    document.addEventListener("MSFullscreenChange", handleFsChange);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFsChange);
+      document.removeEventListener("webkitfullscreenchange", handleFsChange);
+      document.removeEventListener("mozfullscreenchange", handleFsChange);
+      document.removeEventListener("MSFullscreenChange", handleFsChange);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   // Selection for active training
   const [activeCards, setActiveCards] = useState<DictionaryItem[]>([]);
@@ -579,106 +672,185 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-paper bg-japanese-pattern text-ink font-sans pb-12 transition-colors">
-      {/* Upper Navigation Header */}
-      <header className="bg-[#F3EFE3] border-b border-stone-300 sticky top-0 z-40 select-none">
-        <div className="max-w-4xl mx-auto px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-1 sm:gap-2">
-          <div 
-            onClick={() => { if (currentPage !== "training") { setCurrentPage("start"); setIsDrawerOpen(false); } }} 
-            className="flex items-center gap-1 cursor-pointer shrink-0 font-serif font-black tracking-wider sm:tracking-widest text-stone-900 text-xs sm:text-sm md:text-base uppercase"
-          >
-            <span className="text-[#C4482A] font-bold">五十音</span>
-            <span className="text-stone-800">图鉴</span>
-          </div>
-
-          <div className="flex items-center gap-1.5 xs:gap-2.5 sm:gap-4 md:gap-6 shrink-0 font-serif text-[11px] sm:text-xs md:text-sm text-stone-700">
-            {/* Premium Mode Segmented Toggle Switch (Highly Visible & Responsive 3-Way Mode) */}
-            <div className="flex items-center bg-stone-200/60 p-0.5 rounded-full border border-stone-300 shadow-inner select-none">
-              <button
-                onClick={() => {
-                  setIsEnglishMode(false);
-                  setIsKatakanaMode(false);
-                  audioSynth.playCardSlide();
-                }}
-                className={`px-1.5 xs:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-0.5 xs:gap-1 ${
-                  !isEnglishMode && !isKatakanaMode
-                    ? "bg-[#C4482A] text-white shadow-xs font-black scale-102"
-                    : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
-                }`}
-                title="平假名模式"
-              >
-                <span>🇯🇵</span>
-                <span className="hidden xs:inline">平假</span>
-              </button>
-              <button
-                onClick={() => {
-                  setIsEnglishMode(true);
-                  setIsKatakanaMode(false);
-                  audioSynth.playCardSlide();
-                }}
-                className={`px-1.5 xs:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-0.5 xs:gap-1 ${
-                  isEnglishMode
-                    ? "bg-stone-900 text-[#F3EFE3] shadow-xs font-black scale-102"
-                    : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
-                }`}
-                title="英文模式"
-              >
-                <span>🔤</span>
-                <span className="hidden xs:inline">EN</span>
-              </button>
-              <button
-                onClick={() => {
-                  setIsEnglishMode(false);
-                  setIsKatakanaMode(true);
-                  audioSynth.playCardSlide();
-                }}
-                className={`px-1.5 xs:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-0.5 xs:gap-1 ${
-                  !isEnglishMode && isKatakanaMode
-                    ? "bg-amber-600 text-white shadow-xs font-black scale-102"
-                    : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
-                }`}
-                title="片假名模式"
-              >
-                <span>⛩️</span>
-                <span className="hidden xs:inline">片假</span>
-              </button>
+      {/* Upper Navigation Header (Can be hidden in full immersion mode) */}
+      {(!isFullscreen || !hideInAppHeader) && (
+        <header className="bg-[#F3EFE3] border-b border-stone-300 sticky top-0 z-40 select-none transition-all duration-300">
+          <div className="max-w-4xl mx-auto px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-1 sm:gap-2">
+            <div 
+              onClick={() => { if (currentPage !== "training") { setCurrentPage("start"); setIsDrawerOpen(false); } }} 
+              className="flex items-center gap-1 cursor-pointer shrink-0 font-serif font-black tracking-wider sm:tracking-widest text-stone-900 text-xs sm:text-sm md:text-base uppercase"
+            >
+              <span className="text-[#C4482A] font-bold">五十音</span>
+              <span className="text-stone-800">图鉴</span>
             </div>
 
-            {currentPage !== "training" ? (
-              <>
+            <div className="flex items-center gap-1.5 xs:gap-2.5 sm:gap-4 md:gap-6 shrink-0 font-serif text-[11px] sm:text-xs md:text-sm text-stone-700">
+              {/* Premium Mode Segmented Toggle Switch (Highly Visible & Responsive 3-Way Mode) */}
+              <div className="flex items-center bg-stone-200/60 p-0.5 rounded-full border border-stone-300 shadow-inner select-none">
                 <button
-                  onClick={() => { setCurrentPage("start"); setIsDrawerOpen(false); }}
-                  className={`cursor-pointer hover:text-[#C4482A] transition-colors py-0.5 ${currentPage === "start" ? "text-stone-950 font-black border-b-2 border-stone-900" : "text-stone-600"}`}
+                  onClick={() => {
+                    setIsEnglishMode(false);
+                    setIsKatakanaMode(false);
+                    audioSynth.playCardSlide();
+                  }}
+                  className={`px-1.5 xs:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-0.5 xs:gap-1 ${
+                    !isEnglishMode && !isKatakanaMode
+                      ? "bg-[#C4482A] text-white shadow-xs font-black scale-102"
+                      : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
+                  }`}
+                  title="平假名模式"
                 >
-                  练习
+                  <span>🇯🇵</span>
+                  <span className="hidden xs:inline">平假</span>
                 </button>
                 <button
-                  onClick={() => { setCurrentPage("library"); setIsDrawerOpen(false); }}
-                  className={`cursor-pointer hover:text-[#C4482A] transition-colors py-0.5 ${currentPage === "library" ? "text-stone-950 font-black border-b-2 border-stone-900" : "text-stone-600"}`}
+                  onClick={() => {
+                    setIsEnglishMode(true);
+                    setIsKatakanaMode(false);
+                    audioSynth.playCardSlide();
+                  }}
+                  className={`px-1.5 xs:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-0.5 xs:gap-1 ${
+                    isEnglishMode
+                      ? "bg-stone-900 text-[#F3EFE3] shadow-xs font-black scale-102"
+                      : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
+                  }`}
+                  title="英文模式"
                 >
-                  收藏
+                  <span>🔤</span>
+                  <span className="hidden xs:inline">EN</span>
                 </button>
-                <div className="flex items-center gap-0.5 sm:gap-1 text-stone-700 select-none">
-                  <span className="hidden xs:inline">岁币</span>
-                  <span className="xs:hidden">🪙</span>
-                  <span className="font-bold text-[#C4482A] text-xs sm:text-sm">{toHanNumerals(coins)}</span>
-                </div>
-              </>
-            ) : (
-              <div className="px-2 py-0.5 bg-amber-50 border border-amber-300 rounded text-[10px] font-mono font-bold text-amber-700 flex items-center gap-0.5 animate-pulse">
-                <span>锁定熟练中...</span>
+                <button
+                  onClick={() => {
+                    setIsEnglishMode(false);
+                    setIsKatakanaMode(true);
+                    audioSynth.playCardSlide();
+                  }}
+                  className={`px-1.5 xs:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-0.5 xs:gap-1 ${
+                    !isEnglishMode && isKatakanaMode
+                      ? "bg-amber-600 text-white shadow-xs font-black scale-102"
+                      : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
+                  }`}
+                  title="片假名模式"
+                >
+                  <span>⛩️</span>
+                  <span className="hidden xs:inline">片假</span>
+                </button>
               </div>
-            )}
 
-            <button
-              onClick={() => setIsDrawerOpen(prev => !prev)}
-              className="p-1 text-stone-850 hover:text-[#C4482A] transition-colors text-lg md:text-xl font-bold focus:outline-none cursor-pointer"
-              title="设置与工具"
-            >
-              ☰
-            </button>
+              {currentPage !== "training" ? (
+                <>
+                  <button
+                    onClick={() => { setCurrentPage("start"); setIsDrawerOpen(false); }}
+                    className={`cursor-pointer hover:text-[#C4482A] transition-colors py-0.5 ${currentPage === "start" ? "text-stone-950 font-black border-b-2 border-stone-900" : "text-stone-600"}`}
+                  >
+                    练习
+                  </button>
+                  <button
+                    onClick={() => { setCurrentPage("library"); setIsDrawerOpen(false); }}
+                    className={`cursor-pointer hover:text-[#C4482A] transition-colors py-0.5 ${currentPage === "library" ? "text-stone-950 font-black border-b-2 border-stone-900" : "text-stone-600"}`}
+                  >
+                    收藏
+                  </button>
+                  <div className="flex items-center gap-0.5 sm:gap-1 text-stone-700 select-none">
+                    <span className="hidden xs:inline">岁币</span>
+                    <span className="xs:hidden">🪙</span>
+                    <span className="font-bold text-[#C4482A] text-xs sm:text-sm">{toHanNumerals(coins)}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="px-2 py-0.5 bg-amber-50 border border-amber-300 rounded text-[10px] font-mono font-bold text-amber-700 flex items-center gap-0.5 animate-pulse">
+                  <span>锁定熟练中...</span>
+                </div>
+              )}
+
+              {/* Fullscreen Immersion Toggle Button */}
+              <button
+                onClick={toggleFullscreen}
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-serif font-bold transition-all cursor-pointer shadow-xs ${
+                  isFullscreen
+                    ? "bg-[#C4482A]/10 border-[#C4482A] text-[#C4482A]"
+                    : "bg-white/80 hover:bg-white border-stone-300 text-stone-700 hover:text-stone-950"
+                }`}
+                title={isFullscreen ? "退出全屏 (Esc / F11)" : "全屏沉浸模式 (隐藏浏览器域名与系统工具栏，快捷键 F11)"}
+              >
+                {isFullscreen ? (
+                  <>
+                    <Minimize2 className="w-3.5 h-3.5 text-[#C4482A]" />
+                    <span className="hidden sm:inline text-[11px]">退出全屏</span>
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="w-3.5 h-3.5 text-stone-700" />
+                    <span className="hidden sm:inline text-[11px]">全屏模式</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => setIsDrawerOpen(prev => !prev)}
+                className="p-1 text-stone-850 hover:text-[#C4482A] transition-colors text-lg md:text-xl font-bold focus:outline-none cursor-pointer"
+                title="设置与工具"
+              >
+                ☰
+              </button>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
+
+      {/* Floating HUD in Fullscreen Mode */}
+      {isFullscreen && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="fixed top-2.5 right-3 z-50 flex items-center gap-2 bg-stone-900/90 text-stone-100 px-3 py-1.5 rounded-full shadow-2xl backdrop-blur-md border border-stone-700 text-xs font-serif select-none"
+        >
+          <span className="text-amber-400 font-bold flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
+            全屏沉浸
+          </span>
+          <span className="text-stone-600">|</span>
+          <button
+            onClick={() => {
+              setHideInAppHeader(prev => {
+                const next = !prev;
+                try { localStorage.setItem("fifty_sound_hide_header_fs", String(next)); } catch(_) {}
+                return next;
+              });
+              audioSynth.playCardSlide();
+            }}
+            className="text-stone-300 hover:text-white transition-colors cursor-pointer text-[11px]"
+            title={hideInAppHeader ? "显示应用顶栏" : "隐藏应用顶栏以进入极致纯净视界"}
+          >
+            {hideInAppHeader ? "显示顶栏" : "隐藏顶栏"}
+          </button>
+          <span className="text-stone-600">|</span>
+          <button
+            onClick={toggleFullscreen}
+            className="flex items-center gap-1 text-amber-300 hover:text-amber-200 transition-colors font-bold cursor-pointer text-[11px]"
+            title="退出全屏 (快捷键 Esc 或 F11)"
+          >
+            <Minimize2 className="w-3.5 h-3.5" />
+            <span>退出 (Esc)</span>
+          </button>
+        </motion.div>
+      )}
+
+      {/* Fullscreen Toast Notification */}
+      <AnimatePresence>
+        {fsToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-stone-900/95 text-[#F3EFE3] text-xs font-serif rounded-full shadow-2xl border border-stone-700 flex items-center gap-2 select-none backdrop-blur-sm"
+          >
+            <span className="text-amber-400 font-bold">🖥️</span>
+            <span>{fsToast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Elegant Wabi-Sabi Slide-Over Drawer */}
       <AnimatePresence>
@@ -710,6 +882,55 @@ export default function App() {
                   >
                     ✕
                   </button>
+                </div>
+
+                {/* Fullscreen Immersion Mode Section */}
+                <div className="space-y-3">
+                  <h4 className="font-serif font-bold text-stone-800 text-xs uppercase tracking-widest text-[#C4482A]">
+                    🖥️ 禅境全屏 / Fullscreen Immersion
+                  </h4>
+                  <div className="p-3 rounded bg-white/50 border border-stone-200 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-serif text-stone-800 font-bold">系统级全屏模式</span>
+                        <span className="text-[10px] text-stone-500 font-sans">隐藏浏览器地址栏、域名与工具栏 (F11)</span>
+                      </div>
+                      <button
+                        onClick={toggleFullscreen}
+                        className={`px-3 py-1 text-xs rounded border transition-all cursor-pointer font-bold ${
+                          isFullscreen
+                            ? "bg-[#C4482A] text-white border-[#C4482A] shadow-xs"
+                            : "bg-stone-100 border-stone-300 text-stone-800 hover:bg-stone-200"
+                        }`}
+                      >
+                        {isFullscreen ? "退出全屏" : "进入全屏"}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-stone-200/80">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-serif text-stone-800">全屏时隐藏应用顶栏</span>
+                        <span className="text-[10px] text-stone-500 font-sans">隐藏应用顶栏与页脚，不留多余边框</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setHideInAppHeader(prev => {
+                            const next = !prev;
+                            try { localStorage.setItem("fifty_sound_hide_header_fs", String(next)); } catch(_) {}
+                            return next;
+                          });
+                          audioSynth.playCardSlide();
+                        }}
+                        className={`px-3 py-1 text-xs rounded border transition-all cursor-pointer font-bold ${
+                          hideInAppHeader
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-stone-100 border-stone-300 text-stone-500 hover:bg-stone-200"
+                        }`}
+                      >
+                        {hideInAppHeader ? "已开启" : "关闭"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Sound & Music Group */}
@@ -894,6 +1115,8 @@ export default function App() {
                 }}
                 isEnglishMode={isEnglishMode}
                 isKatakanaMode={isKatakanaMode}
+                isFullscreen={isFullscreen}
+                onToggleFullscreen={toggleFullscreen}
               />
             </motion.div>
           )}
@@ -949,6 +1172,8 @@ export default function App() {
                 coins={coins}
                 setCoins={setCoins}
                 narrativeStyle={narrativeStyle}
+                isFullscreen={isFullscreen}
+                onToggleFullscreen={toggleFullscreen}
               />
             </motion.div>
           )}
@@ -994,7 +1219,7 @@ export default function App() {
       </main>
 
       {/* Mascot Companion rendered conditionally with state bindings */}
-      {showMascot && (
+      {showMascot && (!isFullscreen || !hideInAppHeader) && (
         <MascotComponent 
           currentPage={currentPage} 
           lastAction={lastAction} 
@@ -1006,12 +1231,14 @@ export default function App() {
       )}
 
       {/* Footer information bar */}
-      <footer className="text-center text-stone-400 py-6 text-xs font-mono max-w-xl mx-auto space-y-1.5 border-t border-stone-200 select-none">
-        <p>©Katakata「カタカタ」五十音集卡练习 2026 EDITION. POWERED BY GOOGLE DEEPMIND GEMINI & REACT.</p>
-        <p className="text-[10px] text-stone-300">
-          DESIGNED FOR CLASSICAL JAPANESE ROMAJI LEARNING RETENTION. ALL INTELLECTUAL PROPERTY SECURED.
-        </p>
-      </footer>
+      {(!isFullscreen || !hideInAppHeader) && (
+        <footer className="text-center text-stone-400 py-6 text-xs font-mono max-w-xl mx-auto space-y-1.5 border-t border-stone-200 select-none">
+          <p>©Katakata「カタカタ」五十音集卡练习 2026 EDITION. POWERED BY GOOGLE DEEPMIND GEMINI & REACT.</p>
+          <p className="text-[10px] text-stone-300">
+            DESIGNED FOR CLASSICAL JAPANESE ROMAJI LEARNING RETENTION. ALL INTELLECTUAL PROPERTY SECURED.
+          </p>
+        </footer>
+      )}
     </div>
   );
 }

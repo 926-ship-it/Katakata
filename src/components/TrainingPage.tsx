@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Keyboard, ArrowLeft, RefreshCw, Volume2, VolumeX, AlertTriangle, Play, Pause, AlertCircle, HelpCircle, ChevronLeft, ChevronRight, PenTool } from "lucide-react";
+import { Keyboard, ArrowLeft, RefreshCw, Volume2, VolumeX, AlertTriangle, Play, Pause, AlertCircle, HelpCircle, ChevronLeft, ChevronRight, PenTool, Maximize2, Minimize2 } from "lucide-react";
 import { DictionaryItem } from "../data/dictionary";
 import { TracingKana } from "./TracingKana";
 import { audioSynth } from "../utils/audio";
@@ -17,6 +17,8 @@ interface TrainingPageProps {
   onKeyStrike?: (action: "correct" | "error" | "complete") => void;
   isEnglishMode?: boolean;
   isKatakanaMode?: boolean;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }
 
 export const TrainingPage: React.FC<TrainingPageProps> = ({
@@ -28,6 +30,8 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   onKeyStrike,
   isEnglishMode = false,
   isKatakanaMode = false,
+  isFullscreen = false,
+  onToggleFullscreen,
 }) => {
   // Loop sequential indices
   const [currentItemIdx, setCurrentItemIdx] = useState<number>(0);
@@ -370,6 +374,20 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         </button>
 
         <div className="flex items-center gap-2">
+          {onToggleFullscreen && (
+            <button
+              onClick={onToggleFullscreen}
+              className={`p-2 rounded-lg border transition-colors cursor-pointer ${
+                isFullscreen
+                  ? "border-[#C4482A] bg-[#C4482A]/10 text-[#C4482A]"
+                  : "border-stone-300 bg-white hover:bg-stone-50 text-stone-600"
+              }`}
+              title={isFullscreen ? "退出全屏 (Esc)" : "全屏沉浸模式 (隐藏浏览器域名与工具栏)"}
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+          )}
+
           <button
             onClick={handleToggleMute}
             className={`p-2 rounded-lg border text-stone-600 ${

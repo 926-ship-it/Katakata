@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, Clock, Zap, RotateCcw, Volume2, VolumeX, AlertCircle, Award, Trophy } from "lucide-react";
+import { ArrowLeft, Clock, Zap, RotateCcw, Volume2, VolumeX, AlertCircle, Award, Trophy, Maximize2, Minimize2 } from "lucide-react";
 import { DictionaryItem, getDictionary } from "../data/dictionary";
 import { audioSynth } from "../utils/audio";
 import { recordPracticeBatch } from "../utils/srs";
@@ -15,6 +15,8 @@ interface SpellRushPageProps {
   coins: number;
   setCoins: React.Dispatch<React.SetStateAction<number>>;
   narrativeStyle: NarrativeStyle;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }
 
 export const SpellRushPage: React.FC<SpellRushPageProps> = ({
@@ -25,6 +27,8 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
   coins,
   setCoins,
   narrativeStyle,
+  isFullscreen = false,
+  onToggleFullscreen,
 }) => {
   const activeDict = React.useMemo(() => {
     return getDictionary(isEnglishMode, isKatakanaMode);
@@ -406,7 +410,21 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
           <span>{narrativeStyle === "mythology" ? "返回拼写大厅" : narrativeStyle === "cultural" ? "返回练习大厅" : "返回主控制台"}</span>
         </button>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {onToggleFullscreen && (
+            <button
+              onClick={onToggleFullscreen}
+              className={`p-2 rounded-lg border transition-colors cursor-pointer ${
+                isFullscreen
+                  ? "border-amber-600 bg-amber-50 text-amber-800"
+                  : "border-stone-250 bg-white hover:bg-stone-50 text-stone-600"
+              }`}
+              title={isFullscreen ? "退出全屏 (Esc)" : "全屏沉浸模式 (隐藏浏览器域名与工具栏)"}
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+          )}
+
           <button
             onClick={() => setMuted(!muted)}
             className="p-2 rounded-lg border border-stone-250 bg-white hover:bg-stone-50 text-stone-600 transition-colors cursor-pointer"
