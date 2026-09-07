@@ -178,7 +178,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   ];
 
   // Core spelling engine input validator
-  const processInputKey = (key: string) => {
+  const processInputKey = (key: string, fromHardwareListener: boolean = false) => {
     if (practiceMode === "handwriting") return;
     if (isPaused || timerFinished || wordCorrect) return;
 
@@ -226,9 +226,9 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
     const isMatchOfAny = segment.romaji.some(r => r === proposedString);
 
     if (isMatchOfAny) {
-      // Correct character fully completed!
-      audioSynth.playTyping();
-      audioSynth.playTypewriterBell();
+      // Correct character fully completed! Play mechanical typewriter strike
+      audioSynth.playTyping({ isCompletion: true, volume: 1.0 });
+      audioSynth.playCharacterResolved();
       
       setCorrectCount(prev => prev + 1);
       const nextCombo = combo + 1;
@@ -250,6 +250,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         // Entire phrase/word spelled correctly!
         setWordCorrect(true);
         setIsPronouncing(true);
+        audioSynth.playTypewriterBell();
         audioSynth.playFanfare();
         if (onKeyStrike) onKeyStrike("complete");
 
@@ -279,7 +280,9 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       }
     } else if (isPrefixOfAny) {
       // Mid-spelling of romaji character (e.g. typed 't' of 'tsu')
-      audioSynth.playTyping();
+      if (!fromHardwareListener) {
+        audioSynth.playTyping({ volume: 0.65 });
+      }
       setRomajiProgress(proposedString);
       
       setCorrectCount(prev => prev + 1);
@@ -334,14 +337,22 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       if (key !== " " && key !== "." && key !== "-" && key !== "_" && key !== "'" && key !== "。" && key !== "·" && key !== "・") {
         key = key.toLowerCase();
       }
-      processInputKeyRef.current(key);
+
+      // Play subtle mechanical typewriter keystroke sound in the input listener
+      const isTypingChar = /^[a-z0-9]$/.test(key) || 
+        key === " " || key === "." || key === "-" || key === "_" || key === "'" || key === "。" || key === "·" || key === "・";
+      if (isTypingChar && !isPaused && !timerFinished && !wordCorrect && practiceMode !== "handwriting") {
+        audioSynth.playTyping({ volume: 0.65 });
+      }
+
+      processInputKeyRef.current(key, true);
     };
 
     window.addEventListener("keydown", handleKeyPress);
     return () => {
       window.removeEventListener("keydown", handleKeyPress);
     };
-  }, []);
+  }, [isPaused, timerFinished, wordCorrect, practiceMode]);
 
   // Formatter for time display
   const formatTime = (ms: number) => {

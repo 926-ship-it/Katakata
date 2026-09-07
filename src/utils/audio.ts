@@ -603,25 +603,41 @@ class RetroAudioSynth {
   }
 
   // Soft crisp typewriter key click synthesis with wood/metal resonance
-  playTyping() {
+  // Accepts optional volume scale or options object for character completion hammer impact
+  playTyping(options?: number | { volume?: number; isCompletion?: boolean; pitchMultiplier?: number }) {
     if (this.isMuted) return;
     this.init();
     if (!this.ctx) return;
 
     try {
       const now = this.ctx.currentTime;
-      
+      let vol = 1.0;
+      let isCompletion = false;
+      let pitchMod = 1.0;
+
+      if (typeof options === "number") {
+        vol = options;
+      } else if (options) {
+        if (options.volume !== undefined) vol = options.volume;
+        if (options.isCompletion !== undefined) isCompletion = options.isCompletion;
+        if (options.pitchMultiplier !== undefined) pitchMod = options.pitchMultiplier;
+      }
+
+      // Micro-randomization of pitch (±5%) to simulate authentic physical tactile variance between mechanical key levers
+      const naturalRandomPitch = pitchMod * (0.95 + Math.random() * 0.10);
+      const effectiveVol = isCompletion ? vol * 1.25 : vol;
+
       const playSingleClick = (timeOffset: number, isSecondary: boolean) => {
         if (!this.ctx) return;
         const clickTime = now + timeOffset;
-        const volumeMultiplier = isSecondary ? 0.75 : 1.0;
-        const pitchMultiplier = isSecondary ? 1.15 : 1.0;
+        const volumeMultiplier = (isSecondary ? 0.75 : 1.0) * effectiveVol;
+        const pitchMultiplier = (isSecondary ? 1.15 : 1.0) * naturalRandomPitch;
 
         // 1. Bottom-out mechanical thud (the "clack" base)
         const thudOsc = this.ctx.createOscillator();
         const thudGain = this.ctx.createGain();
         thudOsc.type = "sine";
-        thudOsc.frequency.setValueAtTime(160 * pitchMultiplier, clickTime);
+        thudOsc.frequency.setValueAtTime((isCompletion ? 180 : 160) * pitchMultiplier, clickTime);
         thudOsc.frequency.exponentialRampToValueAtTime(75, clickTime + 0.035);
         thudGain.gain.setValueAtTime(0.14 * volumeMultiplier, clickTime);
         thudGain.gain.exponentialRampToValueAtTime(0.001, clickTime + 0.035);
@@ -636,7 +652,7 @@ class RetroAudioSynth {
         const clickGain = this.ctx.createGain();
         clickOsc.type = "triangle";
         // Mechanical switch click frequency is usually around 2000-3000 Hz, decaying extremely fast (10-15ms)
-        clickOsc.frequency.setValueAtTime(2500 * pitchMultiplier, clickTime);
+        clickOsc.frequency.setValueAtTime((isCompletion ? 2800 : 2500) * pitchMultiplier, clickTime);
         clickOsc.frequency.exponentialRampToValueAtTime(600, clickTime + 0.015);
         
         clickGain.gain.setValueAtTime(0.18 * volumeMultiplier, clickTime);
@@ -679,6 +695,22 @@ class RetroAudioSynth {
       
       // Play the "Ta" (哒) with a very slight delay (22ms) to emulate mechanical typewriter rebound friction
       playSingleClick(0.022, true);
+
+      // If character completed, add authentic typewriter platen hammer impact ("Tok")
+      if (isCompletion) {
+        const hammerTime = now + 0.036;
+        const hammerOsc = this.ctx.createOscillator();
+        const hammerGain = this.ctx.createGain();
+        hammerOsc.type = "sine";
+        hammerOsc.frequency.setValueAtTime(320 * naturalRandomPitch, hammerTime);
+        hammerOsc.frequency.exponentialRampToValueAtTime(110, hammerTime + 0.025);
+        hammerGain.gain.setValueAtTime(0.13 * effectiveVol, hammerTime);
+        hammerGain.gain.exponentialRampToValueAtTime(0.001, hammerTime + 0.03);
+        hammerOsc.connect(hammerGain);
+        hammerGain.connect(this.ctx.destination);
+        hammerOsc.start(hammerTime);
+        hammerOsc.stop(hammerTime + 0.035);
+      }
 
     } catch (e) {
       // Fallback simple beep to guarantee no crashes
