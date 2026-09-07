@@ -10,12 +10,235 @@ export function toPhoneticKatakana(text: string): string {
   );
 }
 
+// Master phonetic pronunciation database for words, names, and celebrity entries.
+// Whenever Japanese TTS encounters ambiguous Hiragana names, standard Kanji or phonetic Katakana guarantees 100% exact articulation!
+export const PHONETIC_PRONUNCIATION_MAP: Record<string, { kanji: string; phonetic: string; romaji: string }> = {
+  // Hashimoto Kanna: strictly "Hashimoto Kanna", never "washimoto kanna"!
+  "hashimoto_kanna": { kanji: "橋本環奈", phonetic: "ハシモト カンナ", romaji: "Hashimoto Kanna" },
+  "はしもとかんな": { kanji: "橋本環奈", phonetic: "ハシモト カンナ", romaji: "Hashimoto Kanna" },
+  "ハシモトカンナ": { kanji: "橋本環奈", phonetic: "ハシモト カンナ", romaji: "Hashimoto Kanna" },
+  "橋本環奈": { kanji: "橋本環奈", phonetic: "ハシモト カンナ", romaji: "Hashimoto Kanna" },
+  "橋本环奈": { kanji: "橋本環奈", phonetic: "ハシモト カンナ", romaji: "Hashimoto Kanna" },
+
+  // Hamabe Minami
+  "hamabe_minami": { kanji: "浜辺美波", phonetic: "ハマベ ミナミ", romaji: "Hamabe Minami" },
+  "はまべみなみ": { kanji: "浜辺美波", phonetic: "ハマベ ミナミ", romaji: "Hamabe Minami" },
+  "浜辺美波": { kanji: "浜辺美波", phonetic: "ハマベ ミナミ", romaji: "Hamabe Minami" },
+
+  // Hanyu Yuzuru
+  "hanyuu_yuzuru": { kanji: "羽生結弦", phonetic: "ハニュウ ユヅル", romaji: "Hanyu Yuzuru" },
+  "はにゅうゆづる": { kanji: "羽生結弦", phonetic: "ハニュウ ユヅル", romaji: "Hanyu Yuzuru" },
+  "羽生結弦": { kanji: "羽生結弦", phonetic: "ハニュウ ユヅル", romaji: "Hanyu Yuzuru" },
+
+  // Ayase Haruka
+  "ayase_haruka": { kanji: "綾瀬はるか", phonetic: "アヤセ ハルカ", romaji: "Ayase Haruka" },
+  "あやせはるか": { kanji: "綾瀬はるか", phonetic: "アヤセ ハルカ", romaji: "Ayase Haruka" },
+  "綾瀬はるか": { kanji: "綾瀬はるか", phonetic: "アヤセ ハルカ", romaji: "Ayase Haruka" },
+
+  // Fukuyama Masaharu
+  "fukuyama_masaharu": { kanji: "福山雅治", phonetic: "フクヤマ マサハル", romaji: "Fukuyama Masaharu" },
+  "ふくやままさはる": { kanji: "福山雅治", phonetic: "フクヤマ マサハル", romaji: "Fukuyama Masaharu" },
+  "福山雅治": { kanji: "福山雅治", phonetic: "フクヤマ マサハル", romaji: "Fukuyama Masaharu" },
+
+  // Yokohama Ryusei
+  "yokohama_ryuusei": { kanji: "横浜流星", phonetic: "ヨコハマ リュウセイ", romaji: "Yokohama Ryusei" },
+  "よこはまりゅうせい": { kanji: "横浜流星", phonetic: "ヨコハマ リュウセイ", romaji: "Yokohama Ryusei" },
+  "横浜流星": { kanji: "横浜流星", phonetic: "ヨコハマ リュウセイ", romaji: "Yokohama Ryusei" },
+
+  // Nakamura Kazuha
+  "nakamura_kazuha": { kanji: "中村一葉", phonetic: "ナカムラ カズハ", romaji: "Nakamura Kazuha" },
+  "なかむらかずは": { kanji: "中村一葉", phonetic: "ナカムラ カズハ", romaji: "Nakamura Kazuha" },
+  "中村一葉": { kanji: "中村一葉", phonetic: "ナカムラ カズハ", romaji: "Nakamura Kazuha" },
+
+  // Watanabe Haruto
+  "watanabe_haruto": { kanji: "渡辺温斗", phonetic: "ワタナベ ハルト", romaji: "Watanabe Haruto" },
+  "わたなべはると": { kanji: "渡辺温斗", phonetic: "ワタナベ ハルト", romaji: "Watanabe Haruto" },
+  "渡辺温斗": { kanji: "渡辺温斗", phonetic: "ワタナベ ハルト", romaji: "Watanabe Haruto" },
+
+  // Hokazono Iroha
+  "hokazono_iroha": { kanji: "外園いろは", phonetic: "ホカゾノ イロハ", romaji: "Hokazono Iroha" },
+  "ほかぞのいろは": { kanji: "外園いろは", phonetic: "ホカゾノ イロハ", romaji: "Hokazono Iroha" },
+  "外園いろは": { kanji: "外園いろは", phonetic: "ホカゾノ イロハ", romaji: "Hokazono Iroha" },
+
+  // Ishihara Satomi
+  "ishihara_satomi": { kanji: "石原さとみ", phonetic: "イシハラ サトミ", romaji: "Ishihara Satomi" },
+  "いしはらさとみ": { kanji: "石原さとみ", phonetic: "イシハラ サトミ", romaji: "Ishihara Satomi" },
+  "石原さとみ": { kanji: "石原さとみ", phonetic: "イシハラ サトミ", romaji: "Ishihara Satomi" },
+
+  // Haiku
+  "haiku": { kanji: "俳句", phonetic: "ハイク", romaji: "Haiku" },
+  "はいく": { kanji: "俳句", phonetic: "ハイク", romaji: "Haiku" },
+  "俳句": { kanji: "俳句", phonetic: "ハイク", romaji: "Haiku" },
+
+  // Hanabi
+  "hanabi": { kanji: "花火", phonetic: "ハナビ", romaji: "Hanabi" },
+  "はなび": { kanji: "花火", phonetic: "ハナビ", romaji: "Hanabi" },
+  "花火": { kanji: "花火", phonetic: "ハナビ", romaji: "Hanabi" },
+
+  // Senkouhanabi
+  "senkouhanabi": { kanji: "線香花火", phonetic: "センコウハナビ", romaji: "Senkouhanabi" },
+  "せんこうはなび": { kanji: "線香花火", phonetic: "センコウハナビ", romaji: "Senkouhanabi" },
+  "線香花火": { kanji: "線香花火", phonetic: "センコウハナビ", romaji: "Senkouhanabi" },
+
+  // Gohan
+  "gohan": { kanji: "御飯", phonetic: "ゴハン", romaji: "Gohan" },
+  "ごはん": { kanji: "御飯", phonetic: "ゴハン", romaji: "Gohan" },
+  "御飯": { kanji: "御飯", phonetic: "ゴハン", romaji: "Gohan" },
+
+  // Haruto
+  "haruto": { kanji: "陽翔", phonetic: "ハルト", romaji: "Haruto" },
+  "はると": { kanji: "陽翔", phonetic: "ハルト", romaji: "Haruto" },
+  "陽翔": { kanji: "陽翔", phonetic: "ハルト", romaji: "Haruto" },
+
+  // Yua
+  "yua": { kanji: "結愛", phonetic: "ユア", romaji: "Yua" },
+  "ゆあ": { kanji: "結愛", phonetic: "ユア", romaji: "Yua" },
+  "結愛": { kanji: "結愛", phonetic: "ユア", romaji: "Yua" },
+
+  // Akira
+  "akira": { kanji: "輝", phonetic: "アキラ", romaji: "Akira" },
+  "あきら": { kanji: "輝", phonetic: "アキラ", romaji: "Akira" },
+  "輝": { kanji: "輝", phonetic: "アキラ", romaji: "Akira" },
+
+  // Ren
+  "ren": { kanji: "蓮", phonetic: "レン", romaji: "Ren" },
+  "れん": { kanji: "蓮", phonetic: "レン", romaji: "Ren" },
+  "蓮": { kanji: "蓮", phonetic: "レン", romaji: "Ren" },
+
+  // Shamisen
+  "shamisen": { kanji: "三味線", phonetic: "シャミセン", romaji: "Shamisen" },
+  "しゃみせん": { kanji: "三味線", phonetic: "シャミセン", romaji: "Shamisen" },
+  "三味線": { kanji: "三味線", phonetic: "シャミセン", romaji: "Shamisen" },
+
+  // Shodou
+  "shodou": { kanji: "書道", phonetic: "ショドウ", romaji: "Shodou" },
+  "しょどう": { kanji: "書道", phonetic: "ショドウ", romaji: "Shodou" },
+  "書道": { kanji: "書道", phonetic: "ショドウ", romaji: "Shodou" },
+
+  // Wagasa
+  "wagasa": { kanji: "和傘", phonetic: "ワガサ", romaji: "Wagasa" },
+  "わがさ": { kanji: "和傘", phonetic: "ワガサ", romaji: "Wagasa" },
+  "和傘": { kanji: "和傘", phonetic: "ワガサ", romaji: "Wagasa" },
+
+  // Furoshiki
+  "furoshiki": { kanji: "風呂敷", phonetic: "フロシキ", romaji: "Furoshiki" },
+  "ふろしき": { kanji: "風呂敷", phonetic: "フロシキ", romaji: "Furoshiki" },
+  "風呂敷": { kanji: "風呂敷", phonetic: "フロシキ", romaji: "Furoshiki" },
+
+  // Soji
+  "soji": { kanji: "掃除", phonetic: "ソウジ", romaji: "Soji" },
+  "そうじ": { kanji: "掃除", phonetic: "ソウジ", romaji: "Soji" },
+  "掃除": { kanji: "掃除", phonetic: "ソウジ", romaji: "Soji" },
+
+  // Kendama
+  "kendama": { kanji: "剣玉", phonetic: "ケンダマ", romaji: "Kendama" },
+  "けんだま": { kanji: "剣玉", phonetic: "ケンダマ", romaji: "Kendama" },
+  "剣玉": { kanji: "剣玉", phonetic: "ケンダマ", romaji: "Kendama" },
+
+  // Soroban
+  "soroban": { kanji: "算盤", phonetic: "ソロバン", romaji: "Soroban" },
+  "そろばん": { kanji: "算盤", phonetic: "ソロバン", romaji: "Soroban" },
+  "算盤": { kanji: "算盤", phonetic: "ソロバン", romaji: "Soroban" },
+
+  // Manekineko
+  "manekineko": { kanji: "招き猫", phonetic: "マネキネコ", romaji: "Manekineko" },
+  "まねきねこ": { kanji: "招き猫", phonetic: "マネキネコ", romaji: "Manekineko" },
+  "招き猫": { kanji: "招き猫", phonetic: "マネキネコ", romaji: "Manekineko" },
+
+  // Tanzaku
+  "tanzaku": { kanji: "短冊", phonetic: "タンザク", romaji: "Tanzaku" },
+  "たんざく": { kanji: "短冊", phonetic: "タンザク", romaji: "Tanzaku" },
+  "短冊": { kanji: "短冊", phonetic: "タンザク", romaji: "Tanzaku" },
+
+  // Obento
+  "obento": { kanji: "お弁当", phonetic: "オベントウ", romaji: "Obento" },
+  "おべんとう": { kanji: "お弁当", phonetic: "オベントウ", romaji: "Obento" },
+  "お弁当": { kanji: "お弁当", phonetic: "オベントウ", romaji: "Obento" },
+
+  // Origami Tsuru
+  "origami_tsuru": { kanji: "折鶴", phonetic: "オリヅル", romaji: "Origami Tsuru" },
+  "おりづる": { kanji: "折鶴", phonetic: "オリヅル", romaji: "Origami Tsuru" },
+  "折鶴": { kanji: "折鶴", phonetic: "オリヅル", romaji: "Origami Tsuru" },
+};
+
+export function resolveJapaneseSpeechPayload(
+  text: string,
+  kanjiHint?: string,
+  romajiHint?: string
+): { speechText: string; isEnglish: boolean; romajiFallback: string } {
+  const cleanText = (text || "").trim();
+  const cleanKanji = (kanjiHint || "").trim();
+
+  // If input is purely English/Latin
+  if (/^[a-zA-Z\s\.\-\'\,\!\?\(\)]+$/.test(cleanText)) {
+    return { speechText: cleanText, isEnglish: true, romajiFallback: cleanText };
+  }
+
+  // Check override dictionary
+  const key = cleanText.toLowerCase();
+  const entry =
+    PHONETIC_PRONUNCIATION_MAP[key] ||
+    PHONETIC_PRONUNCIATION_MAP[cleanText] ||
+    (cleanKanji ? PHONETIC_PRONUNCIATION_MAP[cleanKanji.toLowerCase()] || PHONETIC_PRONUNCIATION_MAP[cleanKanji] : undefined);
+
+  if (entry) {
+    return {
+      speechText: entry.kanji || entry.phonetic,
+      isEnglish: false,
+      romajiFallback: entry.romaji || romajiHint || cleanText,
+    };
+  }
+
+  // If Kanji hint is provided and has Kanji characters, prefer Kanji for Japanese TTS
+  if (cleanKanji && /[\u4e00-\u9faf]/.test(cleanKanji)) {
+    return {
+      speechText: cleanKanji,
+      isEnglish: false,
+      romajiFallback: romajiHint || cleanText,
+    };
+  }
+
+  // If text itself has Kanji
+  if (/[\u4e00-\u9faf]/.test(cleanText)) {
+    return {
+      speechText: cleanText,
+      isEnglish: false,
+      romajiFallback: romajiHint || cleanText,
+    };
+  }
+
+  // Otherwise convert to phonetic Katakana to prevent "ha" -> "wa" particle confusion
+  return {
+    speechText: toPhoneticKatakana(cleanText),
+    isEnglish: false,
+    romajiFallback: romajiHint || cleanText,
+  };
+}
+
 class RetroAudioSynth {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
   private voiceType: string = "female"; // "female" | "male" | "child"
   private lastSpeakTime: number = 0;
   private activeFullWordUtterance: SpeechSynthesisUtterance | null = null;
+  private cachedVoices: SpeechSynthesisVoice[] = [];
+
+  constructor() {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      this.cachedVoices = window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        this.cachedVoices = window.speechSynthesis.getVoices();
+      };
+    }
+  }
+
+  private getAvailableVoices(): SpeechSynthesisVoice[] {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return [];
+    if (!this.cachedVoices || this.cachedVoices.length === 0) {
+      this.cachedVoices = window.speechSynthesis.getVoices();
+    }
+    return this.cachedVoices;
+  }
 
   private bgmInterval: any = null;
   private droneOsc1: OscillatorNode | null = null;
@@ -64,20 +287,26 @@ class RetroAudioSynth {
         window.speechSynthesis.cancel();
 
         const cleanText = text.trim();
-        const isEnglish = /^[a-zA-Z\s\.\-\'\,\!\?\(\)]+$/.test(cleanText);
-        const speechText = isEnglish ? cleanText : toPhoneticKatakana(cleanText);
-        const utterance = new SpeechSynthesisUtterance(speechText);
-        utterance.lang = isEnglish ? "en-US" : "ja-JP";
-        utterance.rate = isEnglish ? 1.05 : 1.15; // Snappy, crisp and agile response
+        const payload = resolveJapaneseSpeechPayload(cleanText);
+        const utterance = new SpeechSynthesisUtterance(payload.speechText);
+        utterance.lang = payload.isEnglish ? "en-US" : "ja-JP";
+        utterance.rate = payload.isEnglish ? 1.05 : 1.15; // Snappy, crisp and agile response
         utterance.pitch = this.voiceType === "male" ? 0.85 : (this.voiceType === "child" ? 1.35 : 1.05);
 
-        const voices = window.speechSynthesis.getVoices();
-        const targetVoice = voices.find((v) => {
-          const lang = v.lang.toLowerCase();
-          return isEnglish ? (lang === "en-us" || lang.startsWith("en")) : (lang === "ja-jp" || lang.startsWith("ja"));
-        });
+        const voices = this.getAvailableVoices();
+        let targetVoice = null;
+        if (payload.isEnglish) {
+          targetVoice = voices.find((v) => v.lang.toLowerCase().startsWith("en"));
+        } else {
+          targetVoice = voices.find((v) => v.lang.toLowerCase().startsWith("ja"));
+        }
+
         if (targetVoice) {
           utterance.voice = targetVoice;
+          if (targetVoice.lang.toLowerCase().startsWith("en") && !payload.isEnglish) {
+            utterance.text = payload.romajiFallback;
+            utterance.lang = "en-US";
+          }
         }
 
         window.speechSynthesis.speak(utterance);
@@ -88,7 +317,7 @@ class RetroAudioSynth {
   }
 
   // Speaks Japanese syllable or full word using SpeechSynthesis API (with automatic English detection for English Mode)
-  speakJapanese(text: string, cancelActive: boolean = true) {
+  speakJapanese(text: string, cancelActive: boolean = true, kanjiHint?: string, romajiHint?: string) {
     if (this.isMuted || !text || text.trim() === "") return;
     this.lastSpeakTime = Date.now();
 
@@ -98,15 +327,14 @@ class RetroAudioSynth {
           window.speechSynthesis.resume();
         }
 
-        const isEnglish = /^[a-zA-Z\s\.\-\'\,\!\?\(\)]+$/.test(text);
-        const speechText = isEnglish ? text : toPhoneticKatakana(text);
-        const utterance = new SpeechSynthesisUtterance(speechText);
-        utterance.lang = isEnglish ? "en-US" : "ja-JP";
+        const payload = resolveJapaneseSpeechPayload(text, kanjiHint, romajiHint);
+        const utterance = new SpeechSynthesisUtterance(payload.speechText);
+        utterance.lang = payload.isEnglish ? "en-US" : "ja-JP";
         
         // Custom pitch/rate based on selected speaker gender/type
         if (this.voiceType === "male") {
-          utterance.rate = isEnglish ? 1.00 : 1.05; // clear, authoritative cadence
-          utterance.pitch = isEnglish ? 0.90 : 0.82; // deeper masculine register
+          utterance.rate = payload.isEnglish ? 1.00 : 1.05; // clear, authoritative cadence
+          utterance.pitch = payload.isEnglish ? 0.90 : 0.82; // deeper masculine register
         } else if (this.voiceType === "child") {
           utterance.rate = 1.15; // bouncy and energetic
           utterance.pitch = 1.38; // high-pitched cute anime guide
@@ -118,15 +346,15 @@ class RetroAudioSynth {
           utterance.pitch = 0.65; // deep, weathered hoarse quality
         } else {
           // female (default)
-          utterance.rate = isEnglish ? 1.05 : 1.12; // snappy, crisp, immediate feedback
-          utterance.pitch = isEnglish ? 1.00 : 1.05; // bright, high contrast clarity
+          utterance.rate = payload.isEnglish ? 1.05 : 1.12; // snappy, crisp, immediate feedback
+          utterance.pitch = payload.isEnglish ? 1.00 : 1.05; // bright, high contrast clarity
         }
 
         // Try selecting a specific voice package if available
-        const voices = window.speechSynthesis.getVoices();
+        const voices = this.getAvailableVoices();
         let targetVoice = null;
 
-        if (isEnglish) {
+        if (payload.isEnglish) {
           if (this.voiceType === "male" || this.voiceType === "elderly") {
             targetVoice = voices.find((v) => {
               const name = v.name.toLowerCase();
@@ -195,6 +423,10 @@ class RetroAudioSynth {
 
         if (targetVoice) {
           utterance.voice = targetVoice;
+          if (targetVoice.lang.toLowerCase().startsWith("en") && !payload.isEnglish) {
+            utterance.text = payload.romajiFallback;
+            utterance.lang = "en-US";
+          }
         }
 
         if (cancelActive && window.speechSynthesis.speaking) {
@@ -216,7 +448,7 @@ class RetroAudioSynth {
 
   // Speaks the entire completed word IMMEDIATELY with zero delay, hard-canceling any in-flight syllables.
   // Invokes onEnd when the pronunciation has finished playing so the UI does not advance prematurely!
-  speakFullWord(text: string, onEnd?: () => void) {
+  speakFullWord(text: string, onEnd?: () => void, kanjiHint?: string, romajiHint?: string) {
     if (!text || text.trim() === "") {
       if (onEnd) onEnd();
       return;
@@ -239,16 +471,14 @@ class RetroAudioSynth {
       // Hard cancel any lingering syllable speech immediately so full word plays instantly!
       window.speechSynthesis.cancel();
 
-      const cleanText = text.trim();
-      const isEnglish = /^[a-zA-Z\s\.\-\'\,\!\?\(\)]+$/.test(cleanText);
-      const speechText = isEnglish ? cleanText : toPhoneticKatakana(cleanText);
-      const utterance = new SpeechSynthesisUtterance(speechText);
+      const payload = resolveJapaneseSpeechPayload(text, kanjiHint, romajiHint);
+      const utterance = new SpeechSynthesisUtterance(payload.speechText);
       this.activeFullWordUtterance = utterance; // Prevent garbage collection in V8/WebKit engines
-      utterance.lang = isEnglish ? "en-US" : "ja-JP";
+      utterance.lang = payload.isEnglish ? "en-US" : "ja-JP";
 
       if (this.voiceType === "male") {
-        utterance.rate = isEnglish ? 1.02 : 1.05;
-        utterance.pitch = isEnglish ? 0.90 : 0.82;
+        utterance.rate = payload.isEnglish ? 1.02 : 1.05;
+        utterance.pitch = payload.isEnglish ? 0.90 : 0.82;
       } else if (this.voiceType === "child") {
         utterance.rate = 1.15;
         utterance.pitch = 1.30;
@@ -259,13 +489,13 @@ class RetroAudioSynth {
         utterance.rate = 0.85;
         utterance.pitch = 0.65;
       } else {
-        utterance.rate = isEnglish ? 1.05 : 1.10;
-        utterance.pitch = isEnglish ? 1.00 : 1.02;
+        utterance.rate = payload.isEnglish ? 1.05 : 1.10;
+        utterance.pitch = payload.isEnglish ? 1.00 : 1.02;
       }
 
-      const voices = window.speechSynthesis.getVoices();
+      const voices = this.getAvailableVoices();
       let targetVoice = null;
-      if (isEnglish) {
+      if (payload.isEnglish) {
         if (this.voiceType === "male" || this.voiceType === "elderly") {
           targetVoice = voices.find((v) => {
             const name = v.name.toLowerCase();
@@ -321,6 +551,10 @@ class RetroAudioSynth {
 
       if (targetVoice) {
         utterance.voice = targetVoice;
+        if (targetVoice.lang.toLowerCase().startsWith("en") && !payload.isEnglish) {
+          utterance.text = payload.romajiFallback;
+          utterance.lang = "en-US";
+        }
       }
 
       this.lastSpeakTime = Date.now();
@@ -348,8 +582,8 @@ class RetroAudioSynth {
       };
 
       // Safety watchdog: ensure callback is always reached even if browser drops onend
-      // Calculates based on length: 450ms per character + 1200ms minimum window
-      const maxEstimatedMs = Math.min(8000, Math.max(1400, cleanText.length * 450 + 1200));
+      const cleanLen = (payload.speechText || text).length;
+      const maxEstimatedMs = Math.min(8000, Math.max(1400, cleanLen * 450 + 1200));
       safetyWatchdog = setTimeout(() => {
         triggerCompletion();
       }, maxEstimatedMs);

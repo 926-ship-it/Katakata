@@ -1155,7 +1155,7 @@ const BASE_DICTIONARY: DictionaryItem[] = [
   },
   {
     id: "haruto",
-    kanji: "阳翔",
+    kanji: "陽翔",
     kanaStr: "はると",
     category: "name",
     categoryName: "日本人名",
@@ -1209,7 +1209,7 @@ const BASE_DICTIONARY: DictionaryItem[] = [
   },
   {
     id: "yua",
-    kanji: "结爱",
+    kanji: "結愛",
     kanaStr: "ゆあ",
     category: "name",
     categoryName: "日本人名",
@@ -1261,7 +1261,7 @@ const BASE_DICTIONARY: DictionaryItem[] = [
   },
   {
     id: "akira",
-    kanji: "辉",
+    kanji: "輝",
     kanaStr: "あきら",
     category: "name",
     categoryName: "日本人名",
@@ -1297,7 +1297,7 @@ const BASE_DICTIONARY: DictionaryItem[] = [
   },
   {
     id: "ren",
-    kanji: "莲",
+    kanji: "蓮",
     kanaStr: "れん",
     category: "name",
     categoryName: "日本人名",
@@ -1367,7 +1367,7 @@ const BASE_DICTIONARY: DictionaryItem[] = [
   },
   {
     id: "shamisen",
-    kanji: "三味线",
+    kanji: "三味線",
     kanaStr: "しゃみせん",
     category: "culture",
     categoryName: "民俗文化",
@@ -1387,7 +1387,7 @@ const BASE_DICTIONARY: DictionaryItem[] = [
   },
   {
     id: "shodou",
-    kanji: "书道",
+    kanji: "書道",
     kanaStr: "しょどう",
     category: "culture",
     categoryName: "民俗文化",
@@ -1441,7 +1441,7 @@ const BASE_DICTIONARY: DictionaryItem[] = [
   },
   {
     id: "wagasa",
-    kanji: "和伞",
+    kanji: "和傘",
     kanaStr: "わがさ",
     category: "culture",
     categoryName: "民俗文化",
@@ -1477,7 +1477,7 @@ const BASE_DICTIONARY: DictionaryItem[] = [
   },
   {
     id: "furoshiki",
-    kanji: "风吕敷",
+    kanji: "風呂敷",
     kanaStr: "ふろしき",
     category: "culture",
     categoryName: "民俗文化",
@@ -1515,7 +1515,7 @@ const BASE_DICTIONARY: DictionaryItem[] = [
   },
   {
     id: "soji",
-    kanji: "扫除",
+    kanji: "掃除",
     kanaStr: "そうじ",
     category: "culture",
     categoryName: "民俗文化",
