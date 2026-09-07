@@ -104,7 +104,7 @@ export const KPOP_RIVALRY_DICTIONARY: DictionaryItem[] = [
       { kana: "ら", romaji: ["ra"], displayRomaji: "ra" },
       { kana: "か", romaji: ["ka"], displayRomaji: "ka" },
       { kana: "ず", romaji: ["zu", "du"], displayRomaji: "zu" },
-      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" }
+      { kana: "は", romaji: ["ha"], displayRomaji: "ha" }
     ]
   },
   {
@@ -317,7 +317,7 @@ export const KPOP_RIVALRY_DICTIONARY: DictionaryItem[] = [
       { kana: "た", romaji: ["ta"], displayRomaji: "ta" },
       { kana: "な", romaji: ["na"], displayRomaji: "na" },
       { kana: "べ", romaji: ["be"], displayRomaji: "be" },
-      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" },
+      { kana: "は", romaji: ["ha"], displayRomaji: "ha" },
       { kana: "る", romaji: ["ru"], displayRomaji: "ru" },
       { kana: "と", romaji: ["to"], displayRomaji: "to" }
     ]
@@ -341,7 +341,7 @@ export const KPOP_RIVALRY_DICTIONARY: DictionaryItem[] = [
       { kana: "の", romaji: ["no"], displayRomaji: "no" },
       { kana: "い", romaji: ["i"], displayRomaji: "i" },
       { kana: "ろ", romaji: ["ro"], displayRomaji: "ro" },
-      { kana: "は", romaji: ["ha", "wa"], displayRomaji: "ha" }
+      { kana: "は", romaji: ["ha"], displayRomaji: "ha" }
     ]
   }
 ];

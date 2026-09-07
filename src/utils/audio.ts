@@ -1,6 +1,15 @@
 // Safe Web Audio API synthesizer for retro mechanical game sounds
 // Avoids requiring external static files, keeping it 100% responsive and offline-first!
 
+// Converts Japanese Hiragana to Katakana to ensure 100% accurate phonetic TTS pronunciation.
+// In Hiragana, browser TTS engines often mistakenly treat 「は」 as the topic particle "wa" (e.g. reading はしもとかんな as "washimoto kanna").
+// In Katakana, 「ハ」 is strictly and unambiguously pronounced "ha", and 「ワ」 is strictly "wa".
+export function toPhoneticKatakana(text: string): string {
+  return text.replace(/[\u3041-\u3096]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) + 0x60)
+  );
+}
+
 class RetroAudioSynth {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
@@ -55,8 +64,9 @@ class RetroAudioSynth {
         window.speechSynthesis.cancel();
 
         const cleanText = text.trim();
-        const utterance = new SpeechSynthesisUtterance(cleanText);
         const isEnglish = /^[a-zA-Z\s\.\-\'\,\!\?\(\)]+$/.test(cleanText);
+        const speechText = isEnglish ? cleanText : toPhoneticKatakana(cleanText);
+        const utterance = new SpeechSynthesisUtterance(speechText);
         utterance.lang = isEnglish ? "en-US" : "ja-JP";
         utterance.rate = isEnglish ? 1.05 : 1.15; // Snappy, crisp and agile response
         utterance.pitch = this.voiceType === "male" ? 0.85 : (this.voiceType === "child" ? 1.35 : 1.05);
@@ -88,8 +98,9 @@ class RetroAudioSynth {
           window.speechSynthesis.resume();
         }
 
-        const utterance = new SpeechSynthesisUtterance(text);
         const isEnglish = /^[a-zA-Z\s\.\-\'\,\!\?\(\)]+$/.test(text);
+        const speechText = isEnglish ? text : toPhoneticKatakana(text);
+        const utterance = new SpeechSynthesisUtterance(speechText);
         utterance.lang = isEnglish ? "en-US" : "ja-JP";
         
         // Custom pitch/rate based on selected speaker gender/type
@@ -229,10 +240,10 @@ class RetroAudioSynth {
       window.speechSynthesis.cancel();
 
       const cleanText = text.trim();
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      this.activeFullWordUtterance = utterance; // Prevent garbage collection in V8/WebKit engines
-      
       const isEnglish = /^[a-zA-Z\s\.\-\'\,\!\?\(\)]+$/.test(cleanText);
+      const speechText = isEnglish ? cleanText : toPhoneticKatakana(cleanText);
+      const utterance = new SpeechSynthesisUtterance(speechText);
+      this.activeFullWordUtterance = utterance; // Prevent garbage collection in V8/WebKit engines
       utterance.lang = isEnglish ? "en-US" : "ja-JP";
 
       if (this.voiceType === "male") {

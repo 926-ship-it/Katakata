@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
-import { BookOpen, Sparkles, Trophy, Settings, HelpCircle, Flame, Keyboard, BarChart2, Calendar, Award, Clock, ArrowRight, RotateCw, Play, BookOpenCheck, Activity, Plus, FileText, Trash2, CheckCircle, AlertCircle, Upload, Gamepad2 } from "lucide-react";
+import { BookOpen, Sparkles, Trophy, Settings, HelpCircle, Flame, Keyboard, BarChart2, Calendar, Award, Clock, ArrowRight, RotateCw, Play, BookOpenCheck, Activity, Plus, FileText, Trash2, CheckCircle, AlertCircle, Upload, Gamepad2, Search, X, CheckSquare, Layers } from "lucide-react";
 import { DICTIONARY, DictionaryItem, getDictionary } from "../data/dictionary";
 import { getReviewSummary, getDueCardIds } from "../utils/srs";
 import { uiTranslate, LANG_MAPPING } from "../utils/lang";
@@ -83,6 +83,8 @@ export const StartPage: React.FC<StartPageProps> = ({
   const [customMinutesText, setCustomMinutesText] = useState<string>("");
   const [showCustomTime, setShowCustomTime] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [customBatchCount, setCustomBatchCount] = useState<number>(10);
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
   const [customCardCount, setCustomCardCount] = useState<number>(5);
   const [customTimerMinutes, setCustomTimerMinutes] = useState<number>(3);
@@ -388,12 +390,38 @@ export const StartPage: React.FC<StartPageProps> = ({
 
   const [activeTab, setActiveTab ] = useState<"intro" | "rules">("intro");
 
-  // Filter dictionary based on unlocked status or category
+  // Filter dictionary based on unlocked status, specific category, or search query
   const filteredDict = activeDict.filter((item) => {
-    if (selectedCategory === "all") return true;
-    if (selectedCategory === "locked") return !collectedIds.includes(item.id) && item.category !== "custom";
-    if (selectedCategory === "unlocked") return collectedIds.includes(item.id) || item.category === "custom";
-    return item.category === selectedCategory;
+    let matchCat = true;
+    if (selectedCategory === "all") matchCat = true;
+    else if (selectedCategory === "locked") matchCat = !collectedIds.includes(item.id) && item.category !== "custom";
+    else if (selectedCategory === "unlocked") matchCat = collectedIds.includes(item.id) || item.category === "custom";
+    else if (selectedCategory === "custom") matchCat = item.category === "custom";
+    else if (selectedCategory === "kpop") matchCat = item.categoryName === "K-POP偶像";
+    else if (selectedCategory === "rivalry") matchCat = item.categoryName === "Heated Rivalry";
+    else if (selectedCategory === "celebrity") {
+      matchCat = ["热门名人", "影视巨星", "流行巨星", "体坛巨星", "音乐巨匠", "网络红人"].includes(item.categoryName || "");
+    }
+    else if (selectedCategory === "name") {
+      matchCat = item.category === "name" && ["日本人名", "西式人名"].includes(item.categoryName || "日本人名");
+    }
+    else {
+      matchCat = item.category === selectedCategory;
+    }
+
+    if (!matchCat) return false;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const matchKanji = item.kanji.toLowerCase().includes(q);
+      const matchKana = item.kanaStr.toLowerCase().includes(q);
+      const matchMeaning = item.meaning.toLowerCase().includes(q);
+      const matchRomaji = item.segments.some((s) => s.romaji.some((r) => r.toLowerCase().includes(q)));
+      const matchCatName = (item.categoryName || "").toLowerCase().includes(q);
+      return matchKanji || matchKana || matchMeaning || matchRomaji || matchCatName;
+    }
+
+    return true;
   });
 
   // On initial mount or dictionary switch, keep valid selected cards; if none, initialize with first 5 cards
@@ -414,19 +442,26 @@ export const StartPage: React.FC<StartPageProps> = ({
     setSelectedCardIds((prev) => Array.from(new Set([...prev, ...allIds])));
   };
 
+  const handleSelectAllEntireDict = () => {
+    if (activeDict.length === 0) return;
+    setSelectedCardIds(activeDict.map(item => item.id));
+  };
+
   const handleClearSelection = () => {
     setSelectedCardIds([]);
   };
 
   const handleSelectCount = (count: number) => {
-    if (filteredDict.length === 0) return;
-    const shuffled = [...filteredDict].sort(() => Math.random() - 0.5);
+    const pool = filteredDict.length > 0 ? filteredDict : activeDict;
+    if (pool.length === 0) return;
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, Math.min(count, shuffled.length)).map(item => item.id);
     setSelectedCardIds(selected);
   };
 
   const handleRandomizeSelection = () => {
-    if (filteredDict.length === 0) return;
+    const pool = filteredDict.length > 0 ? filteredDict : activeDict;
+    if (pool.length === 0) return;
     const targetCount = Math.max(selectedCardIds.length, 5);
     handleSelectCount(targetCount);
   };
@@ -1352,70 +1387,206 @@ export const StartPage: React.FC<StartPageProps> = ({
             </button>
           </div>
 
-          {/* Dictionary Filtering Controls */}
-          <div className="flex flex-wrap items-center gap-1.5 mt-4 border-b border-stone-200 pb-3">
-            {[
-              { id: "all", label: "全部词库" },
-              { id: "locked", label: "尚未解锁" },
-              { id: "unlocked", label: "已经收集" },
-              { id: "name", label: isEnglishMode ? "西式人名" : "日本常见人名" },
-              { id: "nature", label: isEnglishMode ? "自然与动物" : "四季自然" },
-              { id: "culture", label: isEnglishMode ? "物品与概念" : "民俗祭典" },
-              { id: "food", label: isEnglishMode ? "西餐美味" : "和食美味" },
-            ].map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`py-1 px-3 rounded-full text-xs font-medium cursor-pointer transition-colors ${
-                  selectedCategory === cat.id
-                    ? "bg-stone-900 text-stone-50"
-                    : "bg-stone-200 text-stone-600 hover:bg-stone-300"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
+          {/* Dictionary Search & Filtering Controls */}
+          <div className="mt-4 space-y-3 border-b border-stone-200 pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Instant Search Bar */}
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={isEnglishMode ? "Search words, meanings, or romaji..." : "快速检索词条、假名、罗马音、名人、词意..."}
+                  className="w-full pl-9 pr-8 py-2 bg-white border border-stone-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-stone-900 font-sans shadow-2xs"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-0.5 cursor-pointer"
+                    title="清空搜索"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              
+              {searchQuery && (
+                <div className="text-xs text-stone-500 font-mono">
+                  找到 <span className="font-bold text-stone-900">{filteredDict.length}</span> 个匹配词条
+                </div>
+              )}
+            </div>
+
+            {/* Category Badges */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[
+                { id: "all", label: "全部词库", count: activeDict.length },
+                { 
+                  id: "celebrity", 
+                  label: "🌟 影视流行名人", 
+                  count: activeDict.filter(it => ["热门名人", "影视巨星", "流行巨星", "体坛巨星", "音乐巨匠", "网络红人"].includes(it.categoryName || "")).length 
+                },
+                { 
+                  id: "kpop", 
+                  label: "🇰🇷 K-POP偶像", 
+                  count: activeDict.filter(it => it.categoryName === "K-POP偶像").length 
+                },
+                { 
+                  id: "rivalry", 
+                  label: "🏒 Heated Rivalry", 
+                  count: activeDict.filter(it => it.categoryName === "Heated Rivalry").length 
+                },
+                { 
+                  id: "name", 
+                  label: isEnglishMode ? "西式人名" : "🎎 日本常见人名", 
+                  count: activeDict.filter(it => it.category === "name" && ["日本人名", "西式人名"].includes(it.categoryName || "日本人名")).length 
+                },
+                { 
+                  id: "nature", 
+                  label: isEnglishMode ? "自然与动物" : "🌸 四季自然", 
+                  count: activeDict.filter(it => it.category === "nature").length 
+                },
+                { 
+                  id: "culture", 
+                  label: isEnglishMode ? "物品与概念" : "⛩️ 民俗祭典", 
+                  count: activeDict.filter(it => it.category === "culture").length 
+                },
+                { 
+                  id: "food", 
+                  label: isEnglishMode ? "西餐美味" : "🍣 和食美味", 
+                  count: activeDict.filter(it => it.category === "food").length 
+                },
+                { 
+                  id: "unlocked", 
+                  label: "⭐ 已经收集", 
+                  count: activeDict.filter(it => collectedIds.includes(it.id) || it.category === "custom").length 
+                },
+                { 
+                  id: "locked", 
+                  label: "🔒 尚未解锁", 
+                  count: activeDict.filter(it => !collectedIds.includes(it.id) && it.category !== "custom").length 
+                },
+                ...(customCards.length > 0 ? [{ id: "custom", label: "✍️ 自定义词库", count: customCards.length }] : []),
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`py-1 px-3 rounded-full text-xs font-medium cursor-pointer transition-all flex items-center gap-1.5 ${
+                    selectedCategory === cat.id
+                      ? "bg-stone-900 text-stone-50 shadow-xs"
+                      : "bg-stone-200/80 text-stone-600 hover:bg-stone-300"
+                  }`}
+                >
+                  <span>{cat.label}</span>
+                  <span className={`text-[10px] font-mono px-1 rounded ${
+                    selectedCategory === cat.id ? "bg-stone-750 text-stone-300" : "bg-stone-300/80 text-stone-600"
+                  }`}>
+                    {cat.count}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Multi-word Quick Selection & Batch Action Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 mt-3 py-2 px-3 bg-stone-100/80 border border-stone-250 rounded-xl text-xs select-none">
+          <div className="flex flex-wrap items-center justify-between gap-3 mt-3 py-2.5 px-3.5 bg-stone-100/90 border border-stone-250 rounded-xl text-xs select-none shadow-2xs">
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
               <span className="font-bold text-stone-750 font-serif flex items-center gap-1 mr-1">
-                <span>勾选联训:</span>
+                <span>选词范围:</span>
               </span>
               <button
                 type="button"
                 onClick={handleSelectAllInView}
-                className="px-2.5 py-1 rounded bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-medium transition-colors cursor-pointer shadow-2xs"
+                className="px-2.5 py-1 rounded-lg bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-bold transition-colors cursor-pointer shadow-2xs"
                 title="全选当前分类下的所有单词"
               >
                 全选本类 ({filteredDict.length})
               </button>
               <button
                 type="button"
+                onClick={handleSelectAllEntireDict}
+                className="px-2.5 py-1 rounded-lg bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-bold transition-colors cursor-pointer shadow-2xs"
+                title="全选整个词库的所有词条"
+              >
+                全库全选 ({activeDict.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectCount(3)}
+                className="px-2 py-1 rounded-lg bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-medium transition-colors cursor-pointer shadow-2xs"
+              >
+                选 3 词
+              </button>
+              <button
+                type="button"
                 onClick={() => handleSelectCount(5)}
-                className="px-2.5 py-1 rounded bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-medium transition-colors cursor-pointer shadow-2xs"
+                className="px-2 py-1 rounded-lg bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-medium transition-colors cursor-pointer shadow-2xs"
               >
                 选 5 词
               </button>
               <button
                 type="button"
                 onClick={() => handleSelectCount(10)}
-                className="px-2.5 py-1 rounded bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-medium transition-colors cursor-pointer shadow-2xs"
+                className="px-2 py-1 rounded-lg bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-medium transition-colors cursor-pointer shadow-2xs"
               >
                 选 10 词
               </button>
               <button
                 type="button"
                 onClick={() => handleSelectCount(20)}
-                className="px-2.5 py-1 rounded bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-medium transition-colors cursor-pointer shadow-2xs"
+                className="px-2 py-1 rounded-lg bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-medium transition-colors cursor-pointer shadow-2xs"
               >
                 选 20 词
               </button>
               <button
                 type="button"
+                onClick={() => handleSelectCount(30)}
+                className="px-2 py-1 rounded-lg bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-medium transition-colors cursor-pointer shadow-2xs"
+              >
+                选 30 词
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectCount(50)}
+                className="px-2 py-1 rounded-lg bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-medium transition-colors cursor-pointer shadow-2xs"
+              >
+                选 50 词
+              </button>
+              
+              {/* Quick Stepper for custom count */}
+              <div className="inline-flex items-center bg-white border border-stone-300 rounded-lg p-0.5 ml-1">
+                <button
+                  type="button"
+                  onClick={() => setCustomBatchCount(c => Math.max(1, c - 5))}
+                  className="px-1.5 py-0.5 text-stone-600 hover:bg-stone-100 rounded text-[11px] font-bold cursor-pointer"
+                  title="减少5词"
+                >
+                  -
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectCount(customBatchCount)}
+                  className="px-2 py-0.5 text-[11px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 rounded transition-colors cursor-pointer"
+                  title={`点击快速勾选 ${customBatchCount} 词`}
+                >
+                  选 {customBatchCount} 词
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCustomBatchCount(c => Math.min(activeDict.length, c + 5))}
+                  className="px-1.5 py-0.5 text-stone-600 hover:bg-stone-100 rounded text-[11px] font-bold cursor-pointer"
+                  title="增加5词"
+                >
+                  +
+                </button>
+              </div>
+
+              <button
+                type="button"
                 onClick={handleClearSelection}
-                className="px-2 py-1 rounded bg-stone-200 hover:bg-stone-300 text-stone-600 transition-colors cursor-pointer"
+                className="px-2.5 py-1 rounded-lg bg-stone-200 hover:bg-stone-300 text-stone-600 font-medium transition-colors cursor-pointer ml-auto sm:ml-0"
               >
                 清空
               </button>
@@ -1425,7 +1596,7 @@ export const StartPage: React.FC<StartPageProps> = ({
               <span className="text-stone-500 font-mono text-[11px]">
                 已勾选:
               </span>
-              <span className={`px-2 py-0.5 rounded-full font-mono font-black text-xs ${
+              <span className={`px-2.5 py-0.5 rounded-full font-mono font-black text-xs ${
                 selectedCardIds.length > 0 
                   ? "bg-amber-500 text-stone-950 shadow-xs" 
                   : "bg-stone-300 text-stone-600"
@@ -1704,9 +1875,24 @@ export const StartPage: React.FC<StartPageProps> = ({
             </div>
           )}
 
-          {/* Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4 max-h-[380px] overflow-y-auto pr-1">
-            {filteredDict.map((item) => {
+          {/* Cards Grid or Empty Search State */}
+          {filteredDict.length === 0 ? (
+            <div className="py-12 px-4 text-center bg-stone-50 border border-dashed border-stone-250 rounded-2xl mt-4">
+              <p className="text-stone-500 text-sm font-medium">未找到与 “{searchQuery}” 匹配的词条</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setSelectedCategory("all");
+                }}
+                className="mt-3 px-4 py-1.5 bg-stone-900 text-stone-100 rounded-lg text-xs font-bold hover:bg-stone-800 transition-colors cursor-pointer"
+              >
+                重置分类与搜索
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4 max-h-[580px] overflow-y-auto pr-1">
+              {filteredDict.map((item) => {
               const isUnlocked = collectedIds.includes(item.id) || item.category === "custom";
               const isChecked = selectedCardIds.includes(item.id);
               
@@ -1852,8 +2038,9 @@ export const StartPage: React.FC<StartPageProps> = ({
               );
             })}
           </div>
-        </div>
+        )}
       </div>
+    </div>
 
       {/* Rules / Tutorial tabs */}
       <div className="bg-stone-100/60 rounded-xl border border-stone-200 p-4">
