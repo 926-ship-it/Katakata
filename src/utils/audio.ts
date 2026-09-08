@@ -245,20 +245,33 @@ class RetroAudioSynth {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
   private voiceType: string = "female"; // "female" | "male" | "child"
+  private speechRate: number = 1.0; // 0.8 | 1.0 | 1.25 | 1.5 | 1.75 | 2.0
   private lastSpeakTime: number = 0;
   private activeFullWordUtterance: SpeechSynthesisUtterance | null = null;
   private cachedVoices: SpeechSynthesisVoice[] = [];
 
   constructor() {
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    if (typeof window !== "undefined") {
       try {
-        this.cachedVoices = window.speechSynthesis.getVoices();
-        window.speechSynthesis.onvoiceschanged = () => {
-          try {
-            this.cachedVoices = window.speechSynthesis.getVoices();
-          } catch (_) {}
-        };
+        const savedRate = localStorage.getItem("fifty_sound_speech_rate");
+        if (savedRate) {
+          const parsed = parseFloat(savedRate);
+          if (!isNaN(parsed) && parsed >= 0.5 && parsed <= 2.5) {
+            this.speechRate = parsed;
+          }
+        }
       } catch (_) {}
+
+      if ("speechSynthesis" in window) {
+        try {
+          this.cachedVoices = window.speechSynthesis.getVoices();
+          window.speechSynthesis.onvoiceschanged = () => {
+            try {
+              this.cachedVoices = window.speechSynthesis.getVoices();
+            } catch (_) {}
+          };
+        } catch (_) {}
+      }
     }
   }
 
@@ -309,6 +322,19 @@ class RetroAudioSynth {
     return this.voiceType;
   }
 
+  setSpeechRate(rate: number) {
+    if (rate >= 0.5 && rate <= 2.5) {
+      this.speechRate = rate;
+      try {
+        localStorage.setItem("fifty_sound_speech_rate", String(rate));
+      } catch (_) {}
+    }
+  }
+
+  getSpeechRate(): number {
+    return this.speechRate;
+  }
+
   // Speaks an individual kana or syllable instantly with zero lag and optimized brisk rate
   speakKanaInstant(text: string) {
     if (this.isMuted || !text || text.trim() === "") return;
@@ -323,7 +349,8 @@ class RetroAudioSynth {
         const payload = resolveJapaneseSpeechPayload(cleanText);
         const utterance = new SpeechSynthesisUtterance(payload.speechText);
         utterance.lang = payload.isEnglish ? "en-US" : "ja-JP";
-        utterance.rate = payload.isEnglish ? 1.05 : 1.15; // Snappy, crisp and agile response
+        const baseRate = payload.isEnglish ? 1.08 : 1.18; // Snappy, crisp and agile response
+        utterance.rate = Math.min(2.5, Math.max(0.5, baseRate * this.speechRate));
         utterance.pitch = this.voiceType === "male" ? 0.85 : (this.voiceType === "child" ? 1.35 : 1.05);
 
         const voices = this.getAvailableVoices();
@@ -365,23 +392,25 @@ class RetroAudioSynth {
         utterance.lang = payload.isEnglish ? "en-US" : "ja-JP";
         
         // Custom pitch/rate based on selected speaker gender/type
+        let baseRate = 1.12;
         if (this.voiceType === "male") {
-          utterance.rate = payload.isEnglish ? 1.00 : 1.05; // clear, authoritative cadence
+          baseRate = payload.isEnglish ? 1.02 : 1.08; // clear, authoritative cadence
           utterance.pitch = payload.isEnglish ? 0.90 : 0.82; // deeper masculine register
         } else if (this.voiceType === "child") {
-          utterance.rate = 1.15; // bouncy and energetic
+          baseRate = 1.18; // bouncy and energetic
           utterance.pitch = 1.38; // high-pitched cute anime guide
         } else if (this.voiceType === "alien") {
-          utterance.rate = 1.45; // ultra-fast cyber alien
+          baseRate = 1.48; // ultra-fast cyber alien
           utterance.pitch = 1.95; // maximum high pitch electronic squeal
         } else if (this.voiceType === "elderly") {
-          utterance.rate = 0.85; // steady wise grandpa pace
+          baseRate = 0.88; // steady wise grandpa pace
           utterance.pitch = 0.65; // deep, weathered hoarse quality
         } else {
           // female (default)
-          utterance.rate = payload.isEnglish ? 1.05 : 1.12; // snappy, crisp, immediate feedback
+          baseRate = payload.isEnglish ? 1.08 : 1.15; // snappy, crisp, immediate feedback
           utterance.pitch = payload.isEnglish ? 1.00 : 1.05; // bright, high contrast clarity
         }
+        utterance.rate = Math.min(2.5, Math.max(0.5, baseRate * this.speechRate));
 
         // Try selecting a specific voice package if available
         const voices = this.getAvailableVoices();
@@ -512,8 +541,9 @@ class RetroAudioSynth {
         window.speechSynthesis.resume();
       }
 
-      // Hard cancel any lingering syllable speech if actively speaking
-      if (window.speechSynthesis.speaking) {
+      // Record whether speech was active so we can clear on microtask if needed
+      const wasSpeaking = window.speechSynthesis.speaking;
+      if (wasSpeaking) {
         window.speechSynthesis.cancel();
       }
 
@@ -629,25 +659,28 @@ class RetroAudioSynth {
       }
 
       // Voice pitch and rate customization
+      let baseRate = 1.12;
       if (payload.isSpanish) {
-        utterance.rate = 1.0;
+        baseRate = 1.15; // Raised default Spanish cadence from 1.0 to 1.15 for agile, crisp phrasing
         utterance.pitch = this.voiceType === "male" ? 0.92 : 1.05;
       } else if (this.voiceType === "male") {
-        utterance.rate = payload.isEnglish ? 1.02 : 1.05;
+        baseRate = payload.isEnglish ? 1.02 : 1.08;
         utterance.pitch = payload.isEnglish ? 0.90 : 0.82;
       } else if (this.voiceType === "child") {
-        utterance.rate = 1.15;
+        baseRate = 1.18;
         utterance.pitch = 1.30;
       } else if (this.voiceType === "alien") {
-        utterance.rate = 1.35;
+        baseRate = 1.45;
         utterance.pitch = 1.80;
       } else if (this.voiceType === "elderly") {
-        utterance.rate = 0.85;
+        baseRate = 0.88;
         utterance.pitch = 0.65;
       } else {
-        utterance.rate = payload.isEnglish ? 1.05 : 1.10;
+        baseRate = payload.isEnglish ? 1.08 : 1.15;
         utterance.pitch = payload.isEnglish ? 1.00 : 1.02;
       }
+
+      utterance.rate = Math.min(2.5, Math.max(0.5, baseRate * this.speechRate));
 
       // Prevent garbage collection in V8/WebKit engines
       this.activeFullWordUtterance = utterance;
@@ -695,13 +728,15 @@ class RetroAudioSynth {
 
       // Safety watchdog: ensure callback is always reached even if browser drops onend
       const cleanLen = spokenText.length;
-      const maxEstimatedMs = Math.min(8000, Math.max(1600, cleanLen * 450 + 1200));
+      const maxEstimatedMs = Math.min(8000, Math.max(1000, (cleanLen * 360 + 900) / this.speechRate));
       safetyWatchdog = setTimeout(() => {
         triggerCompletion();
       }, maxEstimatedMs);
 
-      // Safe buffer delay (60ms) allows preceding cancel() to complete without clearing the new utterance
-      setTimeout(() => {
+      // Instant speak dispatcher:
+      // If previous speech was cancelled, yield to microtask (0ms) so browser speech pipeline flushes.
+      // If nothing was speaking, dispatch synchronously with absolute zero latency!
+      const doSpeak = () => {
         if (!this.isMuted) {
           try {
             if (window.speechSynthesis.paused) {
@@ -715,7 +750,13 @@ class RetroAudioSynth {
         } else {
           triggerCompletion();
         }
-      }, 60);
+      };
+
+      if (wasSpeaking) {
+        setTimeout(doSpeak, 0);
+      } else {
+        doSpeak();
+      }
     } catch (err) {
       console.warn("Full word speech synthesis failed:", err);
       if (onEnd) onEnd();
@@ -1001,7 +1042,7 @@ class RetroAudioSynth {
     } catch (e) {}
   }
 
-  // Joyous retro arcade chord fanfare for completing the entire word spelling!
+  // Delicate retro arcade chime for completing word spelling (quick & non-intrusive so voice is never occluded)
   playFanfare() {
     if (this.isMuted) return;
     this.init();
@@ -1014,18 +1055,18 @@ class RetroAudioSynth {
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
 
-      osc.type = "square";
-      osc.frequency.setValueAtTime(freq, now + idx * 0.07);
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, now + idx * 0.035);
 
       gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.06, now + idx * 0.07 + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.07 + 0.35);
+      gain.gain.linearRampToValueAtTime(0.035, now + idx * 0.035 + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.035 + 0.12);
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
 
-      osc.start(now + idx * 0.07);
-      osc.stop(now + idx * 0.07 + 0.4);
+      osc.start(now + idx * 0.035);
+      osc.stop(now + idx * 0.035 + 0.14);
     });
   }
 

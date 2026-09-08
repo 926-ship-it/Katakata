@@ -694,3 +694,46 @@ export function updateSpanishWordMastery(wordId: string, status: MasteryStatus):
     localStorage.setItem(STORAGE_MASTERY_KEY, JSON.stringify(map));
   } catch (_) {}
 }
+
+// Convert SpanishWord to DictionaryItem for seamless TrainingPage and arcade integration
+export function spanishWordToDictionaryItem(w: SpanishWord): any {
+  const cleanWord = w.word.trim();
+  const segments = cleanWord.split("").map((char) => {
+    const isSpace = char === " ";
+    const lower = char.toLowerCase();
+    const normalized = lower
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+    // Accept exact character, lowercase, and normalized (e.g. typing 'a' matches 'á')
+    const romajiList = Array.from(
+      new Set([char, lower, normalized, isSpace ? " " : ""].filter(Boolean))
+    );
+
+    return {
+      kana: char,
+      romaji: romajiList,
+      displayRomaji: char,
+    };
+  });
+
+  return {
+    id: w.id,
+    kanji: w.word,
+    kanaStr: w.word,
+    category: "custom",
+    categoryName: w.categoryName || "西语沉浸",
+    meaning: `${w.phonetic ? `${w.phonetic} ` : ""}${w.meaning}`,
+    rarity: w.level === "B1" ? "SR" : w.level === "A2" ? "R" : "N",
+    rarityName: w.level,
+    glowColor: "rgba(245, 158, 11, 0.25)",
+    borderColor: "border-amber-400",
+    bgGradient: "from-amber-50 to-orange-100",
+    segments,
+    lang: "es",
+  };
+}
+
+export function getAllSpanishAsDictionaryItems(): any[] {
+  return getAllSpanishWords().map(spanishWordToDictionaryItem);
+}

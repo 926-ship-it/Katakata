@@ -18,11 +18,13 @@ export const TracingKana: React.FC<TracingKanaProps> = ({
   romajiProgress,
   isEnglishMode = false,
 }) => {
+  const isLatin = isEnglishMode || /[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]/.test(kana);
+
   // Let's create a beautiful traditional Japanese gridded paper (田字格)
   return (
     <div
       className={`relative rounded-lg border-2 flex flex-col items-center justify-center bg-stone-50 transition-all duration-300 ${
-        isEnglishMode 
+        isLatin 
           ? "w-10 h-14 sm:w-12 sm:h-16 md:w-16 md:h-22" 
           : "w-14 h-16 sm:w-18 sm:h-20 md:w-24 md:h-28"
       } ${
@@ -41,7 +43,7 @@ export const TracingKana: React.FC<TracingKanaProps> = ({
 
       {/* Rarity/Progress indicator inside grid corner */}
       <div className={`absolute top-1 right-1.5 font-mono text-stone-400 select-none ${
-        isEnglishMode ? "text-[6px] sm:text-[8px] md:text-[9px]" : "text-[8px] sm:text-[10px]"
+        isLatin ? "text-[6px] sm:text-[8px] md:text-[9px]" : "text-[8px] sm:text-[10px]"
       }`}>
         {displayRomaji === " " ? "SPACE" : displayRomaji.toUpperCase()}
       </div>
@@ -51,13 +53,13 @@ export const TracingKana: React.FC<TracingKanaProps> = ({
         {/* Underlay character - grayed out or placeholder */}
         <span
           className={`font-bold tracking-normal transition-colors duration-300 ${
-            isEnglishMode 
+            isLatin 
               ? "text-lg sm:text-2xl md:text-3xl" 
               : "text-3xl sm:text-4xl md:text-6xl"
           } ${
             isCorrect ? "text-stone-300/40" : active ? "text-stone-800" : "text-stone-400"
           }`}
-          style={{ fontFamily: isEnglishMode ? 'ui-sans-serif, system-ui, sans-serif' : '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
+          style={{ fontFamily: isLatin ? 'ui-sans-serif, system-ui, sans-serif' : '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
         >
           {kana === " " ? "␣" : kana}
         </span>
@@ -73,13 +75,13 @@ export const TracingKana: React.FC<TracingKanaProps> = ({
               }}
               transition={{ duration: 0.75, ease: "easeInOut" }}
               className={`absolute text-rose-600 font-bold drop-shadow-[0_0_8px_rgba(225,29,72,0.6)] ${
-                isEnglishMode 
+                isLatin 
                   ? "text-lg sm:text-2xl md:text-3xl" 
                   : "text-3xl sm:text-4xl md:text-6xl"
               }`}
               style={{
-                fontFamily: isEnglishMode ? 'ui-sans-serif, system-ui, sans-serif' : '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif',
-                WebkitTextStroke: isEnglishMode ? "0px" : "1.5px #e11d48",
+                fontFamily: isLatin ? 'ui-sans-serif, system-ui, sans-serif' : '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif',
+                WebkitTextStroke: isLatin ? "0px" : "1.5px #e11d48",
               }}
             >
               {kana === " " ? "␣" : kana}
@@ -92,13 +94,13 @@ export const TracingKana: React.FC<TracingKanaProps> = ({
       <div className="absolute bottom-1 w-full text-center">
         {isCorrect ? (
           <span className={`font-semibold text-rose-600 font-mono flex items-center justify-center gap-0.5 ${
-            isEnglishMode ? "text-[7px] sm:text-[9px] md:text-[10px]" : "text-[10px] sm:text-xs"
+            isLatin ? "text-[7px] sm:text-[9px] md:text-[10px]" : "text-[10px] sm:text-xs"
           }`}>
             ✓ {displayRomaji === " " ? "SPACE" : displayRomaji}
           </span>
         ) : active ? (
           <div className={`flex justify-center items-center font-mono ${
-            isEnglishMode ? "text-[7px] sm:text-[9px] md:text-[10px]" : "text-[10px] sm:text-xs"
+            isLatin ? "text-[7px] sm:text-[9px] md:text-[10px]" : "text-[10px] sm:text-xs"
           }`}>
             <span className="text-amber-600 font-bold underline bg-amber-50 px-0.5 rounded">
               {romajiProgress === " " ? "SPACE" : (romajiProgress || "...")}
@@ -109,7 +111,7 @@ export const TracingKana: React.FC<TracingKanaProps> = ({
           </div>
         ) : (
           <span className={`text-stone-400 font-mono tracking-wider ${
-            isEnglishMode ? "text-[7px] sm:text-[9px] md:text-[10px]" : "text-[10px] sm:text-xs"
+            isLatin ? "text-[7px] sm:text-[9px] md:text-[10px]" : "text-[10px] sm:text-xs"
           }`}>
             {displayRomaji === " " ? "SPACE" : displayRomaji}
           </span>

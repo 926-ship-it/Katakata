@@ -18,7 +18,8 @@ import {
   Check,
   RefreshCw,
   Trash2,
-  FileText
+  FileText,
+  Zap
 } from "lucide-react";
 import {
   SpanishWord,
@@ -27,7 +28,8 @@ import {
   getSpanishMasteryMap,
   updateSpanishWordMastery,
   deleteCustomSpanishWord,
-  MasteryStatus
+  MasteryStatus,
+  spanishWordToDictionaryItem
 } from "../data/spanishData";
 import { audioSynth } from "../utils/audio";
 
@@ -35,6 +37,7 @@ interface SpanishRecitePageProps {
   onBack: () => void;
   onOpenAddModal?: () => void;
   onOpenBatchModal?: () => void;
+  onStartTraining?: (items: any[], durationMs: number) => void;
   refreshTrigger?: number;
 }
 
@@ -42,10 +45,11 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   onBack,
   onOpenAddModal,
   onOpenBatchModal,
+  onStartTraining,
   refreshTrigger = 0,
 }) => {
   // Mode: "flashcard" (翻卡背诵) | "dictation" (默写拼写) | "library" (词库查阅)
-  const [activeTab, setActiveTab] = useState<"flashcard" | "dictation" | "library">("flashcard");
+  const [activeTab, setActiveTab] = useState<"flashcard" | "dictation" | "library">("dictation");
 
   // Deck & Filtering
   const [allWords, setAllWords] = useState<SpanishWord[]>([]);
@@ -57,8 +61,28 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isFlipped, setIsFlipped] = useState<boolean>(false);
   const [sessionStreak, setSessionStreak] = useState<number>(0);
+  const [speechRate, setSpeechRate] = useState<number>(() => audioSynth.getSpeechRate());
 
-  // Dictation State
+  const cycleSpeechRate = (speakSample: boolean = true) => {
+    const rates = [1.0, 1.25, 1.5, 1.75, 0.8];
+    const current = audioSynth.getSpeechRate();
+    const nextIdx = (rates.findIndex((r) => Math.abs(r - current) < 0.05) + 1) % rates.length;
+    const newRate = rates[nextIdx >= 0 ? nextIdx : 1];
+    audioSynth.setSpeechRate(newRate);
+    setSpeechRate(newRate);
+    audioSynth.playCardSlide();
+    if (speakSample && currentWord) {
+      audioSynth.speakSpanish(currentWord.word);
+    }
+  };
+
+  // Dictation & Guided Letter-by-Letter Prompt State
+  const [promptMode, setPromptMode] = useState<"guided" | "hint" | "blind">("guided");
+  const [useTypewriterGrid, setUseTypewriterGrid] = useState<boolean>(true);
+  const [typedChars, setTypedChars] = useState<string[]>([]);
+  const [shakeIndex, setShakeIndex] = useState<number | null>(null);
+  const hiddenInputRef = useRef<HTMLInputElement>(null);
+
   const [dictationInput, setDictationInput] = useState<string>("");
   const [dictationSuccess, setDictationSuccess] = useState<boolean>(false);
   const [dictationError, setDictationError] = useState<boolean>(false);
@@ -89,22 +113,37 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
   const currentWord: SpanishWord | undefined = activeDeck[currentIndex] || activeDeck[0];
 
-  // Auto pronounce on card change in flashcard mode
+  const targetChars = useMemo(() => {
+    if (!currentWord) return [];
+    return currentWord.word.split("");
+  }, [currentWord]);
+
+  // Auto pronounce on card change in flashcard & dictation mode
   useEffect(() => {
     if (currentWord && activeTab === "flashcard") {
       setIsFlipped(false);
-      // Read Spanish pronunciation
       audioSynth.speakSpanish(currentWord.word);
     } else if (currentWord && activeTab === "dictation") {
       setDictationInput("");
       setDictationSuccess(false);
       setDictationError(false);
+      setShakeIndex(null);
+
+      // Auto-advance inverted punctuation (¡, ¿) if word starts with it
+      const first = currentWord.word[0];
+      if (first === "¡" || first === "¿") {
+        setTypedChars([first]);
+      } else {
+        setTypedChars([]);
+      }
+
       audioSynth.speakSpanish(currentWord.word);
       setTimeout(() => {
         dictationInputRef.current?.focus();
+        hiddenInputRef.current?.focus();
       }, 100);
     }
-  }, [currentIndex, activeTab, selectedCategory]);
+  }, [currentIndex, activeTab, selectedCategory, currentWord?.id]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -148,12 +187,125 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   // Accent helper keys for Spanish input
   const SPANISH_KEYS = ["á", "é", "í", "ó", "ú", "ñ", "ü", "¡", "¿"];
 
-  const handleAppendAccent = (char: string) => {
-    setDictationInput((prev) => prev + char);
-    dictationInputRef.current?.focus();
+  // Smart character matching (handles case and accents, e.g. typing 'a' matches 'á')
+  const isCharMatch = (typed: string, target: string) => {
+    if (!typed || !target) return false;
+    if (typed.toLowerCase() === target.toLowerCase()) return true;
+    const normTyped = typed.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const normTarget = target.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return normTyped === normTarget;
   };
 
-  // Check dictation typing
+  const checkCompletion = (newTyped: string[]) => {
+    if (!currentWord) return;
+    if (newTyped.length >= targetChars.length) {
+      setDictationSuccess(true);
+      setDictationError(false);
+      audioSynth.playTypewriterBell();
+      
+      // INSTANT zero-delay pronunciation
+      audioSynth.speakSpanish(currentWord.word);
+      updateSpanishWordMastery(currentWord.id, "mastered");
+      setMasteryMap(getSpanishMasteryMap());
+      setSessionStreak((prev) => prev + 1);
+
+      const advanceDelayMs = Math.round(900 / Math.max(0.8, audioSynth.getSpeechRate()));
+      setTimeout(() => {
+        if (activeDeck.length > 1) {
+          setCurrentIndex((prev) => (prev + 1) % activeDeck.length);
+        }
+      }, Math.max(500, advanceDelayMs));
+    }
+  };
+
+  const handleTypeCharacter = (inputChar: string) => {
+    if (!currentWord || dictationSuccess) return;
+
+    let currIdx = typedChars.length;
+    if (currIdx >= targetChars.length) return;
+
+    let expected = targetChars[currIdx];
+
+    // If expected is space or punctuation, and user typed the next letter: auto-advance past punctuation
+    if (/[ \-\.,\?!¡¿]/.test(expected) && inputChar !== expected && inputChar !== " ") {
+      const nextExpected = targetChars[currIdx + 1];
+      if (nextExpected && isCharMatch(inputChar, nextExpected)) {
+        const nextTyped = [...typedChars, expected, nextExpected];
+        setTypedChars(nextTyped);
+        const isComp = nextTyped.length >= targetChars.length;
+        audioSynth.playTyping({ isCompletion: isComp });
+        checkCompletion(nextTyped);
+        return;
+      }
+    }
+
+    if (isCharMatch(inputChar, expected) || (expected === " " && inputChar === " ")) {
+      const nextTyped = [...typedChars, expected];
+      setTypedChars(nextTyped);
+      const isComp = nextTyped.length >= targetChars.length;
+      audioSynth.playTyping({ isCompletion: isComp });
+      checkCompletion(nextTyped);
+    } else {
+      audioSynth.playError();
+      setShakeIndex(currIdx);
+      setTimeout(() => setShakeIndex(null), 400);
+    }
+  };
+
+  const handleBackspace = () => {
+    if (dictationSuccess) return;
+    if (typedChars.length > 0) {
+      const first = targetChars[0];
+      if ((first === "¡" || first === "¿") && typedChars.length === 1) {
+        return;
+      }
+      audioSynth.playTyping({ volume: 0.6 });
+      setTypedChars((prev) => prev.slice(0, -1));
+    }
+  };
+
+  const handleAppendAccent = (char: string) => {
+    if (useTypewriterGrid) {
+      handleTypeCharacter(char);
+    } else {
+      setDictationInput((prev) => prev + char);
+      dictationInputRef.current?.focus();
+    }
+  };
+
+  // Keyboard listener for physical keyboard typing in typewriter guided mode
+  useEffect(() => {
+    if (activeTab !== "dictation" || !useTypewriterGrid || !currentWord || dictationSuccess) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      if (document.activeElement?.tagName === "INPUT" && document.activeElement !== hiddenInputRef.current) {
+        return;
+      }
+
+      if (e.key === "Backspace") {
+        e.preventDefault();
+        handleBackspace();
+        return;
+      }
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        audioSynth.speakSpanish(currentWord.word);
+        return;
+      }
+
+      if (e.key.length === 1) {
+        e.preventDefault();
+        handleTypeCharacter(e.key);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeTab, useTypewriterGrid, currentWord, typedChars, targetChars, dictationSuccess]);
+
+  // Check dictation typing for classic input mode
   const normalizeSpanish = (str: string) => {
     return str
       .toLowerCase()
@@ -175,16 +327,16 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       setDictationSuccess(true);
       setDictationError(false);
       audioSynth.playTypewriterBell();
-      audioSynth.playFanfare();
       audioSynth.speakSpanish(currentWord.word);
       updateSpanishWordMastery(currentWord.id, "mastered");
       setMasteryMap(getSpanishMasteryMap());
 
+      const advanceDelayMs = Math.round(900 / Math.max(0.8, audioSynth.getSpeechRate()));
       setTimeout(() => {
         if (activeDeck.length > 1) {
           setCurrentIndex((prev) => (prev + 1) % activeDeck.length);
         }
-      }, 1200);
+      }, Math.max(450, advanceDelayMs));
     } else {
       setDictationError(true);
       audioSynth.playError();
@@ -223,6 +375,49 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
           {/* Quick Actions */}
           <div className="flex items-center gap-2">
+            {/* Speed selector pill */}
+            <div className="flex items-center gap-1 bg-white border border-stone-300 rounded-xl px-2.5 py-1.5 shadow-2xs">
+              <Zap className="w-3.5 h-3.5 text-amber-600" />
+              <span className="text-[11px] font-mono text-stone-500 font-bold hidden sm:inline">语速:</span>
+              <select
+                value={speechRate}
+                onChange={(e) => {
+                  const newRate = parseFloat(e.target.value);
+                  setSpeechRate(newRate);
+                  audioSynth.setSpeechRate(newRate);
+                  audioSynth.playCardSlide();
+                  if (currentWord) {
+                    audioSynth.speakSpanish(currentWord.word);
+                  }
+                }}
+                className="font-mono font-black text-xs text-stone-900 bg-transparent outline-none cursor-pointer"
+                title="调整西语发音与例句朗读语速"
+              >
+                <option value={0.8}>0.8x 慢速</option>
+                <option value={1.0}>1.0x 原速</option>
+                <option value={1.25}>1.25x 提速</option>
+                <option value={1.5}>1.5x 倍速</option>
+                <option value={1.75}>1.75x 极速</option>
+              </select>
+            </div>
+
+            {onStartTraining && (
+              <button
+                type="button"
+                onClick={() => {
+                  const items = activeDeck.map(spanishWordToDictionaryItem);
+                  onStartTraining(items, 0);
+                  audioSynth.playTypewriterBell();
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-amber-300 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95 border border-stone-700"
+                title="进入全屏活字打字机联训模式，享受连击音效与沉浸打字"
+              >
+                <Keyboard className="w-4 h-4 text-amber-400" />
+                <span className="hidden sm:inline">活字打字机联训</span>
+                <span className="sm:hidden">打字机</span>
+              </button>
+            )}
+
             {onOpenBatchModal && (
               <button
                 type="button"
@@ -388,6 +583,18 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                         >
                           <Volume2 className="w-5 h-5" />
                         </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            cycleSpeechRate(true);
+                          }}
+                          className="px-2 py-1 rounded-full bg-amber-50 hover:bg-amber-100 border border-amber-300/80 text-amber-900 text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-0.5 active:scale-95"
+                          title="点击循环切换发音语速 (1.0x → 1.25x → 1.5x → 1.75x → 0.8x)"
+                        >
+                          <Zap className="w-3 h-3 text-amber-600" />
+                          <span>{speechRate}x</span>
+                        </button>
                       </div>
 
                       {/* Phonetic & Part of Speech */}
@@ -523,11 +730,79 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
           </div>
         )}
 
-        {/* DICTATION / SPELLING PRACTICE MODE */}
+        {/* DICTATION / GUIDED SPELLING PRACTICE MODE */}
         {activeTab === "dictation" && (
-          <div className="max-w-2xl mx-auto space-y-6">
+          <div className="max-w-3xl mx-auto space-y-6">
             {currentWord ? (
-              <div className="bg-white rounded-3xl border-2 border-stone-800 p-6 sm:p-9 shadow-lg space-y-6 text-center">
+              <div className="bg-white rounded-3xl border-2 border-stone-800 p-5 sm:p-8 shadow-lg space-y-6 text-center">
+                {/* Header & Prompt Level Selector */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 pb-4">
+                  <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl border border-stone-200 text-[11px] font-bold">
+                    <span className="text-stone-400 px-1">提示模式:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPromptMode("guided");
+                        setUseTypewriterGrid(true);
+                        audioSynth.playCardSlide();
+                      }}
+                      className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        promptMode === "guided" && useTypewriterGrid
+                          ? "bg-amber-500 text-stone-950 font-black shadow-2xs"
+                          : "text-stone-600 hover:text-stone-900"
+                      }`}
+                      title="显示每个活字槽位的浅色底纹提示，支持像五十音那样逐字拼写"
+                    >
+                      💡 全字母提示
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPromptMode("hint");
+                        setUseTypewriterGrid(true);
+                        audioSynth.playCardSlide();
+                      }}
+                      className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        promptMode === "hint" && useTypewriterGrid
+                          ? "bg-amber-500 text-stone-950 font-black shadow-2xs"
+                          : "text-stone-600 hover:text-stone-900"
+                      }`}
+                      title="只显示词首字母，其他字母隐藏为圆点"
+                    >
+                      🔤 首字提示
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPromptMode("blind");
+                        setUseTypewriterGrid(true);
+                        audioSynth.playCardSlide();
+                      }}
+                      className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        promptMode === "blind" && useTypewriterGrid
+                          ? "bg-amber-500 text-stone-950 font-black shadow-2xs"
+                          : "text-stone-600 hover:text-stone-900"
+                      }`}
+                      title="空白卡槽盲打默写"
+                    >
+                      🙈 纯默写
+                    </button>
+                  </div>
+
+                  {/* Switch to single input box */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUseTypewriterGrid((prev) => !prev);
+                      audioSynth.playCardSlide();
+                    }}
+                    className="text-xs font-mono text-stone-500 hover:text-stone-900 underline underline-offset-4 cursor-pointer"
+                  >
+                    {useTypewriterGrid ? "📝 切换至传统输入框" : "⌨️ 切换至活字字块提示模式"}
+                  </button>
+                </div>
+
+                {/* Target Meaning & Audio */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-center gap-2">
                     <button
@@ -535,88 +810,312 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                       className="px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-xs flex items-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
                     >
                       <Volume2 className="w-4 h-4" />
-                      <span>听音默写 / 重新播报</span>
+                      <span>听音发音 / 重新播报 (Space)</span>
                     </button>
                   </div>
 
-                  <h3 className="text-xl sm:text-2xl font-serif font-black text-stone-900 pt-2">
+                  <h3 className="text-2xl sm:text-3xl font-serif font-black text-stone-900 pt-1">
                     {currentWord.meaning}
                   </h3>
                   <p className="text-xs text-stone-500 font-mono">
-                    {currentWord.categoryName} ・ 单词长度: {currentWord.word.length} 字符
+                    {currentWord.categoryName} ・ 共 {targetChars.length} 个字符
                   </p>
                 </div>
 
-                {/* Input area */}
-                <div className="max-w-md mx-auto space-y-3">
-                  <div className="relative">
-                    <input
-                      ref={dictationInputRef}
-                      type="text"
-                      value={dictationInput}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setDictationInput(val);
-                        audioSynth.playTyping();
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          handleCheckDictation(dictationInput);
+                {/* Hidden input for mobile keyboard focus */}
+                <input
+                  ref={hiddenInputRef}
+                  type="text"
+                  className="opacity-0 absolute -z-10 w-0 h-0 pointer-events-none"
+                  onKeyDown={(e) => {
+                    if (e.key === "Backspace") {
+                      e.preventDefault();
+                      handleBackspace();
+                    } else if (e.key === "Enter") {
+                      e.preventDefault();
+                      audioSynth.speakSpanish(currentWord.word);
+                    } else if (e.key.length === 1) {
+                      e.preventDefault();
+                      handleTypeCharacter(e.key);
+                    }
+                  }}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) {
+                      const lastChar = val[val.length - 1];
+                      handleTypeCharacter(lastChar);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+
+                {/* TYPEWRITER GUIDED LETTER BLOCKS */}
+                {useTypewriterGrid ? (
+                  <div className="space-y-5">
+                    <div
+                      onClick={() => hiddenInputRef.current?.focus()}
+                      className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 py-4 cursor-text outline-none"
+                      tabIndex={0}
+                    >
+                      {targetChars.map((char, idx) => {
+                        const isTyped = idx < typedChars.length;
+                        const isActive = idx === typedChars.length;
+                        const isSpace = char === " ";
+                        const isPunct = /[\-,\.!\?¡¿']/.test(char);
+                        const isShaking = shakeIndex === idx;
+
+                        // Letter prompt visibility
+                        let promptChar = "";
+                        if (promptMode === "guided") {
+                          promptChar = char;
+                        } else if (promptMode === "hint") {
+                          if (idx === 0 || targetChars[idx - 1] === " " || isPunct) {
+                            promptChar = char;
+                          } else {
+                            promptChar = "·";
+                          }
+                        } else {
+                          promptChar = isPunct ? char : "·";
                         }
-                      }}
-                      placeholder="在此处拼写西语单词并回车..."
-                      className={`w-full py-3.5 px-4 text-center font-sans font-bold text-lg sm:text-xl rounded-2xl border-2 focus:outline-none transition-all ${
-                        dictationSuccess
-                          ? "border-emerald-500 bg-emerald-50 text-emerald-900"
-                          : dictationError
-                          ? "border-rose-500 bg-rose-50 text-rose-900 animate-shake"
-                          : "border-stone-800 bg-stone-50 focus:bg-white focus:ring-4 focus:ring-amber-400/30"
-                      }`}
-                      autoFocus
-                    />
 
-                    {dictationSuccess && (
-                      <div className="absolute right-3 top-3.5 text-emerald-600">
-                        <CheckCircle2 className="w-6 h-6 animate-bounce" />
-                      </div>
-                    )}
-                  </div>
+                        if (isSpace) {
+                          return (
+                            <div
+                              key={idx}
+                              className="w-4 sm:w-6 flex items-center justify-center text-stone-300 font-mono text-sm select-none"
+                            >
+                              ␣
+                            </div>
+                          );
+                        }
 
-                  {/* Accent Key Toolbar */}
-                  <div className="flex items-center justify-center flex-wrap gap-1.5 pt-1">
-                    <span className="text-[10px] font-mono text-stone-400 mr-1">变音符:</span>
-                    {SPANISH_KEYS.map((char) => (
+                        return (
+                          <div
+                            key={idx}
+                            className={`relative rounded-xl border-2 flex flex-col items-center justify-center transition-all select-none ${
+                              char.length > 1
+                                ? "w-11 h-16 sm:w-13 sm:h-20"
+                                : "w-10 h-15 sm:w-12 sm:h-18 md:w-14 md:h-20"
+                            } ${
+                              isTyped
+                                ? "border-emerald-500 bg-emerald-50/80 text-emerald-800 shadow-xs"
+                                : isActive
+                                ? `border-amber-500 bg-amber-50/60 shadow-md ring-2 ring-amber-300/90 ${
+                                    isShaking ? "animate-shake border-rose-500 bg-rose-50 ring-rose-300" : ""
+                                  }`
+                                : "border-stone-300 bg-stone-50/40 text-stone-400"
+                            }`}
+                          >
+                            {/* Paper grid guides */}
+                            <div className="absolute inset-0 pointer-events-none opacity-20">
+                              <div className="absolute top-1/2 left-0 right-0 border-t border-dashed border-stone-500" />
+                              <div className="absolute left-1/2 top-0 bottom-0 border-l border-dashed border-stone-500" />
+                            </div>
+
+                            {/* Position indicator */}
+                            <div className="absolute top-1 right-1.5 font-mono text-[8px] text-stone-400">
+                              {idx + 1}
+                            </div>
+
+                            {/* Main Character text */}
+                            <div className="relative text-2xl sm:text-3xl font-bold font-sans">
+                              {isTyped ? (
+                                <motion.span
+                                  initial={{ scale: 0.5, opacity: 0 }}
+                                  animate={{ scale: 1, opacity: 1 }}
+                                  className="text-emerald-700 font-black"
+                                >
+                                  {typedChars[idx]}
+                                </motion.span>
+                              ) : isActive ? (
+                                <span className="text-amber-700 font-bold opacity-75">
+                                  {promptChar}
+                                </span>
+                              ) : (
+                                <span className="text-stone-300 font-medium">
+                                  {promptChar}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Bottom guide marker */}
+                            <div className="absolute bottom-1 text-[9px] font-mono">
+                              {isTyped ? (
+                                <span className="text-emerald-600 font-bold">✓</span>
+                              ) : isActive ? (
+                                <span className="text-amber-600 font-black animate-pulse">▲</span>
+                              ) : (
+                                <span className="text-stone-300">_</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Accent Buttons Toolbar with Backspace & Clear */}
+                    <div className="flex items-center justify-center flex-wrap gap-1.5 pt-1">
+                      <span className="text-[10px] font-mono text-stone-400 mr-1 hidden sm:inline">变音快捷键:</span>
+                      {SPANISH_KEYS.map((char) => (
+                        <button
+                          key={char}
+                          type="button"
+                          onClick={() => handleTypeCharacter(char)}
+                          className="px-2.5 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-950 font-mono text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs"
+                        >
+                          {char}
+                        </button>
+                      ))}
+
+                      <div className="h-4 w-px bg-stone-300 mx-1 hidden sm:block" />
+
                       <button
-                        key={char}
                         type="button"
-                        onClick={() => handleAppendAccent(char)}
-                        className="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 font-mono text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs"
+                        onClick={handleBackspace}
+                        className="px-3 py-1.5 rounded-lg bg-stone-200 hover:bg-stone-300 text-stone-800 font-mono text-xs font-bold transition-all cursor-pointer active:scale-95"
+                        title="删除上一字符 (Backspace)"
                       >
-                        {char}
+                        ⌫ 退格
                       </button>
-                    ))}
-                  </div>
 
-                  <div className="flex items-center justify-center gap-3 pt-3">
-                    <button
-                      type="button"
-                      onClick={() => handleCheckDictation(dictationInput)}
-                      className="px-6 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-50 font-black text-xs tracking-wider transition-all cursor-pointer shadow-md active:scale-95"
-                    >
-                      提交检验 (Enter)
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const first = currentWord.word[0];
+                          if (first === "¡" || first === "¿") {
+                            setTypedChars([first]);
+                          } else {
+                            setTypedChars([]);
+                          }
+                          setDictationSuccess(false);
+                          audioSynth.playCardSlide();
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg border border-stone-300 hover:bg-stone-100 text-stone-600 text-xs font-bold transition-all cursor-pointer"
+                        title="清空当前输入重来"
+                      >
+                        🔄 重写
+                      </button>
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDictationInput(currentWord.word);
-                        dictationInputRef.current?.focus();
-                      }}
-                      className="px-4 py-2.5 rounded-xl border border-stone-300 hover:bg-stone-100 text-stone-600 font-bold text-xs transition-all cursor-pointer"
-                    >
-                      查看答案
-                    </button>
+                    {/* Progress Info & Quick Tips */}
+                    <div className="text-[11px] text-stone-500 font-serif flex items-center justify-center gap-4">
+                      <span>💡 提示：在物理键盘直接敲击字母即可输入，无需变音符号也可以输入基础字母（如 a 对应 á）</span>
+                    </div>
                   </div>
+                ) : (
+                  /* CLASSIC INPUT FIELD */
+                  <div className="max-w-md mx-auto space-y-3">
+                    <div className="relative">
+                      <input
+                        ref={dictationInputRef}
+                        type="text"
+                        value={dictationInput}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setDictationInput(val);
+                          audioSynth.playTyping();
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            handleCheckDictation(dictationInput);
+                          }
+                        }}
+                        placeholder="在此处拼写西语单词并回车..."
+                        className={`w-full py-3.5 px-4 text-center font-sans font-bold text-lg sm:text-xl rounded-2xl border-2 focus:outline-none transition-all ${
+                          dictationSuccess
+                            ? "border-emerald-500 bg-emerald-50 text-emerald-900"
+                            : dictationError
+                            ? "border-rose-500 bg-rose-50 text-rose-900 animate-shake"
+                            : "border-stone-800 bg-stone-50 focus:bg-white focus:ring-4 focus:ring-amber-400/30"
+                        }`}
+                        autoFocus
+                      />
+
+                      {dictationSuccess && (
+                        <div className="absolute right-3 top-3.5 text-emerald-600">
+                          <CheckCircle2 className="w-6 h-6 animate-bounce" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Accent Key Toolbar */}
+                    <div className="flex items-center justify-center flex-wrap gap-1.5 pt-1">
+                      <span className="text-[10px] font-mono text-stone-400 mr-1">变音符:</span>
+                      {SPANISH_KEYS.map((char) => (
+                        <button
+                          key={char}
+                          type="button"
+                          onClick={() => handleAppendAccent(char)}
+                          className="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 font-mono text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs"
+                        >
+                          {char}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center justify-center gap-3 pt-3">
+                      <button
+                        type="button"
+                        onClick={() => handleCheckDictation(dictationInput)}
+                        className="px-6 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-50 font-black text-xs tracking-wider transition-all cursor-pointer shadow-md active:scale-95"
+                      >
+                        提交检验 (Enter)
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDictationInput(currentWord.word);
+                          dictationInputRef.current?.focus();
+                        }}
+                        className="px-4 py-2.5 rounded-xl border border-stone-300 hover:bg-stone-100 text-stone-600 font-bold text-xs transition-all cursor-pointer"
+                      >
+                        查看答案
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Success Feedback Banner */}
+                {dictationSuccess && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-3 bg-emerald-100/90 border border-emerald-300 rounded-2xl text-emerald-950 flex items-center justify-center gap-2 font-bold text-sm shadow-xs"
+                  >
+                    <span>🎉</span>
+                    <span>拼写正确！朗读中，正在自动前往下一词...</span>
+                  </motion.div>
+                )}
+
+                {/* Action Controls & Skip */}
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Reveal word
+                      setTypedChars(targetChars);
+                      setDictationSuccess(true);
+                      audioSynth.playTypewriterBell();
+                      audioSynth.speakSpanish(currentWord.word);
+                    }}
+                    className="px-4 py-2 rounded-xl border border-stone-300 hover:bg-stone-100 text-stone-600 font-bold text-xs transition-all cursor-pointer"
+                  >
+                    👀 提示答案
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeDeck.length > 1) {
+                        setCurrentIndex((prev) => (prev + 1) % activeDeck.length);
+                        audioSynth.playCardSlide();
+                      }
+                    }}
+                    className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-300 text-stone-800 font-bold text-xs transition-all cursor-pointer"
+                  >
+                    ⏭️ 跳过此词
+                  </button>
                 </div>
 
                 {/* Example sentence hint */}

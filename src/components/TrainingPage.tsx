@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Keyboard, ArrowLeft, RefreshCw, Volume2, VolumeX, AlertTriangle, Play, Pause, AlertCircle, HelpCircle, ChevronLeft, ChevronRight, PenTool, Maximize2, Minimize2 } from "lucide-react";
+import { Keyboard, ArrowLeft, RefreshCw, Volume2, VolumeX, AlertTriangle, Play, Pause, AlertCircle, HelpCircle, ChevronLeft, ChevronRight, PenTool, Maximize2, Minimize2, Zap } from "lucide-react";
 import { DictionaryItem } from "../data/dictionary";
 import { TracingKana } from "./TracingKana";
 import { audioSynth } from "../utils/audio";
@@ -49,6 +49,17 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
   // Sound control
   const [muted, setMuted] = useState<boolean>(() => audioSynth.getMuted());
+  const [speechRate, setSpeechRate] = useState<number>(() => audioSynth.getSpeechRate());
+
+  const handleCycleSpeechRate = () => {
+    const rates = [1.0, 1.25, 1.5, 1.75, 0.8];
+    const current = audioSynth.getSpeechRate();
+    const nextIdx = (rates.findIndex((r) => Math.abs(r - current) < 0.05) + 1) % rates.length;
+    const newRate = rates[nextIdx >= 0 ? nextIdx : 1];
+    audioSynth.setSpeechRate(newRate);
+    setSpeechRate(newRate);
+    audioSynth.playCardSlide();
+  };
 
   // Loop/Typewriter spelling states
   const [completedRounds, setCompletedRounds] = useState<number>(0);
@@ -264,7 +275,8 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         audioSynth.speakFullWord(
           item.kanaStr || item.kanji,
           () => {
-            // Reading finished! Crisp micro-pause (120ms) for natural acoustics, then advance to next word
+            // Reading finished! Crisp micro-pause for natural acoustics, then advance to next word
+            const advancePauseMs = Math.max(40, Math.round(70 / Math.max(0.8, audioSynth.getSpeechRate())));
             setTimeout(() => {
               setIsPronouncing(false);
               setCompletedRounds(prev => prev + 1);
@@ -274,15 +286,17 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
               setCurrentSegmentIdx(0);
               setRomajiProgress("");
               setWordCorrect(false);
-            }, 120);
+            }, advancePauseMs);
           },
           item.kanji,
           romajiHint,
           langHint
         );
       } else {
-        // Speak the individual intermediate syllable completed INSTANTLY
-        audioSynth.speakKanaInstant(segment.kana);
+        // Only speak instant syllable for Japanese kana. In English and Spanish alphabet typing, avoid queuing letter voices so the speech engine is completely clear for zero-lag full-word pronunciation upon completion!
+        if (!isEnglishMode && (item as any).lang !== "es") {
+          audioSynth.speakKanaInstant(segment.kana);
+        }
         setCurrentSegmentIdx(currentSegmentIdx + 1);
         if (onKeyStrike) onKeyStrike("correct");
       }
@@ -429,6 +443,17 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         </button>
 
         <div className="flex items-center gap-2">
+          {/* Quick Speech Rate Cycler */}
+          <button
+            type="button"
+            onClick={handleCycleSpeechRate}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-stone-300 bg-white hover:bg-amber-50 text-stone-700 text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+            title={`点击循环调整朗读语速 (当前: ${speechRate}x)`}
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-600" />
+            <span>{speechRate}x</span>
+          </button>
+
           {onToggleFullscreen && (
             <button
               onClick={onToggleFullscreen}
@@ -594,6 +619,21 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                       aria-label="朗读发音"
                     >
                       <Volume2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCycleSpeechRate();
+                        const romajiHint = item.segments.map(s => s.displayRomaji || (s.romaji && s.romaji[0]) || "").join("");
+                        const langHint: "ja" | "es" | "en" = (item as any).lang || (isEnglishMode ? "en" : "ja");
+                        audioSynth.speakFullWord(item.kanaStr || item.kanji, undefined, item.kanji, romajiHint, langHint);
+                      }}
+                      className="px-1.5 py-0.5 rounded-full bg-amber-100/70 hover:bg-amber-100 text-amber-900 border border-amber-300/60 font-mono text-[10px] font-bold transition-all cursor-pointer flex items-center gap-0.5 active:scale-95"
+                      title="切换发音语速 (0.8x - 1.75x)"
+                    >
+                      <Zap className="w-2.5 h-2.5 text-amber-600" />
+                      <span>{speechRate}x</span>
                     </button>
                   </div>
                   <h3 className="text-stone-750 font-medium font-serif text-xs sm:text-sm mt-1 sm:mt-1.5 opacity-90 leading-relaxed max-w-lg mx-auto">

@@ -87,6 +87,9 @@ export default function App() {
       return "female";
     }
   });
+  const [speechRate, setSpeechRate] = useState<number>(() => {
+    return audioSynth.getSpeechRate();
+  });
   const [showMascot, setShowMascot] = useState<boolean>(() => {
     try {
       return localStorage.getItem("fifty_sound_show_mascot") !== "false";
@@ -287,6 +290,15 @@ export default function App() {
       console.warn("localStorage restricted", e);
     }
   }, [voiceType]);
+
+  useEffect(() => {
+    audioSynth.setSpeechRate(speechRate);
+    try {
+      localStorage.setItem("fifty_sound_speech_rate", String(speechRate));
+    } catch (e) {
+      console.warn("localStorage restricted", e);
+    }
+  }, [speechRate]);
 
   useEffect(() => {
     try {
@@ -1038,10 +1050,12 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Teacher Voice Group */}
+                {/* Teacher Voice & Speed Group */}
                 <div className="space-y-3">
-                  <h4 className="font-serif font-bold text-stone-800 text-xs uppercase tracking-widest text-[#C4482A]">假名导师 / Pronunciation Voice</h4>
-                  <div className="p-3 rounded bg-white/50 border border-stone-200 flex flex-col gap-2">
+                  <h4 className="font-serif font-bold text-stone-800 text-xs uppercase tracking-widest text-[#C4482A]">
+                    导师发音与语速 / Voice & Speed
+                  </h4>
+                  <div className="p-3 rounded bg-white/50 border border-stone-200 flex flex-col gap-3">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-serif text-stone-700">声优音色</span>
                       <select
@@ -1059,6 +1073,66 @@ export default function App() {
                         <option value="alien">外星人声</option>
                         <option value="elderly">智慧老人</option>
                       </select>
+                    </div>
+
+                    {/* Speech Speed Rate Selector */}
+                    <div className="flex flex-col gap-1.5 pt-2 border-t border-stone-200/80">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-serif text-stone-700 font-bold flex items-center gap-1">
+                          <span>⚡ 单词发音语速</span>
+                          <span className="text-[11px] font-mono text-[#C4482A] font-black">{speechRate}x</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (currentPage === "spanish_recite") {
+                              audioSynth.speakSpanish("¡Hola! Práctica de pronunciación");
+                            } else if (isEnglishMode) {
+                              audioSynth.speakFullWord("Quick learning pace", undefined, undefined, undefined, "en");
+                            } else {
+                              audioSynth.speakFullWord("さくら", undefined, "桜", "sakura", "ja");
+                            }
+                          }}
+                          className="text-[10px] px-2 py-0.5 rounded bg-amber-100/70 hover:bg-amber-100 text-amber-900 border border-amber-300/80 font-bold cursor-pointer transition-all flex items-center gap-1"
+                          title="试听当前发音速度"
+                        >
+                          <span>🔊</span>
+                          <span>试听语速</span>
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-5 gap-1 pt-1">
+                        {[
+                          { rate: 0.8, label: "0.8x", desc: "慢速" },
+                          { rate: 1.0, label: "1.0x", desc: "原速" },
+                          { rate: 1.25, label: "1.25x", desc: "提速" },
+                          { rate: 1.5, label: "1.5x", desc: "倍速" },
+                          { rate: 1.75, label: "1.75x", desc: "极速" },
+                        ].map((item) => (
+                          <button
+                            key={item.rate}
+                            type="button"
+                            onClick={() => {
+                              setSpeechRate(item.rate);
+                              audioSynth.setSpeechRate(item.rate);
+                              audioSynth.playCardSlide();
+                            }}
+                            className={`py-1 px-0.5 rounded border text-center transition-all cursor-pointer flex flex-col items-center ${
+                              Math.abs(speechRate - item.rate) < 0.05
+                                ? "bg-[#C4482A] text-white border-[#C4482A] shadow-xs font-bold"
+                                : "bg-white border-stone-300 text-stone-700 hover:bg-stone-100 font-medium"
+                            }`}
+                          >
+                            <span className="text-[11px] font-mono font-bold leading-tight">{item.label}</span>
+                            <span className={`text-[9px] ${Math.abs(speechRate - item.rate) < 0.05 ? "text-amber-100" : "text-stone-400"}`}>
+                              {item.desc}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-stone-500 font-sans pt-0.5">
+                        若觉得单词朗读节奏较慢，强烈推荐切换为 <strong className="text-stone-800">1.25x</strong> 或 <strong className="text-stone-800">1.5x</strong>，复习刷词更干脆利落！
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1286,6 +1360,13 @@ export default function App() {
                 onOpenBatchModal={() => {
                   setBatchModalLang("es");
                   setIsBatchModalOpen(true);
+                }}
+                onStartTraining={(spanishItems) => {
+                  setActiveCards(spanishItems);
+                  setActiveDurationMs(0);
+                  setIsEnglishMode(false);
+                  setIsKatakanaMode(false);
+                  setCurrentPage("training");
                 }}
                 refreshTrigger={spanishRefreshTrigger}
               />
