@@ -18,6 +18,7 @@ interface CardLibraryPageProps {
   setCoins?: React.Dispatch<React.SetStateAction<number>>;
   cardUpgrades?: Record<string, { level: number; exp: number; stars: number }>;
   setCardUpgrades?: React.Dispatch<React.SetStateAction<Record<string, { level: number; exp: number; stars: number }>>>;
+  refreshTrigger?: number;
 }
 
 interface UpgradeParticle {
@@ -41,10 +42,11 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
   setCoins,
   cardUpgrades = {},
   setCardUpgrades,
+  refreshTrigger,
 }) => {
   const activeDict = React.useMemo(() => {
     return getDictionary(isEnglishMode, isKatakanaMode);
-  }, [isEnglishMode, isKatakanaMode]);
+  }, [isEnglishMode, isKatakanaMode, refreshTrigger]);
 
   // Gamified Tabs: Binder (Collection) and Gacha (Summon Shrine)
   const [libraryTab, setLibraryTab] = useState<"binder" | "gacha">("binder");
@@ -799,6 +801,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
           <div className="flex flex-wrap items-center gap-1.5 border-b border-stone-200 pb-3">
             {[
               { id: "all", label: "全部图鉴" },
+              { id: "custom", label: isEnglishMode ? "✨ 自定生词" : "✨ 自定词库" },
               { id: "collected", label: "已收集闪卡" },
               { id: "locked", label: "未解锁图纸" },
               { id: "name", label: isEnglishMode ? "西式人名" : "日本人名" },

@@ -1267,6 +1267,7 @@ export default function App() {
                 setCoins={setCoins}
                 cardUpgrades={cardUpgrades}
                 setCardUpgrades={setCardUpgrades}
+                refreshTrigger={spanishRefreshTrigger}
               />
             </motion.div>
           )}
@@ -1408,6 +1409,20 @@ export default function App() {
         onImportComplete={(count, lang) => {
           setSpanishRefreshTrigger((prev) => prev + 1);
           showToast(`🎉 成功批量导入 ${count} 条短句至${lang === "es" ? "西语" : lang === "ja" ? "日语" : "英语"}词库！`);
+        }}
+        onNavigateToRecite={(lang) => {
+          setIsBatchModalOpen(false);
+          if (lang === "en") {
+            setIsEnglishMode(true);
+            setIsKatakanaMode(false);
+          } else {
+            setIsEnglishMode(false);
+          }
+          setCurrentPage("spanish_recite");
+        }}
+        onNavigateToLibrary={() => {
+          setIsBatchModalOpen(false);
+          setCurrentPage("library");
         }}
       />
 
