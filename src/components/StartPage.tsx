@@ -13,6 +13,8 @@ interface StartPageProps {
   onGoToSpellRush: () => void;
   onGoToMemoryMatch: () => void;
   onGoToKanaTraining: (type?: "hiragana" | "katakana" | "both") => void;
+  onGoToSpanishRecite?: () => void;
+  onOpenAddWord?: (lang?: "ja" | "es" | "en") => void;
   collectedIds: string[];
   practiceTimes: Record<string, number>;
   practiceMode: "typing" | "handwriting";
@@ -28,6 +30,8 @@ export const StartPage: React.FC<StartPageProps> = ({
   onGoToSpellRush,
   onGoToMemoryMatch,
   onGoToKanaTraining,
+  onGoToSpanishRecite,
+  onOpenAddWord,
   collectedIds,
   practiceTimes = {},
   practiceMode,
@@ -563,7 +567,7 @@ export const StartPage: React.FC<StartPageProps> = ({
 
             {/* Daily Practice Start Button & Custom Settings */}
             <div className="flex flex-col gap-4 pl-4 pt-6 md:pt-8 z-20 relative">
-              <div className="flex items-center gap-5 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap">
                 <button
                   onClick={() => {
                     const shuffled = [...activeDict].sort(() => Math.random() - 0.5);
@@ -575,6 +579,30 @@ export const StartPage: React.FC<StartPageProps> = ({
                   <Play className="w-3.5 h-3.5 fill-current" />
                   <span>开始今日练习</span>
                 </button>
+
+                {onGoToSpanishRecite && (
+                  <button
+                    type="button"
+                    onClick={onGoToSpanishRecite}
+                    className="px-4 py-3 bg-amber-500 hover:bg-amber-400 text-stone-950 active:scale-98 transition-all font-serif font-black text-xs tracking-wider rounded-sm shadow-sm cursor-pointer flex items-center gap-1.5"
+                    title="进入西班牙语沉浸背诵工坊（翻卡与默写练习）"
+                  >
+                    <span>🇪🇸</span>
+                    <span>西语背诵工坊</span>
+                  </button>
+                )}
+
+                {onOpenAddWord && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenAddWord(isEnglishMode ? "en" : "ja")}
+                    className="px-4 py-3 bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 active:scale-98 transition-all font-serif font-bold text-xs tracking-wider rounded-sm shadow-xs cursor-pointer flex items-center gap-1.5"
+                    title="录入新的词汇到词库（支持日/西/英与AI智能填充）"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-amber-600" />
+                    <span>录入单词</span>
+                  </button>
+                )}
 
                 {dueCardIds.length > 0 ? (
                   <button
@@ -718,21 +746,23 @@ export const StartPage: React.FC<StartPageProps> = ({
           力
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 relative z-10">
           {/* Track 1: 风雅学宫 (Handwriting/typing single character exercise) */}
           <div 
-            className="group p-4 border border-stone-300/40 hover:border-stone-300 rounded transition-all duration-300 relative select-none bg-stone-50/30"
+            className="group p-4 border border-stone-300/40 hover:border-stone-300 rounded transition-all duration-300 relative select-none bg-stone-50/30 flex flex-col justify-between"
           >
-            <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-300/40 mb-3 font-serif">
-              <span className="text-[#C4482A] font-black text-sm">壹</span>
-              <span className="text-stone-500 font-bold">熟记</span>
+            <div>
+              <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-300/40 mb-3 font-serif">
+                <span className="text-[#C4482A] font-black text-sm">壹</span>
+                <span className="text-stone-500 font-bold">熟记</span>
+              </div>
+              <h3 className="font-serif font-black text-stone-900 text-lg tracking-wider">
+                风雅学宫
+              </h3>
+              <p className="text-xs text-stone-500 font-sans mt-2 tracking-wide leading-relaxed">
+                五十音单字高频练习，巩固地基
+              </p>
             </div>
-            <h3 className="font-serif font-black text-stone-900 text-lg tracking-wider">
-              风雅学宫
-            </h3>
-            <p className="text-xs text-stone-500 font-sans mt-2 tracking-wide leading-relaxed">
-              五十音单字高频练习，巩固地基
-            </p>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
                 onClick={() => onGoToKanaTraining("hiragana")}
@@ -752,7 +782,7 @@ export const StartPage: React.FC<StartPageProps> = ({
           {/* Track 2: 时钟疾驰 (Speed run romanization race) */}
           <div 
             onClick={onGoToSpellRush}
-            className="group cursor-pointer hover:bg-stone-200/20 p-4 border border-transparent hover:border-stone-300 rounded transition-all duration-300 relative select-none"
+            className="group cursor-pointer hover:bg-stone-200/20 p-4 border border-transparent hover:border-stone-300 rounded transition-all duration-300 relative select-none bg-stone-50/30"
           >
             <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-300/40 mb-3 font-serif">
               <span className="text-[#C4482A] font-black text-sm">贰</span>
@@ -769,7 +799,7 @@ export const StartPage: React.FC<StartPageProps> = ({
           {/* Track 3: 风雅和歌 (Classic card pair memory match game) */}
           <div 
             onClick={onGoToMemoryMatch}
-            className="group cursor-pointer hover:bg-stone-200/20 p-4 border border-transparent hover:border-stone-300 rounded transition-all duration-300 relative select-none"
+            className="group cursor-pointer hover:bg-stone-200/20 p-4 border border-transparent hover:border-stone-300 rounded transition-all duration-300 relative select-none bg-stone-50/30"
           >
             <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-300/40 mb-3 font-serif">
               <span className="text-[#C4482A] font-black text-sm">叁</span>
@@ -780,6 +810,40 @@ export const StartPage: React.FC<StartPageProps> = ({
             </h3>
             <p className="text-xs text-stone-500 font-sans mt-2 tracking-wide leading-relaxed">
               经典翻牌记忆配对
+            </p>
+          </div>
+
+          {/* Track 4: 西班牙语背诵工坊 (Spanish Recitation Workshop) */}
+          <div 
+            onClick={onGoToSpanishRecite}
+            className="group cursor-pointer hover:bg-amber-100/40 p-4 border border-amber-300/60 hover:border-amber-500 rounded transition-all duration-300 relative select-none bg-amber-50/40 shadow-xs"
+          >
+            <div className="flex justify-between items-center text-xs pb-2 border-b border-amber-300/60 mb-3 font-serif">
+              <span className="text-amber-700 font-black text-sm">肆</span>
+              <span className="text-amber-800 font-bold">西语</span>
+            </div>
+            <h3 className="font-serif font-black text-stone-900 text-lg tracking-wider group-hover:text-amber-700 transition-colors flex items-center gap-1.5">
+              <span>🇪🇸 西语背诵工坊</span>
+            </h3>
+            <p className="text-xs text-stone-600 font-sans mt-2 tracking-wide leading-relaxed">
+              翻卡记忆、听音默写、自然发音与变音符输入工具
+            </p>
+          </div>
+
+          {/* Track 5: 自定义词条录入 (Add Words with AI) */}
+          <div 
+            onClick={() => onOpenAddWord && onOpenAddWord(isEnglishMode ? "en" : "ja")}
+            className="group cursor-pointer hover:bg-stone-200/40 p-4 border border-stone-300/60 hover:border-stone-500 rounded transition-all duration-300 relative select-none bg-stone-50/50 shadow-xs"
+          >
+            <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-300/60 mb-3 font-serif">
+              <span className="text-stone-700 font-black text-sm">伍</span>
+              <span className="text-stone-500 font-bold">录词</span>
+            </div>
+            <h3 className="font-serif font-black text-stone-900 text-lg tracking-wider group-hover:text-stone-950 transition-colors flex items-center gap-1.5">
+              <span>➕ 录入新单词</span>
+            </h3>
+            <p className="text-xs text-stone-600 font-sans mt-2 tracking-wide leading-relaxed">
+              一键录入日/西/英单词，支持试听发音与 AI 智能注音释义
             </p>
           </div>
         </div>

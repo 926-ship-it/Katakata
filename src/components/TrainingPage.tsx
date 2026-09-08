@@ -48,7 +48,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   const [showQuitConfirm, setShowQuitConfirm] = useState<boolean>(false);
 
   // Sound control
-  const [muted, setMuted] = useState<boolean>(false);
+  const [muted, setMuted] = useState<boolean>(() => audioSynth.getMuted());
 
   // Loop/Typewriter spelling states
   const [completedRounds, setCompletedRounds] = useState<number>(0);
@@ -257,21 +257,29 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         // Reward major word-complete bonus!
         triggerXpGain(10 + item.segments.length * 2, "Word Mastery ✨");
         
-        // RAPID PRONUNCIATION: Immediately speak the entire word with zero delay!
-        // CRITICAL REQUIREMENT: Do NOT advance to next word until pronunciation has completely finished!
-        audioSynth.speakFullWord(item.kanaStr, () => {
-          // Reading finished! Crisp micro-pause (120ms) for natural acoustics, then advance to next word
-          setTimeout(() => {
-            setIsPronouncing(false);
-            setCompletedRounds(prev => prev + 1);
-            setSlideDirection(1);
-            audioSynth.playCarriageReturn();
-            setCurrentItemIdx((prevIdx) => (prevIdx + 1) % items.length);
-            setCurrentSegmentIdx(0);
-            setRomajiProgress("");
-            setWordCorrect(false);
-          }, 120);
-        });
+        const romajiHint = item.segments.map(s => s.displayRomaji || (s.romaji && s.romaji[0]) || "").join("");
+        const langHint: "ja" | "es" | "en" = (item as any).lang || (isEnglishMode ? "en" : "ja");
+
+        // Speak full word clearly with automatic language detection, kanji hints, and romaji fallback
+        audioSynth.speakFullWord(
+          item.kanaStr || item.kanji,
+          () => {
+            // Reading finished! Crisp micro-pause (120ms) for natural acoustics, then advance to next word
+            setTimeout(() => {
+              setIsPronouncing(false);
+              setCompletedRounds(prev => prev + 1);
+              setSlideDirection(1);
+              audioSynth.playCarriageReturn();
+              setCurrentItemIdx((prevIdx) => (prevIdx + 1) % items.length);
+              setCurrentSegmentIdx(0);
+              setRomajiProgress("");
+              setWordCorrect(false);
+            }, 120);
+          },
+          item.kanji,
+          romajiHint,
+          langHint
+        );
       } else {
         // Speak the individual intermediate syllable completed INSTANTLY
         audioSynth.speakKanaInstant(segment.kana);
@@ -568,10 +576,26 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                 transition={{ type: "spring", damping: 20, stiffness: 140 }}
                 className="w-full flex flex-col items-center justify-center space-y-2.5 sm:space-y-4"
               >
-                <div className="text-center">
-                  <span className="text-[8px] sm:text-[10px] text-amber-800 font-mono tracking-wider font-bold uppercase bg-amber-500/10 border border-amber-500/20 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full">
-                    {item.categoryName} ・ {item.rarity} 稀有度
-                  </span>
+                <div className="text-center flex flex-col items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[8px] sm:text-[10px] text-amber-800 font-mono tracking-wider font-bold uppercase bg-amber-500/10 border border-amber-500/20 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full">
+                      {item.categoryName} ・ {item.rarity} 稀有度
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const romajiHint = item.segments.map(s => s.displayRomaji || (s.romaji && s.romaji[0]) || "").join("");
+                        const langHint: "ja" | "es" | "en" = (item as any).lang || (isEnglishMode ? "en" : "ja");
+                        audioSynth.speakFullWord(item.kanaStr || item.kanji, undefined, item.kanji, romajiHint, langHint);
+                      }}
+                      className="p-1 rounded-full text-stone-500 hover:text-amber-700 hover:bg-amber-100/80 transition-all cursor-pointer"
+                      title="朗读当前词条发音"
+                      aria-label="朗读发音"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   <h3 className="text-stone-750 font-medium font-serif text-xs sm:text-sm mt-1 sm:mt-1.5 opacity-90 leading-relaxed max-w-lg mx-auto">
                     {item.meaning}
                   </h3>

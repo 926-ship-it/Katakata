@@ -8,6 +8,8 @@ import { MascotComponent } from "./components/MascotComponent";
 import { SpellRushPage } from "./components/SpellRushPage";
 import { MemoryMatchPage } from "./components/MemoryMatchPage";
 import { KanaTrainingPage } from "./components/KanaTrainingPage";
+import { SpanishRecitePage } from "./components/SpanishRecitePage";
+import { AddWordModal } from "./components/AddWordModal";
 import { OnlineTimer } from "./components/OnlineTimer";
 import { DictionaryItem } from "./data/dictionary";
 import { audioSynth } from "./utils/audio";
@@ -15,7 +17,7 @@ import { recordPracticeBatch } from "./utils/srs";
 import { uiTranslate } from "./utils/lang";
 import { NarrativeStyle, nTrans } from "./utils/narrative";
 
-type ScreenState = "start" | "training" | "library" | "unlocked_ceremony" | "spell_rush" | "memory_match" | "kana_training";
+type ScreenState = "start" | "training" | "library" | "unlocked_ceremony" | "spell_rush" | "memory_match" | "kana_training" | "spanish_recite";
 
 export function toHanNumerals(num: number): string {
   const chars = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
@@ -117,6 +119,10 @@ export default function App() {
       return "cultural";
     }
   });
+
+  // Global Add Word Modal state
+  const [isAddWordModalOpen, setIsAddWordModalOpen] = useState<boolean>(false);
+  const [addWordDefaultLang, setAddWordDefaultLang] = useState<"ja" | "es" | "en">("ja");
 
   useEffect(() => {
     try {
@@ -750,6 +756,26 @@ export default function App() {
                     className={`cursor-pointer hover:text-[#C4482A] transition-colors py-0.5 ${currentPage === "library" ? "text-stone-950 font-black border-b-2 border-stone-900" : "text-stone-600"}`}
                   >
                     收藏
+                  </button>
+                  <button
+                    onClick={() => { setCurrentPage("spanish_recite"); setIsDrawerOpen(false); }}
+                    className={`cursor-pointer hover:text-amber-750 transition-colors py-0.5 flex items-center gap-0.5 ${currentPage === "spanish_recite" ? "text-stone-950 font-black border-b-2 border-amber-600" : "text-stone-600"}`}
+                    title="西班牙语沉浸背诵工坊"
+                  >
+                    <span>🇪🇸</span>
+                    <span className="hidden xs:inline">西语</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAddWordDefaultLang(isEnglishMode ? "en" : "ja");
+                      setIsAddWordModalOpen(true);
+                      setIsDrawerOpen(false);
+                    }}
+                    className="cursor-pointer hover:text-stone-950 transition-colors py-0.5 text-stone-600 flex items-center gap-0.5"
+                    title="录入新单词到词库"
+                  >
+                    <span className="text-amber-600 font-bold">➕</span>
+                    <span className="hidden xs:inline">录词</span>
                   </button>
                   <div className="flex items-center gap-0.5 sm:gap-1 text-stone-700 select-none">
                     <span className="hidden xs:inline">岁币</span>

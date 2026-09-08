@@ -270,6 +270,82 @@ ${text}
     }
   });
 
+  // AI Smart Word Fill endpoint: queries Gemini to generate readings, definitions, and examples
+  app.post("/api/smart-word-fill", async (req, res) => {
+    try {
+      const { word, lang = "ja" } = req.body;
+      if (!word || typeof word !== "string") {
+        return res.status(400).json({ error: "Word parameter is required." });
+      }
+
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(200).json({
+          success: false,
+          message: "No GEMINI_API_KEY configured. Please enter fields manually.",
+        });
+      }
+
+      const prompt = `You are a professional multi-language lexicographer and language tutor.
+The user wants to add a word to their vocabulary flashcard collection.
+Target word: "${word.trim()}"
+Language mode: "${lang}" (ja = Japanese, es = Spanish, en = English).
+
+Please analyze this word and provide:
+1. For Japanese ("ja"):
+   - kanji: standard Japanese orthography (e.g. 桜 or ありがとう)
+   - kana: complete reading in standard Hiragana (e.g. さくら)
+   - romaji: standard Hepburn romanization (e.g. sakura)
+   - meaning: concise, clear Chinese definition (e.g. 樱花；日本国花)
+   - exampleSentence: a natural, clean Japanese example sentence
+   - exampleTranslation: Chinese translation of the example sentence
+
+2. For Spanish ("es"):
+   - word: proper Spanish word with correct diacritics / accents (e.g. Canción, Buenos días)
+   - phonetic: IPA phonetic guide (e.g. [kanˈsjon])
+   - partOfSpeech: (e.g. s.f., s.m., adj., v., exp.)
+   - meaning: concise, clear Chinese definition
+   - exampleSentence: a natural, clean Spanish example sentence
+   - exampleTranslation: Chinese translation of the example sentence
+
+3. For English ("en"):
+   - word: the English word
+   - phonetic: IPA phonetic guide
+   - partOfSpeech: (e.g. n., v., adj., adv.)
+   - meaning: concise, clear Chinese definition
+   - exampleSentence: a natural English example sentence
+   - exampleTranslation: Chinese translation of the example sentence
+
+Output format must be valid JSON:
+{
+  "word": "...",
+  "kana": "...",
+  "romaji": "...",
+  "phonetic": "...",
+  "partOfSpeech": "...",
+  "meaning": "...",
+  "exampleSentence": "...",
+  "exampleTranslation": "..."
+}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+        },
+      });
+
+      const parsed = JSON.parse(response.text || "{}");
+      res.json({ success: true, data: parsed });
+    } catch (error: any) {
+      console.error("Smart word fill failed:", error);
+      res.status(500).json({
+        success: false,
+        error: "AI smart fill failed: " + (error.message || error),
+      });
+    }
+  });
+
   // Check health endpoint
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", time: new Date() });

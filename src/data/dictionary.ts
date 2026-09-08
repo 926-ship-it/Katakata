@@ -2415,9 +2415,22 @@ export function hiraganaToKatakana(str: string): string {
   });
 }
 
+export function getStoredCustomWords(): DictionaryItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("fifty_sound_custom_words");
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch (_) {
+    return [];
+  }
+}
+
 export function getDictionary(isEnglishMode: boolean, isKatakanaMode?: boolean): DictionaryItem[] {
+  const customItems = getStoredCustomWords();
+
   if (isEnglishMode) {
-    return DICTIONARY.map(item => {
+    const mappedBase = DICTIONARY.map(item => {
       const overlay = ENGLISH_OVERLAYS[item.id];
       if (!overlay) return item;
       
@@ -2440,10 +2453,13 @@ export function getDictionary(isEnglishMode: boolean, isKatakanaMode?: boolean):
         segments: segments,
       };
     });
+
+    const englishCustoms = customItems.filter(c => (c as any).lang === "en" || /^[a-zA-Z0-9\s\.\,\!\?]+$/.test(c.kanji));
+    return [...englishCustoms, ...mappedBase];
   }
   
   if (isKatakanaMode) {
-    return DICTIONARY.map(item => {
+    const convertedBase = DICTIONARY.map(item => {
       const convertedKanaStr = hiraganaToKatakana(item.kanaStr);
       const convertedSegments = item.segments.map(seg => ({
         ...seg,
@@ -2455,8 +2471,19 @@ export function getDictionary(isEnglishMode: boolean, isKatakanaMode?: boolean):
         segments: convertedSegments,
       };
     });
+
+    const convertedCustom = customItems.map(item => ({
+      ...item,
+      kanaStr: hiraganaToKatakana(item.kanaStr),
+      segments: item.segments.map(seg => ({
+        ...seg,
+        kana: hiraganaToKatakana(seg.kana),
+      })),
+    }));
+
+    return [...convertedCustom, ...convertedBase];
   }
   
-  return DICTIONARY;
+  return [...customItems, ...DICTIONARY];
 }
 

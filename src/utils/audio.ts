@@ -164,17 +164,35 @@ export const PHONETIC_PRONUNCIATION_MAP: Record<string, { kanji: string; phoneti
 export function resolveJapaneseSpeechPayload(
   text: string,
   kanjiHint?: string,
-  romajiHint?: string
-): { speechText: string; isEnglish: boolean; romajiFallback: string } {
+  romajiHint?: string,
+  langHint?: "ja" | "es" | "en"
+): { speechText: string; isEnglish: boolean; isSpanish: boolean; lang: string; romajiFallback: string } {
   const cleanText = (text || "").trim();
   const cleanKanji = (kanjiHint || "").trim();
 
-  // If input is purely English/Latin
-  if (/^[a-zA-Z\s\.\-\'\,\!\?\(\)]+$/.test(cleanText)) {
-    return { speechText: cleanText, isEnglish: true, romajiFallback: cleanText };
+  // Explicit Spanish mode or Spanish accented characters
+  if (langHint === "es" || /[áéíóúÁÉÍÓÚñÑüÜ¡¿]/.test(cleanText)) {
+    return {
+      speechText: cleanText,
+      isEnglish: false,
+      isSpanish: true,
+      lang: "es-ES",
+      romajiFallback: cleanText,
+    };
   }
 
-  // Check override dictionary
+  // Explicit English or Latin characters
+  if (langHint === "en" || /^[a-zA-Z0-9\s\.\-\'\,\!\?\(\)]+$/.test(cleanText)) {
+    return {
+      speechText: cleanText,
+      isEnglish: true,
+      isSpanish: false,
+      lang: "en-US",
+      romajiFallback: cleanText,
+    };
+  }
+
+  // Check override dictionary for Japanese words
   const key = cleanText.toLowerCase();
   const entry =
     PHONETIC_PRONUNCIATION_MAP[key] ||
@@ -185,6 +203,8 @@ export function resolveJapaneseSpeechPayload(
     return {
       speechText: entry.kanji || entry.phonetic,
       isEnglish: false,
+      isSpanish: false,
+      lang: "ja-JP",
       romajiFallback: entry.romaji || romajiHint || cleanText,
     };
   }
@@ -194,6 +214,8 @@ export function resolveJapaneseSpeechPayload(
     return {
       speechText: cleanKanji,
       isEnglish: false,
+      isSpanish: false,
+      lang: "ja-JP",
       romajiFallback: romajiHint || cleanText,
     };
   }
@@ -203,6 +225,8 @@ export function resolveJapaneseSpeechPayload(
     return {
       speechText: cleanText,
       isEnglish: false,
+      isSpanish: false,
+      lang: "ja-JP",
       romajiFallback: romajiHint || cleanText,
     };
   }
@@ -211,6 +235,8 @@ export function resolveJapaneseSpeechPayload(
   return {
     speechText: toPhoneticKatakana(cleanText),
     isEnglish: false,
+    isSpanish: false,
+    lang: "ja-JP",
     romajiFallback: romajiHint || cleanText,
   };
 }
@@ -225,19 +251,26 @@ class RetroAudioSynth {
 
   constructor() {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      this.cachedVoices = window.speechSynthesis.getVoices();
-      window.speechSynthesis.onvoiceschanged = () => {
+      try {
         this.cachedVoices = window.speechSynthesis.getVoices();
-      };
+        window.speechSynthesis.onvoiceschanged = () => {
+          try {
+            this.cachedVoices = window.speechSynthesis.getVoices();
+          } catch (_) {}
+        };
+      } catch (_) {}
     }
   }
 
   private getAvailableVoices(): SpeechSynthesisVoice[] {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return [];
-    if (!this.cachedVoices || this.cachedVoices.length === 0) {
-      this.cachedVoices = window.speechSynthesis.getVoices();
-    }
-    return this.cachedVoices;
+    try {
+      const current = window.speechSynthesis.getVoices();
+      if (current && current.length > 0) {
+        this.cachedVoices = current;
+      }
+    } catch (_) {}
+    return this.cachedVoices || [];
   }
 
   private bgmInterval: any = null;
@@ -446,9 +479,20 @@ class RetroAudioSynth {
     }
   }
 
+  // Speaks Spanish word with authentic native cadence and accent support
+  speakSpanish(text: string, onEnd?: () => void) {
+    this.speakFullWord(text, onEnd, undefined, undefined, "es");
+  }
+
   // Speaks the entire completed word IMMEDIATELY with zero delay, hard-canceling any in-flight syllables.
   // Invokes onEnd when the pronunciation has finished playing so the UI does not advance prematurely!
-  speakFullWord(text: string, onEnd?: () => void, kanjiHint?: string, romajiHint?: string) {
+  speakFullWord(
+    text: string,
+    onEnd?: () => void,
+    kanjiHint?: string,
+    romajiHint?: string,
+    langHint?: "ja" | "es" | "en"
+  ) {
     if (!text || text.trim() === "") {
       if (onEnd) onEnd();
       return;
@@ -456,8 +500,8 @@ class RetroAudioSynth {
 
     if (this.isMuted || typeof window === "undefined" || !("speechSynthesis" in window)) {
       if (onEnd) {
-        // When muted or unsupported, provide a natural 600ms grace window before advancing
-        setTimeout(() => onEnd(), 600);
+        // When muted or unsupported, provide a natural 400ms grace window before advancing
+        setTimeout(() => onEnd(), 400);
       }
       return;
     }
@@ -468,15 +512,127 @@ class RetroAudioSynth {
         window.speechSynthesis.resume();
       }
 
-      // Hard cancel any lingering syllable speech immediately so full word plays instantly!
-      window.speechSynthesis.cancel();
+      // Hard cancel any lingering syllable speech if actively speaking
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
 
-      const payload = resolveJapaneseSpeechPayload(text, kanjiHint, romajiHint);
-      const utterance = new SpeechSynthesisUtterance(payload.speechText);
-      this.activeFullWordUtterance = utterance; // Prevent garbage collection in V8/WebKit engines
-      utterance.lang = payload.isEnglish ? "en-US" : "ja-JP";
+      const payload = resolveJapaneseSpeechPayload(text, kanjiHint, romajiHint, langHint);
+      const voices = this.getAvailableVoices();
+      let targetVoice: SpeechSynthesisVoice | null = null;
+      let spokenText = payload.speechText;
+      let spokenLang = payload.lang;
 
-      if (this.voiceType === "male") {
+      if (payload.isSpanish) {
+        // Spanish voice lookup
+        targetVoice =
+          voices.find((v) => {
+            const lang = v.lang.toLowerCase();
+            return lang === "es-es" || lang === "es-mx" || lang === "es-us" || lang.startsWith("es");
+          }) || null;
+
+        if (!targetVoice && voices.length > 0) {
+          // If no Spanish voice is installed, fall back to default or system voice
+          targetVoice = voices.find((v) => v.default) || voices[0];
+        }
+      } else if (payload.isEnglish) {
+        // English voice lookup
+        if (this.voiceType === "male" || this.voiceType === "elderly") {
+          targetVoice =
+            voices.find((v) => {
+              const name = v.name.toLowerCase();
+              const lang = v.lang.toLowerCase();
+              return (
+                (lang === "en-us" || lang.startsWith("en")) &&
+                (name.includes("male") || name.includes("man") || name.includes("guy") || name.includes("david") || name.includes("mark") || name.includes("daniel"))
+              );
+            }) || null;
+        } else {
+          targetVoice =
+            voices.find((v) => {
+              const name = v.name.toLowerCase();
+              const lang = v.lang.toLowerCase();
+              return (
+                (lang === "en-us" || lang.startsWith("en")) &&
+                (name.includes("female") || name.includes("woman") || name.includes("girl") || name.includes("zira") || name.includes("samantha"))
+              );
+            }) || null;
+        }
+        if (!targetVoice) {
+          targetVoice = voices.find((v) => v.lang.toLowerCase().startsWith("en")) || null;
+        }
+      } else {
+        // Japanese voice lookup
+        if (this.voiceType === "male") {
+          targetVoice =
+            voices.find((v) => {
+              const name = v.name.toLowerCase();
+              const lang = v.lang.toLowerCase();
+              return (
+                (lang === "ja-jp" || lang.startsWith("ja")) &&
+                (name.includes("ichiro") || name.includes("otoya") || name.includes("male") || name.includes("man") || name.includes("guy"))
+              );
+            }) || null;
+        } else if (this.voiceType === "child") {
+          targetVoice =
+            voices.find((v) => {
+              const name = v.name.toLowerCase();
+              const lang = v.lang.toLowerCase();
+              return (
+                (lang === "ja-jp" || lang.startsWith("ja")) &&
+                (name.includes("ayumi") || name.includes("haruka") || name.includes("sakura") || name.includes("child"))
+              );
+            }) || null;
+        } else if (this.voiceType === "elderly") {
+          targetVoice =
+            voices.find((v) => {
+              const name = v.name.toLowerCase();
+              const lang = v.lang.toLowerCase();
+              return (
+                (lang === "ja-jp" || lang.startsWith("ja")) &&
+                (name.includes("ichiro") || name.includes("otoya") || name.includes("keiji"))
+              );
+            }) || null;
+        } else {
+          targetVoice =
+            voices.find((v) => {
+              const name = v.name.toLowerCase();
+              const lang = v.lang.toLowerCase();
+              return (
+                (lang === "ja-jp" || lang.startsWith("ja")) &&
+                (name.includes("kyoko") || name.includes("nanami") || name.includes("female") || name.includes("woman") || name.includes("ayumi"))
+              );
+            }) || null;
+        }
+
+        if (!targetVoice) {
+          targetVoice = voices.find((v) => v.lang === "ja-JP" || v.lang.toLowerCase().startsWith("ja")) || null;
+        }
+
+        // CRITICAL AUDIO FALLBACK:
+        // If the client system lacks a Japanese voice, fall back to Romaji reading using default/English voice!
+        // This ensures pronunciation audio ALWAYS sounds for every word on all operating systems!
+        if (!targetVoice && voices.length > 0) {
+          targetVoice =
+            voices.find((v) => v.lang.toLowerCase().startsWith("en")) ||
+            voices.find((v) => v.default) ||
+            voices[0];
+          spokenText = payload.romajiFallback;
+          spokenLang = "en-US";
+        }
+      }
+
+      const utterance = new SpeechSynthesisUtterance(spokenText);
+      utterance.lang = spokenLang;
+      if (targetVoice) {
+        utterance.voice = targetVoice;
+      }
+
+      // Voice pitch and rate customization
+      if (payload.isSpanish) {
+        utterance.rate = 1.0;
+        utterance.pitch = this.voiceType === "male" ? 0.92 : 1.05;
+      } else if (this.voiceType === "male") {
         utterance.rate = payload.isEnglish ? 1.02 : 1.05;
         utterance.pitch = payload.isEnglish ? 0.90 : 0.82;
       } else if (this.voiceType === "child") {
@@ -493,68 +649,10 @@ class RetroAudioSynth {
         utterance.pitch = payload.isEnglish ? 1.00 : 1.02;
       }
 
-      const voices = this.getAvailableVoices();
-      let targetVoice = null;
-      if (payload.isEnglish) {
-        if (this.voiceType === "male" || this.voiceType === "elderly") {
-          targetVoice = voices.find((v) => {
-            const name = v.name.toLowerCase();
-            const lang = v.lang.toLowerCase();
-            return (lang === "en-us" || lang.startsWith("en")) &&
-              (name.includes("male") || name.includes("man") || name.includes("guy") || name.includes("david") || name.includes("mark") || name.includes("daniel"));
-          });
-        } else {
-          targetVoice = voices.find((v) => {
-            const name = v.name.toLowerCase();
-            const lang = v.lang.toLowerCase();
-            return (lang === "en-us" || lang.startsWith("en")) &&
-              (name.includes("female") || name.includes("woman") || name.includes("girl") || name.includes("zira") || name.includes("samantha"));
-          });
-        }
-        if (!targetVoice) {
-          targetVoice = voices.find((v) => v.lang.toLowerCase().startsWith("en"));
-        }
-      } else {
-        if (this.voiceType === "male") {
-          targetVoice = voices.find((v) => {
-            const name = v.name.toLowerCase();
-            const lang = v.lang.toLowerCase();
-            return (lang === "ja-jp" || lang.startsWith("ja")) &&
-              (name.includes("ichiro") || name.includes("otoya") || name.includes("male") || name.includes("man") || name.includes("guy"));
-          });
-        } else if (this.voiceType === "child") {
-          targetVoice = voices.find((v) => {
-            const name = v.name.toLowerCase();
-            const lang = v.lang.toLowerCase();
-            return (lang === "ja-jp" || lang.startsWith("ja")) &&
-              (name.includes("ayumi") || name.includes("haruka") || name.includes("sakura") || name.includes("child"));
-          });
-        } else if (this.voiceType === "elderly") {
-          targetVoice = voices.find((v) => {
-            const name = v.name.toLowerCase();
-            const lang = v.lang.toLowerCase();
-            return (lang === "ja-jp" || lang.startsWith("ja")) &&
-              (name.includes("ichiro") || name.includes("otoya") || name.includes("keiji"));
-          });
-        } else {
-          targetVoice = voices.find((v) => {
-            const name = v.name.toLowerCase();
-            const lang = v.lang.toLowerCase();
-            return (lang === "ja-jp" || lang.startsWith("ja")) &&
-              (name.includes("kyoko") || name.includes("nanami") || name.includes("female") || name.includes("woman") || name.includes("ayumi"));
-          });
-        }
-        if (!targetVoice) {
-          targetVoice = voices.find((v) => v.lang === "ja-JP" || v.lang.toLowerCase().startsWith("ja"));
-        }
-      }
-
-      if (targetVoice) {
-        utterance.voice = targetVoice;
-        if (targetVoice.lang.toLowerCase().startsWith("en") && !payload.isEnglish) {
-          utterance.text = payload.romajiFallback;
-          utterance.lang = "en-US";
-        }
+      // Prevent garbage collection in V8/WebKit engines
+      this.activeFullWordUtterance = utterance;
+      if (typeof window !== "undefined") {
+        (window as any).__katakata_utterance = utterance;
       }
 
       this.lastSpeakTime = Date.now();
@@ -567,6 +665,9 @@ class RetroAudioSynth {
         hasTriggered = true;
         if (safetyWatchdog) clearTimeout(safetyWatchdog);
         this.activeFullWordUtterance = null;
+        if (typeof window !== "undefined") {
+          (window as any).__katakata_utterance = null;
+        }
         if (onEnd) {
           onEnd();
         }
@@ -577,25 +678,44 @@ class RetroAudioSynth {
       };
 
       utterance.onerror = (e) => {
-        console.warn("Full word speech synthesis error/interrupted:", e);
+        console.warn("Speech synthesis notice:", e);
+        // Fallback retry if language/voice was unavailable
+        if ((e.error === "language-unavailable" || e.error === "voice-unavailable") && !payload.isEnglish) {
+          try {
+            const fallbackUtterance = new SpeechSynthesisUtterance(payload.romajiFallback);
+            fallbackUtterance.lang = "en-US";
+            fallbackUtterance.onend = () => triggerCompletion();
+            fallbackUtterance.onerror = () => triggerCompletion();
+            window.speechSynthesis.speak(fallbackUtterance);
+            return;
+          } catch (_) {}
+        }
         triggerCompletion();
       };
 
       // Safety watchdog: ensure callback is always reached even if browser drops onend
-      const cleanLen = (payload.speechText || text).length;
-      const maxEstimatedMs = Math.min(8000, Math.max(1400, cleanLen * 450 + 1200));
+      const cleanLen = spokenText.length;
+      const maxEstimatedMs = Math.min(8000, Math.max(1600, cleanLen * 450 + 1200));
       safetyWatchdog = setTimeout(() => {
         triggerCompletion();
       }, maxEstimatedMs);
 
-      // Immediate play - micro delay (8ms) ensures preceding window.speechSynthesis.cancel() cleanly finishes
+      // Safe buffer delay (60ms) allows preceding cancel() to complete without clearing the new utterance
       setTimeout(() => {
         if (!this.isMuted) {
-          window.speechSynthesis.speak(utterance);
+          try {
+            if (window.speechSynthesis.paused) {
+              window.speechSynthesis.resume();
+            }
+            window.speechSynthesis.speak(utterance);
+          } catch (speakErr) {
+            console.warn("Speak call exception:", speakErr);
+            triggerCompletion();
+          }
         } else {
           triggerCompletion();
         }
-      }, 8);
+      }, 60);
     } catch (err) {
       console.warn("Full word speech synthesis failed:", err);
       if (onEnd) onEnd();
