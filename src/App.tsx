@@ -778,10 +778,10 @@ export default function App() {
                   <button
                     onClick={() => { setCurrentPage("spanish_recite"); setIsDrawerOpen(false); }}
                     className={`cursor-pointer hover:text-amber-750 transition-colors py-0.5 flex items-center gap-0.5 ${currentPage === "spanish_recite" ? "text-stone-950 font-black border-b-2 border-amber-600" : "text-stone-600"}`}
-                    title="西班牙语沉浸背诵工坊"
+                    title="沉浸背诵与活字默写工坊（支持日语、英语、西语）"
                   >
-                    <span>🇪🇸</span>
-                    <span className="hidden xs:inline">西语</span>
+                    <span>📖</span>
+                    <span className="hidden xs:inline">背诵</span>
                   </button>
                   <button
                     onClick={() => {
@@ -1353,19 +1353,29 @@ export default function App() {
             >
               <SpanishRecitePage
                 onBack={() => setCurrentPage("start")}
-                onOpenAddModal={() => {
-                  setAddWordDefaultLang("es");
+                initialLanguage={isEnglishMode ? "en" : "ja"}
+                onOpenAddModal={(lang) => {
+                  setAddWordDefaultLang(lang || (isEnglishMode ? "en" : "ja"));
                   setIsAddWordModalOpen(true);
                 }}
-                onOpenBatchModal={() => {
-                  setBatchModalLang("es");
+                onOpenBatchModal={(lang) => {
+                  setBatchModalLang(lang || (isEnglishMode ? "en" : "ja"));
                   setIsBatchModalOpen(true);
                 }}
-                onStartTraining={(spanishItems) => {
-                  setActiveCards(spanishItems);
+                onStartTraining={(reciteItems) => {
+                  const targetLang = reciteItems[0]?.lang;
+                  if (targetLang === "en") {
+                    setIsEnglishMode(true);
+                    setIsKatakanaMode(false);
+                  } else if (targetLang === "es") {
+                    setIsEnglishMode(false);
+                    setIsKatakanaMode(false);
+                  } else {
+                    setIsEnglishMode(false);
+                    setIsKatakanaMode(false);
+                  }
+                  setActiveCards(reciteItems);
                   setActiveDurationMs(0);
-                  setIsEnglishMode(false);
-                  setIsKatakanaMode(false);
                   setCurrentPage("training");
                 }}
                 refreshTrigger={spanishRefreshTrigger}

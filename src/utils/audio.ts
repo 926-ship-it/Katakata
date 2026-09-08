@@ -513,6 +513,11 @@ class RetroAudioSynth {
     this.speakFullWord(text, onEnd, undefined, undefined, "es");
   }
 
+  // Speaks English word with native pronunciation
+  speakEnglish(text: string, onEnd?: () => void) {
+    this.speakFullWord(text, onEnd, undefined, undefined, "en");
+  }
+
   // Speaks the entire completed word IMMEDIATELY with zero delay, hard-canceling any in-flight syllables.
   // Invokes onEnd when the pronunciation has finished playing so the UI does not advance prematurely!
   speakFullWord(

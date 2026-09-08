@@ -587,10 +587,10 @@ export const StartPage: React.FC<StartPageProps> = ({
                     type="button"
                     onClick={onGoToSpanishRecite}
                     className="px-4 py-3 bg-amber-500 hover:bg-amber-400 text-stone-950 active:scale-98 transition-all font-serif font-black text-xs tracking-wider rounded-sm shadow-sm cursor-pointer flex items-center gap-1.5"
-                    title="进入西班牙语沉浸背诵工坊（翻卡与默写练习）"
+                    title="进入沉浸背诵与活字默写工坊（支持日语、英语、西语）"
                   >
-                    <span>🇪🇸</span>
-                    <span>西语背诵工坊</span>
+                    <span>📖</span>
+                    <span>沉浸背诵工坊</span>
                   </button>
                 )}
 
@@ -827,20 +827,20 @@ export const StartPage: React.FC<StartPageProps> = ({
             </p>
           </div>
 
-          {/* Track 4: 西班牙语背诵工坊 (Spanish Recitation Workshop) */}
+          {/* Track 4: 沉浸背诵与活字默写工坊 (Multilingual Recitation Workshop) */}
           <div 
             onClick={onGoToSpanishRecite}
             className="group cursor-pointer hover:bg-amber-100/40 p-4 border border-amber-300/60 hover:border-amber-500 rounded transition-all duration-300 relative select-none bg-amber-50/40 shadow-xs"
           >
             <div className="flex justify-between items-center text-xs pb-2 border-b border-amber-300/60 mb-3 font-serif">
               <span className="text-amber-700 font-black text-sm">肆</span>
-              <span className="text-amber-800 font-bold">西语</span>
+              <span className="text-amber-800 font-bold">背诵</span>
             </div>
             <h3 className="font-serif font-black text-stone-900 text-lg tracking-wider group-hover:text-amber-700 transition-colors flex items-center gap-1.5">
-              <span>🇪🇸 西语背诵工坊</span>
+              <span>📖 沉浸背诵与默写工坊</span>
             </h3>
             <p className="text-xs text-stone-600 font-sans mt-2 tracking-wide leading-relaxed">
-              翻卡记忆、听音默写、自然发音与变音符输入工具
+              支持日语、英语、西语！翻卡记忆、逐字活字默写与自然发音自动切词
             </p>
           </div>
 
