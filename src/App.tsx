@@ -1106,6 +1106,11 @@ export default function App() {
                   setTrainingKanaType(type || "hiragana");
                   setCurrentPage("kana_training");
                 }}
+                onGoToSpanishRecite={() => setCurrentPage("spanish_recite")}
+                onOpenAddWord={(lang) => {
+                  setAddWordDefaultLang(lang || "ja");
+                  setIsAddWordModalOpen(true);
+                }}
                 collectedIds={collectedIds}
                 practiceTimes={practiceTimes}
                 practiceMode={practiceMode}
@@ -1241,8 +1246,36 @@ export default function App() {
               />
             </motion.div>
           )}
+
+          {currentPage === "spanish_recite" && (
+            <motion.div
+              key="spanish_recite"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+            >
+              <SpanishRecitePage
+                onBack={() => setCurrentPage("start")}
+                onOpenAddModal={() => {
+                  setAddWordDefaultLang("es");
+                  setIsAddWordModalOpen(true);
+                }}
+              />
+            </motion.div>
+          )}
         </AnimatePresence>
       </main>
+
+      {/* Global Add Word Modal */}
+      <AddWordModal
+        isOpen={isAddWordModalOpen}
+        onClose={() => setIsAddWordModalOpen(false)}
+        defaultLanguage={addWordDefaultLang}
+        onWordAdded={(item, lang) => {
+          showToast(`成功添加新词汇至${lang === "es" ? "西语" : lang === "ja" ? "日语" : "英语"}词库！`);
+        }}
+      />
 
       {/* Mascot Companion rendered conditionally with state bindings */}
       {showMascot && (!isFullscreen || !hideInAppHeader) && (

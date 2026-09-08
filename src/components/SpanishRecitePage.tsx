@@ -182,7 +182,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       }, 1200);
     } else {
       setDictationError(true);
-      audioSynth.playErrorThud();
+      audioSynth.playError();
       setTimeout(() => setDictationError(false), 800);
     }
   };
