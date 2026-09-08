@@ -554,16 +554,50 @@ class RetroAudioSynth {
       let spokenLang = payload.lang;
 
       if (payload.isSpanish) {
-        // Spanish voice lookup
+        // Robust Spanish voice lookup: check language tag variants and voice names
         targetVoice =
           voices.find((v) => {
-            const lang = v.lang.toLowerCase();
-            return lang === "es-es" || lang === "es-mx" || lang === "es-us" || lang.startsWith("es");
-          }) || null;
+            const lang = (v.lang || "").toLowerCase().replace("_", "-");
+            return (
+              lang.startsWith("es-") ||
+              lang === "es" ||
+              lang.startsWith("spa")
+            );
+          }) ||
+          voices.find((v) => {
+            const name = (v.name || "").toLowerCase();
+            return (
+              name.includes("spanish") ||
+              name.includes("español") ||
+              name.includes("castellano") ||
+              name.includes("helena") ||
+              name.includes("laura") ||
+              name.includes("pablo") ||
+              name.includes("sabina") ||
+              name.includes("monica") ||
+              name.includes("jorge")
+            );
+          }) ||
+          null;
 
-        if (!targetVoice && voices.length > 0) {
-          // If no Spanish voice is installed, fall back to default or system voice
-          targetVoice = voices.find((v) => v.default) || voices[0];
+        if (targetVoice) {
+          spokenLang = targetVoice.lang || "es-ES";
+        } else {
+          // CRITICAL: If no Spanish voice is installed in the client OS,
+          // NEVER force a Chinese (zh) or Japanese (ja) voice because they CANNOT speak Latin Spanish text!
+          // Instead, select an English (en-*) voice which CAN read Spanish words with clear Latin phonetics.
+          const englishVoice = voices.find((v) => {
+            const lang = (v.lang || "").toLowerCase().replace("_", "-");
+            return lang.startsWith("en-") || lang === "en";
+          });
+
+          if (englishVoice) {
+            targetVoice = englishVoice;
+            spokenLang = englishVoice.lang || "en-US";
+          } else {
+            targetVoice = null;
+            spokenLang = "es-ES";
+          }
         }
       } else if (payload.isEnglish) {
         // English voice lookup
@@ -712,11 +746,16 @@ class RetroAudioSynth {
 
       utterance.onerror = (e) => {
         console.warn("Speech synthesis notice:", e);
-        // Fallback retry if language/voice was unavailable
-        if ((e.error === "language-unavailable" || e.error === "voice-unavailable") && !payload.isEnglish) {
+        // Fallback retry if language/voice was unavailable or interrupted
+        if (!payload.isEnglish && (e.error === "language-unavailable" || e.error === "voice-unavailable" || e.error === "synthesis-failed" || e.error === "network")) {
           try {
-            const fallbackUtterance = new SpeechSynthesisUtterance(payload.romajiFallback);
+            const fallbackText = payload.isSpanish ? spokenText : payload.romajiFallback;
+            const fallbackUtterance = new SpeechSynthesisUtterance(fallbackText);
             fallbackUtterance.lang = "en-US";
+            const engVoice = voices.find((v) => (v.lang || "").toLowerCase().startsWith("en"));
+            if (engVoice) fallbackUtterance.voice = engVoice;
+            fallbackUtterance.rate = utterance.rate;
+            fallbackUtterance.pitch = utterance.pitch;
             fallbackUtterance.onend = () => triggerCompletion();
             fallbackUtterance.onerror = () => triggerCompletion();
             window.speechSynthesis.speak(fallbackUtterance);
@@ -734,7 +773,7 @@ class RetroAudioSynth {
       }, maxEstimatedMs);
 
       // Instant speak dispatcher:
-      // If previous speech was cancelled, yield to microtask (0ms) so browser speech pipeline flushes.
+      // If previous speech was cancelled, yield 35ms so Chromium IPC audio buffer flushes cleanly.
       // If nothing was speaking, dispatch synchronously with absolute zero latency!
       const doSpeak = () => {
         if (!this.isMuted) {
@@ -753,7 +792,7 @@ class RetroAudioSynth {
       };
 
       if (wasSpeaking) {
-        setTimeout(doSpeak, 0);
+        setTimeout(doSpeak, 35);
       } else {
         doSpeak();
       }

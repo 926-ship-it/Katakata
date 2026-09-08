@@ -203,18 +203,19 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       setDictationError(false);
       audioSynth.playTypewriterBell();
       
-      // INSTANT zero-delay pronunciation
-      audioSynth.speakSpanish(currentWord.word);
       updateSpanishWordMastery(currentWord.id, "mastered");
       setMasteryMap(getSpanishMasteryMap());
       setSessionStreak((prev) => prev + 1);
 
-      const advanceDelayMs = Math.round(900 / Math.max(0.8, audioSynth.getSpeechRate()));
-      setTimeout(() => {
-        if (activeDeck.length > 1) {
-          setCurrentIndex((prev) => (prev + 1) % activeDeck.length);
-        }
-      }, Math.max(500, advanceDelayMs));
+      // Speak the completed word clearly, and advance ONLY after pronunciation completes!
+      audioSynth.speakSpanish(currentWord.word, () => {
+        const pauseDelay = Math.max(120, Math.round(180 / Math.max(0.8, audioSynth.getSpeechRate())));
+        setTimeout(() => {
+          if (activeDeck.length > 1) {
+            setCurrentIndex((prev) => (prev + 1) % activeDeck.length);
+          }
+        }, pauseDelay);
+      });
     }
   };
 
@@ -327,16 +328,17 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       setDictationSuccess(true);
       setDictationError(false);
       audioSynth.playTypewriterBell();
-      audioSynth.speakSpanish(currentWord.word);
       updateSpanishWordMastery(currentWord.id, "mastered");
       setMasteryMap(getSpanishMasteryMap());
 
-      const advanceDelayMs = Math.round(900 / Math.max(0.8, audioSynth.getSpeechRate()));
-      setTimeout(() => {
-        if (activeDeck.length > 1) {
-          setCurrentIndex((prev) => (prev + 1) % activeDeck.length);
-        }
-      }, Math.max(450, advanceDelayMs));
+      audioSynth.speakSpanish(currentWord.word, () => {
+        const pauseDelay = Math.max(120, Math.round(180 / Math.max(0.8, audioSynth.getSpeechRate())));
+        setTimeout(() => {
+          if (activeDeck.length > 1) {
+            setCurrentIndex((prev) => (prev + 1) % activeDeck.length);
+          }
+        }, pauseDelay);
+      });
     } else {
       setDictationError(true);
       audioSynth.playError();
