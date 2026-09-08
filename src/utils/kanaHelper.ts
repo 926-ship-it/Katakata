@@ -156,6 +156,16 @@ export function saveStoredCustomWord(item: DictionaryItem): void {
   } catch (_) {}
 }
 
+export function saveBatchStoredCustomWords(items: DictionaryItem[]): void {
+  if (typeof window === "undefined" || items.length === 0) return;
+  try {
+    const current = getStoredCustomWords();
+    const newIds = new Set(items.map((i) => i.id));
+    const filtered = current.filter((w) => !newIds.has(w.id));
+    localStorage.setItem(CUSTOM_WORDS_KEY, JSON.stringify([...items, ...filtered]));
+  } catch (_) {}
+}
+
 export function deleteStoredCustomWord(id: string): void {
   if (typeof window === "undefined") return;
   try {

@@ -10,6 +10,7 @@ import { MemoryMatchPage } from "./components/MemoryMatchPage";
 import { KanaTrainingPage } from "./components/KanaTrainingPage";
 import { SpanishRecitePage } from "./components/SpanishRecitePage";
 import { AddWordModal } from "./components/AddWordModal";
+import { BatchImportModal } from "./components/BatchImportModal";
 import { OnlineTimer } from "./components/OnlineTimer";
 import { DictionaryItem } from "./data/dictionary";
 import { audioSynth } from "./utils/audio";
@@ -123,6 +124,11 @@ export default function App() {
   // Global Add Word Modal state
   const [isAddWordModalOpen, setIsAddWordModalOpen] = useState<boolean>(false);
   const [addWordDefaultLang, setAddWordDefaultLang] = useState<"ja" | "es" | "en">("ja");
+
+  // Global Batch Import Modal state
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState<boolean>(false);
+  const [batchModalLang, setBatchModalLang] = useState<"es" | "ja" | "en">("es");
+  const [spanishRefreshTrigger, setSpanishRefreshTrigger] = useState<number>(0);
 
   useEffect(() => {
     try {
@@ -777,6 +783,18 @@ export default function App() {
                     <span className="text-amber-600 font-bold">➕</span>
                     <span className="hidden xs:inline">录词</span>
                   </button>
+                  <button
+                    onClick={() => {
+                      setBatchModalLang(currentPage === "spanish_recite" ? "es" : (isEnglishMode ? "en" : "ja"));
+                      setIsBatchModalOpen(true);
+                      setIsDrawerOpen(false);
+                    }}
+                    className="cursor-pointer hover:text-stone-950 transition-colors py-0.5 text-stone-600 flex items-center gap-0.5"
+                    title="批量导入多行短句与生词"
+                  >
+                    <span className="text-amber-600 font-bold">📥</span>
+                    <span className="hidden xs:inline">批量</span>
+                  </button>
                   <div className="flex items-center gap-0.5 sm:gap-1 text-stone-700 select-none">
                     <span className="hidden xs:inline">岁币</span>
                     <span className="xs:hidden">🪙</span>
@@ -1111,6 +1129,10 @@ export default function App() {
                   setAddWordDefaultLang(lang || "ja");
                   setIsAddWordModalOpen(true);
                 }}
+                onOpenBatchImport={(lang) => {
+                  setBatchModalLang(lang || (isEnglishMode ? "en" : "es"));
+                  setIsBatchModalOpen(true);
+                }}
                 collectedIds={collectedIds}
                 practiceTimes={practiceTimes}
                 practiceMode={practiceMode}
@@ -1261,6 +1283,11 @@ export default function App() {
                   setAddWordDefaultLang("es");
                   setIsAddWordModalOpen(true);
                 }}
+                onOpenBatchModal={() => {
+                  setBatchModalLang("es");
+                  setIsBatchModalOpen(true);
+                }}
+                refreshTrigger={spanishRefreshTrigger}
               />
             </motion.div>
           )}
@@ -1273,7 +1300,23 @@ export default function App() {
         onClose={() => setIsAddWordModalOpen(false)}
         defaultLanguage={addWordDefaultLang}
         onWordAdded={(item, lang) => {
+          setSpanishRefreshTrigger((prev) => prev + 1);
           showToast(`成功添加新词汇至${lang === "es" ? "西语" : lang === "ja" ? "日语" : "英语"}词库！`);
+        }}
+        onSwitchToBatchImport={(lang) => {
+          setBatchModalLang(lang);
+          setIsBatchModalOpen(true);
+        }}
+      />
+
+      {/* Global Batch Import Modal */}
+      <BatchImportModal
+        isOpen={isBatchModalOpen}
+        onClose={() => setIsBatchModalOpen(false)}
+        defaultLanguage={batchModalLang}
+        onImportComplete={(count, lang) => {
+          setSpanishRefreshTrigger((prev) => prev + 1);
+          showToast(`🎉 成功批量导入 ${count} 条短句至${lang === "es" ? "西语" : lang === "ja" ? "日语" : "英语"}词库！`);
         }}
       />
 

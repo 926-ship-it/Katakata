@@ -616,8 +616,33 @@ export function saveCustomSpanishWord(word: SpanishWord): void {
   try {
     const current = getCustomSpanishWords();
     const filtered = current.filter((w) => w.id !== word.id);
-    filtered.unshift({ ...word, isCustom: true, category: "custom", categoryName: "自定义生词" });
+    const cat = word.category || "custom";
+    filtered.unshift({
+      ...word,
+      isCustom: true,
+      category: cat,
+      categoryName: word.categoryName || (cat === "travel" ? "旅行实用" : "自定义词库"),
+    });
     localStorage.setItem(STORAGE_CUSTOM_KEY, JSON.stringify(filtered));
+  } catch (_) {}
+}
+
+export function saveBatchCustomSpanishWords(words: SpanishWord[]): void {
+  if (typeof window === "undefined" || words.length === 0) return;
+  try {
+    const current = getCustomSpanishWords();
+    const newIds = new Set(words.map((w) => w.id));
+    const filtered = current.filter((w) => !newIds.has(w.id));
+    const processedWords = words.map((w) => {
+      const cat = w.category || "custom";
+      return {
+        ...w,
+        isCustom: true,
+        category: cat,
+        categoryName: w.categoryName || (cat === "travel" ? "旅行实用" : "自定义词库"),
+      };
+    });
+    localStorage.setItem(STORAGE_CUSTOM_KEY, JSON.stringify([...processedWords, ...filtered]));
   } catch (_) {}
 }
 

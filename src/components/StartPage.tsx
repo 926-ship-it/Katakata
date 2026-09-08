@@ -15,6 +15,7 @@ interface StartPageProps {
   onGoToKanaTraining: (type?: "hiragana" | "katakana" | "both") => void;
   onGoToSpanishRecite?: () => void;
   onOpenAddWord?: (lang?: "ja" | "es" | "en") => void;
+  onOpenBatchImport?: (lang?: "es" | "ja" | "en") => void;
   collectedIds: string[];
   practiceTimes: Record<string, number>;
   practiceMode: "typing" | "handwriting";
@@ -32,6 +33,7 @@ export const StartPage: React.FC<StartPageProps> = ({
   onGoToKanaTraining,
   onGoToSpanishRecite,
   onOpenAddWord,
+  onOpenBatchImport,
   collectedIds,
   practiceTimes = {},
   practiceMode,
@@ -604,6 +606,18 @@ export const StartPage: React.FC<StartPageProps> = ({
                   </button>
                 )}
 
+                {onOpenBatchImport && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenBatchImport(isEnglishMode ? "en" : "es")}
+                    className="px-4 py-3 bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 active:scale-98 transition-all font-serif font-bold text-xs tracking-wider rounded-sm shadow-xs cursor-pointer flex items-center gap-1.5"
+                    title="批量导入短句与词库（支持从Excel/文本粘贴Tab分隔、编号列表）"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-amber-600" />
+                    <span>批量导入短句</span>
+                  </button>
+                )}
+
                 {dueCardIds.length > 0 ? (
                   <button
                     onClick={() => {
@@ -844,6 +858,23 @@ export const StartPage: React.FC<StartPageProps> = ({
             </h3>
             <p className="text-xs text-stone-600 font-sans mt-2 tracking-wide leading-relaxed">
               一键录入日/西/英单词，支持试听发音与 AI 智能注音释义
+            </p>
+          </div>
+
+          {/* Track 6: 批量短句导入 (Batch Import Sentences) */}
+          <div 
+            onClick={() => onOpenBatchImport && onOpenBatchImport(isEnglishMode ? "en" : "es")}
+            className="group cursor-pointer hover:bg-amber-100/40 p-4 border border-amber-300/60 hover:border-amber-500 rounded transition-all duration-300 relative select-none bg-amber-50/40 shadow-xs"
+          >
+            <div className="flex justify-between items-center text-xs pb-2 border-b border-amber-300/60 mb-3 font-serif">
+              <span className="text-amber-800 font-black text-sm">陆</span>
+              <span className="text-amber-700 font-bold">批量</span>
+            </div>
+            <h3 className="font-serif font-black text-stone-900 text-lg tracking-wider group-hover:text-amber-800 transition-colors flex items-center gap-1.5">
+              <span>📥 批量短句导入</span>
+            </h3>
+            <p className="text-xs text-stone-600 font-sans mt-2 tracking-wide leading-relaxed">
+              支持从表格粘贴多行短句（Tab/编号分隔），自动解析并试听发音
             </p>
           </div>
         </div>

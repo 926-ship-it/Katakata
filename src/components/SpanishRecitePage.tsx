@@ -17,7 +17,8 @@ import {
   Flame,
   Check,
   RefreshCw,
-  Trash2
+  Trash2,
+  FileText
 } from "lucide-react";
 import {
   SpanishWord,
@@ -33,11 +34,15 @@ import { audioSynth } from "../utils/audio";
 interface SpanishRecitePageProps {
   onBack: () => void;
   onOpenAddModal?: () => void;
+  onOpenBatchModal?: () => void;
+  refreshTrigger?: number;
 }
 
 export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   onBack,
-  onOpenAddModal
+  onOpenAddModal,
+  onOpenBatchModal,
+  refreshTrigger = 0,
 }) => {
   // Mode: "flashcard" (翻卡背诵) | "dictation" (默写拼写) | "library" (词库查阅)
   const [activeTab, setActiveTab] = useState<"flashcard" | "dictation" | "library">("flashcard");
@@ -68,7 +73,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
   useEffect(() => {
     reloadWords();
-  }, []);
+  }, [refreshTrigger]);
 
   // Filtered Deck
   const activeDeck = useMemo(() => {
@@ -218,7 +223,20 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
           {/* Quick Actions */}
           <div className="flex items-center gap-2">
+            {onOpenBatchModal && (
+              <button
+                type="button"
+                onClick={onOpenBatchModal}
+                className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95"
+                title="批量导入多行短句（支持制表符 Tab、编号列表复制）"
+              >
+                <FileText className="w-4 h-4 text-amber-600" />
+                <span>批量导入短句</span>
+              </button>
+            )}
+
             <button
+              type="button"
               onClick={onOpenAddModal}
               className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
               title="录入新的西班牙语词汇"

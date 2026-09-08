@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Plus, Sparkles, Volume2, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { X, Plus, Sparkles, Volume2, CheckCircle2, AlertCircle, Loader2, FileText } from "lucide-react";
 import { DictionaryItem } from "../data/dictionary";
 import { splitKanaIntoSyllables, splitAlphabeticIntoSegments, saveStoredCustomWord } from "../utils/kanaHelper";
 import { saveCustomSpanishWord, SpanishWord, SPANISH_CATEGORIES } from "../data/spanishData";
@@ -11,6 +11,7 @@ interface AddWordModalProps {
   onClose: () => void;
   defaultLanguage?: "ja" | "es" | "en";
   onWordAdded?: (item: DictionaryItem | SpanishWord, lang: "ja" | "es" | "en") => void;
+  onSwitchToBatchImport?: (lang: "ja" | "es" | "en") => void;
 }
 
 export const AddWordModal: React.FC<AddWordModalProps> = ({
@@ -18,6 +19,7 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({
   onClose,
   defaultLanguage = "ja",
   onWordAdded,
+  onSwitchToBatchImport,
 }) => {
   const [langTab, setLangTab] = useState<"ja" | "es" | "en">(defaultLanguage);
 
@@ -275,53 +277,71 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({
             </button>
           </div>
 
-          {/* Language Selection Tabs */}
-          <div className="flex rounded-xl bg-stone-200/80 p-1 text-xs font-bold select-none">
-            <button
-              type="button"
-              onClick={() => {
-                setLangTab("ja");
-                setNotification(null);
-              }}
-              className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                langTab === "ja"
-                  ? "bg-white text-stone-900 shadow-xs font-black"
-                  : "text-stone-600 hover:text-stone-900"
-              }`}
-            >
-              <span>🇯🇵</span>
-              <span>日语五十音词卡</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setLangTab("es");
-                setNotification(null);
-              }}
-              className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                langTab === "es"
-                  ? "bg-white text-stone-900 shadow-xs font-black"
-                  : "text-stone-600 hover:text-stone-900"
-              }`}
-            >
-              <span>🇪🇸</span>
-              <span>西语背诵单词</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setLangTab("en");
-                setNotification(null);
-              }}
-              className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                langTab === "en"
-                  ? "bg-white text-stone-900 shadow-xs font-black"
-                  : "text-stone-600 hover:text-stone-900"
-              }`}
-            >
-              <span>🔤</span>
-              <span>英语词汇</span>
-            </button>
+          {/* Language Selection Tabs and Mode Switcher */}
+          <div className="space-y-2">
+            <div className="flex rounded-xl bg-stone-200/80 p-1 text-xs font-bold select-none">
+              <button
+                type="button"
+                onClick={() => {
+                  setLangTab("ja");
+                  setNotification(null);
+                }}
+                className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  langTab === "ja"
+                    ? "bg-white text-stone-900 shadow-xs font-black"
+                    : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                <span>🇯🇵</span>
+                <span>日语五十音词卡</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLangTab("es");
+                  setNotification(null);
+                }}
+                className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  langTab === "es"
+                    ? "bg-white text-stone-900 shadow-xs font-black"
+                    : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                <span>🇪🇸</span>
+                <span>西语背诵单词</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLangTab("en");
+                  setNotification(null);
+                }}
+                className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  langTab === "en"
+                    ? "bg-white text-stone-900 shadow-xs font-black"
+                    : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                <span>🔤</span>
+                <span>英语词汇</span>
+              </button>
+            </div>
+
+            {onSwitchToBatchImport && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onSwitchToBatchImport(langTab);
+                  }}
+                  className="text-xs text-amber-700 hover:text-amber-900 font-bold flex items-center gap-1 py-1 px-2 rounded hover:bg-amber-100/50 transition-colors cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5 text-amber-600" />
+                  <span>想批量粘贴多行短句？切换至「批量导入工坊」→</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Notification banner */}
