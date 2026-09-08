@@ -463,6 +463,9 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
         setTypedChars(nextTyped);
         const isComp = nextTyped.length >= targetChars.length;
         audioSynth.playTyping({ isCompletion: isComp });
+        if (!isComp) {
+          audioSynth.speakKanaInstant(currentSegment.display);
+        }
         checkCompletion(nextTyped);
         return;
       }
@@ -478,6 +481,9 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
         setTypedChars(nextTyped);
         const isComp = nextTyped.length >= targetChars.length;
         audioSynth.playTyping({ isCompletion: isComp });
+        if (!isComp) {
+          audioSynth.speakKanaInstant(currentSegment.display);
+        }
         checkCompletion(nextTyped);
       } else if (isPrefix) {
         setRomajiBuffer(proposed);

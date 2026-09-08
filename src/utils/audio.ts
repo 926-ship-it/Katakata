@@ -278,8 +278,127 @@ class RetroAudioSynth {
           setTimeout(syncVoices, 100);
           setTimeout(syncVoices, 500);
           setTimeout(syncVoices, 1500);
+
+          // User interaction unblocker for SpeechSynthesis in iframe / strict policy environments
+          const unlockSpeech = () => {
+            try {
+              if (window.speechSynthesis.paused) {
+                window.speechSynthesis.resume();
+              }
+            } catch (_) {}
+          };
+          window.addEventListener("click", unlockSpeech, { passive: true });
+          window.addEventListener("keydown", unlockSpeech, { passive: true });
+          window.addEventListener("touchstart", unlockSpeech, { passive: true });
         } catch (_) {}
       }
+    }
+  }
+
+  // Plays human pronunciation using online dictionary audio endpoint with HTML5 Audio element
+  // Works reliably across iframes and mobile webviews where native SpeechSynthesis might be restricted
+  playOnlineTTSAudio(
+    text: string,
+    langHint: "ja" | "es" | "en",
+    onEnd?: () => void
+  ): boolean {
+    if (this.isMuted || typeof window === "undefined") {
+      if (onEnd) onEnd();
+      return false;
+    }
+
+    try {
+      const clean = encodeURIComponent((text || "").trim().replace(/[¡¿\?!]/g, ""));
+      if (!clean) {
+        if (onEnd) onEnd();
+        return false;
+      }
+
+      let audioUrl = "";
+      if (langHint === "es") {
+        audioUrl = `https://dict.youdao.com/dictvoice?le=spa&audio=${clean}`;
+      } else if (langHint === "en") {
+        audioUrl = `https://dict.youdao.com/dictvoice?type=2&audio=${clean}`;
+      } else {
+        audioUrl = `https://dict.youdao.com/dictvoice?le=jap&audio=${clean}`;
+      }
+
+      const audio = new Audio(audioUrl);
+      audio.playbackRate = Math.max(0.8, Math.min(1.3, this.speechRate));
+      
+      let triggered = false;
+      const finish = () => {
+        if (!triggered) {
+          triggered = true;
+          if (onEnd) onEnd();
+        }
+      };
+
+      audio.onended = finish;
+      audio.onerror = () => {
+        // If online audio network fails, fallback to synthesized resonant vocal chime
+        this.playPhoneticVocalChime(text, finish);
+      };
+
+      // Safeguard watchdog: don't hang if audio takes too long to load
+      setTimeout(() => {
+        if (!triggered) {
+          finish();
+        }
+      }, 3500);
+
+      const playPromise = audio.play();
+      if (playPromise) {
+        playPromise.catch(() => {
+          this.playPhoneticVocalChime(text, finish);
+        });
+      }
+      return true;
+    } catch (_) {
+      this.playPhoneticVocalChime(text, onEnd);
+      return false;
+    }
+  }
+
+  // Synthesizes pleasant acoustic harmonic vocal chimes using Web Audio API
+  // Guaranteed zero-silence fallback that works 100% offline without any external services
+  playPhoneticVocalChime(text: string, onEnd?: () => void) {
+    if (this.isMuted) {
+      if (onEnd) onEnd();
+      return;
+    }
+    this.init();
+    if (!this.ctx) {
+      if (onEnd) onEnd();
+      return;
+    }
+
+    try {
+      const now = this.ctx.currentTime;
+      const seed = (text || "word").split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+      const baseFreq = 260 + (seed % 140);
+      const chord = [baseFreq, baseFreq * 1.25, baseFreq * 1.5]; // Warm major triad
+
+      chord.forEach((freq, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(freq, now + idx * 0.035);
+        gain.gain.setValueAtTime(0.09, now + idx * 0.035);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.035 + 0.38);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now + idx * 0.035);
+        osc.stop(now + idx * 0.035 + 0.40);
+      });
+
+      setTimeout(() => {
+        if (onEnd) onEnd();
+      }, 420);
+    } catch (_) {
+      if (onEnd) onEnd();
     }
   }
 
@@ -702,53 +821,18 @@ class RetroAudioSynth {
         }
       }
 
-      const utterance = new SpeechSynthesisUtterance(spokenText);
-      utterance.lang = spokenLang;
-      if (targetVoice) {
-        utterance.voice = targetVoice;
-      }
-
-      // Voice pitch and rate customization
-      let baseRate = 1.12;
-      if (payload.isSpanish) {
-        baseRate = 1.15; // Raised default Spanish cadence from 1.0 to 1.15 for agile, crisp phrasing
-        utterance.pitch = this.voiceType === "male" ? 0.92 : 1.05;
-      } else if (this.voiceType === "male") {
-        baseRate = payload.isEnglish ? 1.02 : 1.08;
-        utterance.pitch = payload.isEnglish ? 0.90 : 0.82;
-      } else if (this.voiceType === "child") {
-        baseRate = 1.18;
-        utterance.pitch = 1.30;
-      } else if (this.voiceType === "alien") {
-        baseRate = 1.45;
-        utterance.pitch = 1.80;
-      } else if (this.voiceType === "elderly") {
-        baseRate = 0.88;
-        utterance.pitch = 0.65;
-      } else {
-        baseRate = payload.isEnglish ? 1.08 : 1.15;
-        utterance.pitch = payload.isEnglish ? 1.00 : 1.02;
-      }
-
-      utterance.rate = Math.min(2.5, Math.max(0.5, baseRate * this.speechRate));
-
-      // Prevent garbage collection in V8/WebKit engines
-      this.activeFullWordUtterance = utterance;
-      if (typeof window !== "undefined") {
-        (window as any).__katakata_utterance = utterance;
-      }
-
-      this.lastSpeakTime = Date.now();
+      const langCategory: "ja" | "es" | "en" = payload.isSpanish ? "es" : payload.isEnglish ? "en" : "ja";
 
       let hasStarted = false;
       let hasTriggered = false;
       let safetyWatchdog: any = null;
-      let retryCount = 0;
+      let fallbackTimer: any = null;
 
       const triggerCompletion = () => {
         if (hasTriggered) return;
         hasTriggered = true;
         if (safetyWatchdog) clearTimeout(safetyWatchdog);
+        if (fallbackTimer) clearTimeout(fallbackTimer);
         this.activeFullWordUtterance = null;
         if (typeof window !== "undefined") {
           (window as any).__katakata_utterance = null;
@@ -758,86 +842,118 @@ class RetroAudioSynth {
         }
       };
 
-      utterance.onstart = () => {
-        hasStarted = true;
-      };
-
-      utterance.onend = () => {
-        triggerCompletion();
-      };
-
-      utterance.onerror = (e) => {
-        console.warn("Speech synthesis notice:", e);
-
-        // If interrupted before speech even started (Chrome cancel race condition), retry once!
-        if (!hasStarted && (e.error === "interrupted" || e.error === "canceled") && retryCount < 2) {
-          retryCount++;
-          setTimeout(() => {
-            try {
-              if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-              window.speechSynthesis.speak(utterance);
-            } catch (_) {
-              triggerCompletion();
-            }
-          }, 95);
-          return;
-        }
-
-        // Fallback retry if language/voice was unavailable or interrupted
-        if (!payload.isEnglish && (e.error === "language-unavailable" || e.error === "voice-unavailable" || e.error === "synthesis-failed" || e.error === "network")) {
-          try {
-            const fallbackText = payload.isSpanish ? spokenText : payload.romajiFallback;
-            const fallbackUtterance = new SpeechSynthesisUtterance(fallbackText);
-            fallbackUtterance.lang = "en-US";
-            const freshVoices = this.getAvailableVoices();
-            const engVoice = freshVoices.find((v) => (v.lang || "").toLowerCase().startsWith("en")) || freshVoices[0];
-            if (engVoice) fallbackUtterance.voice = engVoice;
-            fallbackUtterance.rate = utterance.rate;
-            fallbackUtterance.pitch = utterance.pitch;
-            fallbackUtterance.onend = () => triggerCompletion();
-            fallbackUtterance.onerror = () => triggerCompletion();
-            if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-            window.speechSynthesis.speak(fallbackUtterance);
-            return;
-          } catch (_) {}
-        }
-        triggerCompletion();
-      };
-
-      // Safety watchdog: ensure callback is always reached without cutting off natural speech
+      // Safety watchdog: ensure callback is always reached even if speech is slow
       const cleanLen = spokenText.length;
       const maxEstimatedMs = Math.min(10000, Math.max(2800, (cleanLen * 450 + 1500) / this.speechRate));
       safetyWatchdog = setTimeout(() => {
         triggerCompletion();
       }, maxEstimatedMs);
 
-      // Instant speak dispatcher:
-      // If previous speech was cancelled, yield 85ms so Chromium IPC audio buffer flushes cleanly.
-      // If nothing was speaking, dispatch synchronously with absolute zero latency!
-      const doSpeak = () => {
-        if (!this.isMuted) {
-          try {
-            if (window.speechSynthesis.paused) {
-              window.speechSynthesis.resume();
+      // Fallback timer: if native SpeechSynthesis hasn't started speaking within 550ms (common Chromium stall),
+      // seamlessly play using the online human audio / acoustic synthesizer!
+      fallbackTimer = setTimeout(() => {
+        if (!hasStarted && !hasTriggered) {
+          console.warn("SpeechSynthesis start timed out, engaging audio fallback...");
+          this.playOnlineTTSAudio(text, langCategory, triggerCompletion);
+        }
+      }, 550);
+
+      // Voice pitch and rate customization
+      let baseRate = 1.12;
+      let targetPitch = 1.0;
+      if (payload.isSpanish) {
+        baseRate = 1.15;
+        targetPitch = this.voiceType === "male" ? 0.92 : 1.05;
+      } else if (this.voiceType === "male") {
+        baseRate = payload.isEnglish ? 1.02 : 1.08;
+        targetPitch = payload.isEnglish ? 0.90 : 0.82;
+      } else if (this.voiceType === "child") {
+        baseRate = 1.18;
+        targetPitch = 1.30;
+      } else if (this.voiceType === "alien") {
+        baseRate = 1.45;
+        targetPitch = 1.80;
+      } else if (this.voiceType === "elderly") {
+        baseRate = 0.88;
+        targetPitch = 0.65;
+      } else {
+        baseRate = payload.isEnglish ? 1.08 : 1.15;
+        targetPitch = payload.isEnglish ? 1.00 : 1.02;
+      }
+
+      const effectiveRate = Math.min(2.5, Math.max(0.5, baseRate * this.speechRate));
+
+      const attemptNativeSpeak = (attempt: number) => {
+        if (hasTriggered || this.isMuted) return;
+
+        try {
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
+
+          // Always construct a FRESH utterance instance for every attempt
+          const freshUtterance = new SpeechSynthesisUtterance(spokenText);
+          freshUtterance.lang = spokenLang;
+          if (targetVoice) {
+            freshUtterance.voice = targetVoice;
+          }
+          freshUtterance.rate = effectiveRate;
+          freshUtterance.pitch = targetPitch;
+
+          freshUtterance.onstart = () => {
+            hasStarted = true;
+            if (fallbackTimer) clearTimeout(fallbackTimer);
+          };
+
+          freshUtterance.onend = () => {
+            triggerCompletion();
+          };
+
+          freshUtterance.onerror = (e) => {
+            console.warn(`Speech synthesis notice (attempt ${attempt}):`, e);
+
+            // If interrupted before speech even started and attempts remain, retry with fresh utterance
+            if (!hasStarted && attempt < 2) {
+              setTimeout(() => {
+                attemptNativeSpeak(attempt + 1);
+              }, 75);
+              return;
             }
-            window.speechSynthesis.speak(utterance);
-          } catch (speakErr) {
-            console.warn("Speak call exception:", speakErr);
+
+            // If native speech fails, seamlessly fall back to online audio player
+            if (!hasStarted && !hasTriggered) {
+              this.playOnlineTTSAudio(text, langCategory, triggerCompletion);
+            } else {
+              triggerCompletion();
+            }
+          };
+
+          this.activeFullWordUtterance = freshUtterance;
+          if (typeof window !== "undefined") {
+            (window as any).__katakata_utterance = freshUtterance;
+          }
+          this.lastSpeakTime = Date.now();
+
+          window.speechSynthesis.speak(freshUtterance);
+        } catch (err) {
+          console.warn("Exception during native speak:", err);
+          if (!hasStarted && !hasTriggered) {
+            this.playOnlineTTSAudio(text, langCategory, triggerCompletion);
+          } else {
             triggerCompletion();
           }
-        } else {
-          triggerCompletion();
         }
       };
 
       if (wasSpeaking) {
-        setTimeout(doSpeak, 85);
+        setTimeout(() => attemptNativeSpeak(0), 65);
       } else {
-        doSpeak();
+        attemptNativeSpeak(0);
       }
     } catch (err) {
       console.warn("Full word speech synthesis failed:", err);
-      if (onEnd) onEnd();
+      const langCategory: "ja" | "es" | "en" = langHint === "es" ? "es" : langHint === "en" ? "en" : "ja";
+      this.playOnlineTTSAudio(text, langCategory, onEnd);
     }
   }
 
