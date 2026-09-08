@@ -158,6 +158,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   // Flashcard State
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isFlipped, setIsFlipped] = useState<boolean>(false);
+  const [isPronouncing, setIsPronouncing] = useState<boolean>(false);
   const [sessionStreak, setSessionStreak] = useState<number>(0);
   const [speechRate, setSpeechRate] = useState<number>(() => audioSynth.getSpeechRate());
 
@@ -301,9 +302,13 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       if (onEnd) onEnd();
       return;
     }
+    setIsPronouncing(true);
     audioSynth.speakFullWord(
       currentWord.pronounceText,
-      onEnd,
+      () => {
+        setIsPronouncing(false);
+        if (onEnd) onEnd();
+      },
       currentWord.kanjiHint,
       currentWord.romajiHint,
       currentWord.lang
@@ -910,8 +915,12 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                             e.stopPropagation();
                             pronounceCurrentWord();
                           }}
-                          className="p-2 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-900 transition-all cursor-pointer active:scale-90"
-                          title="点击发音"
+                          className={`p-2 rounded-full transition-all cursor-pointer active:scale-90 ${
+                            isPronouncing
+                              ? "bg-amber-400 text-stone-950 animate-pulse scale-110 shadow-xs"
+                              : "bg-amber-100 hover:bg-amber-200 text-amber-900"
+                          }`}
+                          title={isPronouncing ? "正在朗读..." : "点击发音"}
                         >
                           <Volume2 className="w-5 h-5" />
                         </button>
@@ -1137,10 +1146,14 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                   <button
                     type="button"
                     onClick={() => pronounceCurrentWord()}
-                    className="px-4 py-2 rounded-full bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-950 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                    className={`px-4 py-2 rounded-full border text-xs flex items-center gap-2 transition-all cursor-pointer active:scale-95 shadow-2xs ${
+                      isPronouncing
+                        ? "bg-amber-400 border-amber-500 text-stone-950 font-black animate-pulse"
+                        : "bg-amber-100 hover:bg-amber-200 border-amber-300 text-amber-950 font-bold"
+                    }`}
                   >
-                    <Volume2 className="w-4 h-4 text-amber-800" />
-                    <span>重听发音 (Enter)</span>
+                    <Volume2 className={`w-4 h-4 ${isPronouncing ? "text-stone-950 animate-bounce" : "text-amber-800"}`} />
+                    <span>{isPronouncing ? "正在朗读..." : "重听发音 (Enter)"}</span>
                   </button>
 
                   <button

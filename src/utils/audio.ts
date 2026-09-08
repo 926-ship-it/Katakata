@@ -172,12 +172,13 @@ export function resolveJapaneseSpeechPayload(
 
   // Explicit Spanish mode or Spanish accented characters
   if (langHint === "es" || /[áéíóúÁÉÍÓÚñÑüÜ¡¿]/.test(cleanText)) {
+    const ttsClean = cleanText.replace(/^[¡¿\s]+|[!?\s]+$/g, "").trim() || cleanText;
     return {
-      speechText: cleanText,
+      speechText: ttsClean,
       isEnglish: false,
       isSpanish: true,
       lang: "es-ES",
-      romajiFallback: cleanText,
+      romajiFallback: ttsClean,
     };
   }
 
@@ -264,12 +265,19 @@ class RetroAudioSynth {
 
       if ("speechSynthesis" in window) {
         try {
-          this.cachedVoices = window.speechSynthesis.getVoices();
-          window.speechSynthesis.onvoiceschanged = () => {
+          const syncVoices = () => {
             try {
-              this.cachedVoices = window.speechSynthesis.getVoices();
+              const v = window.speechSynthesis.getVoices();
+              if (v && v.length > 0) {
+                this.cachedVoices = v;
+              }
             } catch (_) {}
           };
+          syncVoices();
+          window.speechSynthesis.addEventListener("voiceschanged", syncVoices);
+          setTimeout(syncVoices, 100);
+          setTimeout(syncVoices, 500);
+          setTimeout(syncVoices, 1500);
         } catch (_) {}
       }
     }
@@ -493,13 +501,16 @@ class RetroAudioSynth {
 
         if (cancelActive && window.speechSynthesis.speaking) {
           window.speechSynthesis.cancel();
-          // Give a small setTimeout buffer for Chrome/Safari to safely clear and speak the new utterance
           setTimeout(() => {
             if (!this.isMuted) {
-              window.speechSynthesis.speak(utterance);
+              try {
+                if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+                window.speechSynthesis.speak(utterance);
+              } catch (_) {}
             }
-          }, 15);
+          }, 85);
         } else {
+          if (window.speechSynthesis.paused) window.speechSynthesis.resume();
           window.speechSynthesis.speak(utterance);
         }
       } catch (err) {
@@ -729,8 +740,10 @@ class RetroAudioSynth {
 
       this.lastSpeakTime = Date.now();
 
+      let hasStarted = false;
       let hasTriggered = false;
       let safetyWatchdog: any = null;
+      let retryCount = 0;
 
       const triggerCompletion = () => {
         if (hasTriggered) return;
@@ -745,24 +758,45 @@ class RetroAudioSynth {
         }
       };
 
+      utterance.onstart = () => {
+        hasStarted = true;
+      };
+
       utterance.onend = () => {
         triggerCompletion();
       };
 
       utterance.onerror = (e) => {
         console.warn("Speech synthesis notice:", e);
+
+        // If interrupted before speech even started (Chrome cancel race condition), retry once!
+        if (!hasStarted && (e.error === "interrupted" || e.error === "canceled") && retryCount < 2) {
+          retryCount++;
+          setTimeout(() => {
+            try {
+              if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+              window.speechSynthesis.speak(utterance);
+            } catch (_) {
+              triggerCompletion();
+            }
+          }, 95);
+          return;
+        }
+
         // Fallback retry if language/voice was unavailable or interrupted
         if (!payload.isEnglish && (e.error === "language-unavailable" || e.error === "voice-unavailable" || e.error === "synthesis-failed" || e.error === "network")) {
           try {
             const fallbackText = payload.isSpanish ? spokenText : payload.romajiFallback;
             const fallbackUtterance = new SpeechSynthesisUtterance(fallbackText);
             fallbackUtterance.lang = "en-US";
-            const engVoice = voices.find((v) => (v.lang || "").toLowerCase().startsWith("en"));
+            const freshVoices = this.getAvailableVoices();
+            const engVoice = freshVoices.find((v) => (v.lang || "").toLowerCase().startsWith("en")) || freshVoices[0];
             if (engVoice) fallbackUtterance.voice = engVoice;
             fallbackUtterance.rate = utterance.rate;
             fallbackUtterance.pitch = utterance.pitch;
             fallbackUtterance.onend = () => triggerCompletion();
             fallbackUtterance.onerror = () => triggerCompletion();
+            if (window.speechSynthesis.paused) window.speechSynthesis.resume();
             window.speechSynthesis.speak(fallbackUtterance);
             return;
           } catch (_) {}
@@ -770,15 +804,15 @@ class RetroAudioSynth {
         triggerCompletion();
       };
 
-      // Safety watchdog: ensure callback is always reached even if browser drops onend
+      // Safety watchdog: ensure callback is always reached without cutting off natural speech
       const cleanLen = spokenText.length;
-      const maxEstimatedMs = Math.min(8000, Math.max(1000, (cleanLen * 360 + 900) / this.speechRate));
+      const maxEstimatedMs = Math.min(10000, Math.max(2800, (cleanLen * 450 + 1500) / this.speechRate));
       safetyWatchdog = setTimeout(() => {
         triggerCompletion();
       }, maxEstimatedMs);
 
       // Instant speak dispatcher:
-      // If previous speech was cancelled, yield 35ms so Chromium IPC audio buffer flushes cleanly.
+      // If previous speech was cancelled, yield 85ms so Chromium IPC audio buffer flushes cleanly.
       // If nothing was speaking, dispatch synchronously with absolute zero latency!
       const doSpeak = () => {
         if (!this.isMuted) {
@@ -797,7 +831,7 @@ class RetroAudioSynth {
       };
 
       if (wasSpeaking) {
-        setTimeout(doSpeak, 35);
+        setTimeout(doSpeak, 85);
       } else {
         doSpeak();
       }

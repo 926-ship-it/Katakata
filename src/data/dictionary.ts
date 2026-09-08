@@ -2430,9 +2430,8 @@ export function getDictionary(isEnglishMode: boolean, isKatakanaMode?: boolean):
   const customItems = getStoredCustomWords();
 
   if (isEnglishMode) {
-    const mappedBase = DICTIONARY.map(item => {
-      const overlay = ENGLISH_OVERLAYS[item.id];
-      if (!overlay) return item;
+    const mappedBase = DICTIONARY.filter(item => !!ENGLISH_OVERLAYS[item.id]).map(item => {
+      const overlay = ENGLISH_OVERLAYS[item.id]!;
       
       // Split the English word into segments of individual characters
       const segments = overlay.word.split("").map((char) => {
