@@ -702,10 +702,11 @@ export default function App() {
           <div className="max-w-4xl mx-auto px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-1 sm:gap-2">
             <div 
               onClick={() => { if (currentPage !== "training") { setCurrentPage("start"); setIsDrawerOpen(false); } }} 
-              className="flex items-center gap-1 cursor-pointer shrink-0 font-serif font-black tracking-wider sm:tracking-widest text-stone-900 text-xs sm:text-sm md:text-base uppercase"
+              className="flex items-center gap-1.5 cursor-pointer shrink-0 font-serif font-black tracking-wider sm:tracking-widest text-stone-900 text-xs sm:text-sm md:text-base uppercase"
             >
-              <span className="text-[#C4482A] font-bold">五十音</span>
-              <span className="text-stone-800">图鉴</span>
+              <span className="text-[#C4482A] font-bold">Katakata</span>
+              <span className="text-stone-800">咔嗒</span>
+              <span className="hidden lg:inline text-[11px] font-medium text-stone-500 tracking-normal pl-1 border-l border-stone-300">多语言练习工坊</span>
             </div>
 
             <div className="flex items-center gap-1.5 xs:gap-2.5 sm:gap-4 md:gap-6 shrink-0 font-serif text-[11px] sm:text-xs md:text-sm text-stone-700">
@@ -1441,9 +1442,9 @@ export default function App() {
       {/* Footer information bar */}
       {(!isFullscreen || !hideInAppHeader) && (
         <footer className="text-center text-stone-400 py-6 text-xs font-mono max-w-xl mx-auto space-y-1.5 border-t border-stone-200 select-none">
-          <p>©Katakata「カタカタ」五十音集卡练习 2026 EDITION. POWERED BY GOOGLE DEEPMIND GEMINI & REACT.</p>
+          <p>©Katakata 咔嗒 · 多语言沉浸练习工坊 2026. 日语五十音 · 英语词汇 · 西班牙语背诵默写.</p>
           <p className="text-[10px] text-stone-300">
-            DESIGNED FOR CLASSICAL JAPANESE ROMAJI LEARNING RETENTION. ALL INTELLECTUAL PROPERTY SECURED.
+            IMMERSIVE MULTILINGUAL RETENTION WORKSHOP. ALL INTELLECTUAL PROPERTY SECURED.
           </p>
         </footer>
       )}

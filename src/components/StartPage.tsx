@@ -560,10 +560,10 @@ export const StartPage: React.FC<StartPageProps> = ({
             {/* Tagline/Subtitle for mobile only */}
             <div className="md:hidden mt-4 pl-4 flex items-center gap-3 select-none">
               <span className="px-2 py-0.5 bg-[#C4482A] text-[#F3EFE3] text-[10px] font-serif rounded rotate-[-2deg] shadow-xs shrink-0">
-                秘藏
+                工坊
               </span>
               <span className="font-serif text-xs tracking-widest text-stone-850 leading-relaxed">
-                {isEnglishMode ? "和风洋词熟化 · 英文打字图鉴" : "五十音集卡练习 · 打字图鉴"}
+                {isEnglishMode ? "英语单词盲打 · 多语言沉浸练习" : "Katakata 咔嗒 · 多语言沉浸练习工坊"}
               </span>
             </div>
 
@@ -744,7 +744,7 @@ export const StartPage: React.FC<StartPageProps> = ({
 
             {/* Double columns vertical text running right-to-left replaced with single div */}
             <div style={{ writingMode: "vertical-rl", height: "220px", fontFamily: "'Yu Mincho','Hiragino Mincho ProN',serif", fontSize: "14px", letterSpacing: "0.35em", lineHeight: 1.9, color: "#221E18" }} className="relative z-10 select-none">
-              {isEnglishMode ? "和风洋词熟化・英文打字图鉴" : "五十音集卡练习・打字图鉴"}
+              {isEnglishMode ? "英语单词盲打・多语言沉浸练习" : "咔嗒多语言・沉浸式击键工坊"}
             </div>
 
             {/* Stamp Box '秘藏' */}

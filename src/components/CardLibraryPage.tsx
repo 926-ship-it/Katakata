@@ -683,10 +683,10 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
           style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
         >
           <BookOpen className="w-7 h-7 text-amber-700" />
-          <span>{isEnglishMode ? "Katakata 英语单词大收藏馆" : "Katakata「カタカタ」五十音闪卡藏馆"}</span>
+          <span>{isEnglishMode ? "Katakata 英语单词大收藏馆" : "Katakata「咔嗒」多语言闪卡藏馆"}</span>
         </h1>
         <p className="text-xs text-stone-500 font-mono uppercase tracking-wider">
-          {isEnglishMode ? "THE ENGLISH NOUNS AND WESTERN NAMES COLLECTIVE TYPING STUDY ROOM" : "THE JAPANESE NOMINAL CARD BINDER LIBRARY & REVISION ROOM"}
+          {isEnglishMode ? "THE ENGLISH VOCABULARY COLLECTIVE TYPING STUDY ROOM" : "THE MULTILINGUAL CARD BINDER LIBRARY & RETENTION ROOM"}
         </p>
       </div>
 
