@@ -31,7 +31,7 @@ import {
   MasteryStatus
 } from "../data/spanishData";
 import { getDictionary, DictionaryItem } from "../data/dictionary";
-import { audioSynth } from "../utils/audio";
+import { audioSynth, TypingSoundStyle } from "../utils/audio";
 
 export type ReciteLanguage = "ja" | "en" | "es";
 
@@ -170,6 +170,8 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   const [shakeIndex, setShakeIndex] = useState<number | null>(null);
   const hiddenInputRef = useRef<HTMLInputElement>(null);
   const dictationCardRef = useRef<HTMLDivElement>(null);
+  const lastAutoPronouncedWordIdRef = useRef<string>("");
+  const [typingSoundStyle, setTypingSoundStyle] = useState<TypingSoundStyle>(() => audioSynth.getTypingSoundStyle());
 
   const [dictationInput, setDictationInput] = useState<string>("");
   const [dictationSuccess, setDictationSuccess] = useState<boolean>(false);
@@ -331,10 +333,16 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
   // Auto pronounce on card change in flashcard & dictation mode
   useEffect(() => {
-    if (currentWord && activeTab === "flashcard") {
+    if (!currentWord) return;
+    const pronounceKey = `${activeTab}_${currentWord.id}_${currentIndex}`;
+
+    if (activeTab === "flashcard") {
       setIsFlipped(false);
-      pronounceCurrentWord();
-    } else if (currentWord && activeTab === "dictation") {
+      if (lastAutoPronouncedWordIdRef.current !== pronounceKey) {
+        lastAutoPronouncedWordIdRef.current = pronounceKey;
+        pronounceCurrentWord();
+      }
+    } else if (activeTab === "dictation") {
       setDictationInput("");
       setDictationSuccess(false);
       setDictationError(false);
@@ -349,7 +357,11 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
         setTypedChars([]);
       }
 
-      pronounceCurrentWord();
+      if (lastAutoPronouncedWordIdRef.current !== pronounceKey) {
+        lastAutoPronouncedWordIdRef.current = pronounceKey;
+        pronounceCurrentWord();
+      }
+
       setTimeout(() => {
         if (useTypewriterGrid) {
           hiddenInputRef.current?.focus({ preventScroll: true });
@@ -1120,6 +1132,24 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const styles: TypingSoundStyle[] = ["crisp", "typewriter", "bubble", "soft"];
+                        const nextIdx = (styles.indexOf(typingSoundStyle) + 1) % styles.length;
+                        const nextStyle = styles[nextIdx];
+                        audioSynth.setTypingSoundStyle(nextStyle);
+                        setTypingSoundStyle(nextStyle);
+                        audioSynth.playTyping({ volume: 1.0 });
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-700 text-xs font-mono transition-all cursor-pointer flex items-center gap-1"
+                      title="点击切换键盘击键音效: 清脆青轴 / 经典打字机 / 清脆气泡 / 轻音柔和"
+                    >
+                      <span>🔊</span>
+                      <span className="hidden sm:inline">音效:</span>
+                      <span>{typingSoundStyle === "crisp" ? "清脆青轴" : typingSoundStyle === "typewriter" ? "打字机" : typingSoundStyle === "bubble" ? "水滴气泡" : "轻音柔和"}</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => {
