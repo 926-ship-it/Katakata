@@ -1135,7 +1135,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        const styles: TypingSoundStyle[] = ["crisp", "typewriter", "bubble", "soft"];
+                        const styles: TypingSoundStyle[] = ["crisp", "typewriter", "bubble"];
                         const nextIdx = (styles.indexOf(typingSoundStyle) + 1) % styles.length;
                         const nextStyle = styles[nextIdx];
                         audioSynth.setTypingSoundStyle(nextStyle);
@@ -1143,11 +1143,11 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                         audioSynth.playTyping({ volume: 1.0, isCompletion: true });
                       }}
                       className="px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-700 text-xs font-mono transition-all cursor-pointer flex items-center gap-1"
-                      title="点击切换键盘击键音效: 清脆青轴 / 复古打字机 / 清脆水滴 / 清音木作"
+                      title="点击切换键盘击键音效: 清脆青轴 / 复古打字机 / 水滴气泡"
                     >
                       <span>🔊</span>
                       <span className="hidden sm:inline">音效:</span>
-                      <span>{typingSoundStyle === "crisp" ? "清脆青轴" : typingSoundStyle === "typewriter" ? "打字机" : typingSoundStyle === "bubble" ? "水滴气泡" : "清音木作"}</span>
+                      <span>{typingSoundStyle === "crisp" ? "清脆青轴" : typingSoundStyle === "typewriter" ? "打字机" : "水滴气泡"}</span>
                     </button>
 
                     <button

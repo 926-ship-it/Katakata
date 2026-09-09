@@ -67,7 +67,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       { id: "crisp", label: "清脆青轴" },
       { id: "typewriter", label: "打字机" },
       { id: "bubble", label: "清脆水滴" },
-      { id: "soft", label: "清音木作" },
     ];
     const currentIdx = styles.findIndex((s) => s.id === typingSoundStyle);
     const nextStyle = styles[(currentIdx + 1) % styles.length].id;
@@ -253,9 +252,8 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
     const isMatchOfAny = segment.romaji.some(r => r === proposedString);
 
     if (isMatchOfAny) {
-      // Correct character fully completed! Play mechanical typewriter strike
+      // Correct character fully completed! Play crystal-clear completion strike
       audioSynth.playTyping({ isCompletion: true, volume: 1.0 });
-      audioSynth.playCharacterResolved();
       
       setCorrectCount(prev => prev + 1);
       const nextCombo = combo + 1;
@@ -318,9 +316,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       }
     } else if (isPrefixOfAny) {
       // Mid-spelling of romaji character (e.g. typed 't' of 'tsu')
-      if (!fromHardwareListener) {
-        audioSynth.playTyping({ volume: 0.65 });
-      }
+      audioSynth.playTyping({ volume: 0.85 });
       setRomajiProgress(proposedString);
       
       setCorrectCount(prev => prev + 1);
@@ -374,13 +370,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       // Allow dot, punctuation, or lowercase letter
       if (key !== " " && key !== "." && key !== "-" && key !== "_" && key !== "'" && key !== "。" && key !== "·" && key !== "・") {
         key = key.toLowerCase();
-      }
-
-      // Play subtle mechanical typewriter keystroke sound in the input listener
-      const isTypingChar = /^[a-z0-9]$/.test(key) || 
-        key === " " || key === "." || key === "-" || key === "_" || key === "'" || key === "。" || key === "·" || key === "・";
-      if (isTypingChar && !isPaused && !timerFinished && !wordCorrect && practiceMode !== "handwriting") {
-        audioSynth.playTyping({ volume: 0.65 });
       }
 
       processInputKeyRef.current(key, true);
@@ -475,10 +464,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
             type="button"
             onClick={handleCycleTypingSound}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-stone-300 bg-white hover:bg-amber-50 text-stone-700 text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
-            title={`点击切换击键音效 (当前: ${typingSoundStyle === "crisp" ? "清脆青轴" : typingSoundStyle === "typewriter" ? "复古打字机" : typingSoundStyle === "bubble" ? "清脆水滴" : "清音木作"})`}
+            title={`点击切换击键音效 (当前: ${typingSoundStyle === "crisp" ? "清脆青轴" : typingSoundStyle === "typewriter" ? "复古打字机" : "水滴气泡"})`}
           >
             <Keyboard className="w-3.5 h-3.5 text-amber-600" />
-            <span>{typingSoundStyle === "crisp" ? "清脆青轴" : typingSoundStyle === "typewriter" ? "打字机" : typingSoundStyle === "bubble" ? "水滴气泡" : "清音木作"}</span>
+            <span>{typingSoundStyle === "crisp" ? "清脆青轴" : typingSoundStyle === "typewriter" ? "打字机" : "水滴气泡"}</span>
           </button>
 
           {onToggleFullscreen && (

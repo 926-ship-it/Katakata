@@ -345,33 +345,13 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
     }
   };
 
-  // Audio tone synth
+  // Audio tone synth using unified audioSynth typing sound
   const playKeyTone = (isCorrectWord: boolean) => {
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-      
-      osc.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      
       if (isCorrectWord) {
-        // High-pitched crystal bell sound
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.15);
-        gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.25);
+        audioSynth.playTyping({ isCompletion: true, volume: 1.0 });
       } else {
-        // Mechanical tactile wooden tick sound
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(520, audioCtx.currentTime);
-        gainNode.gain.setValueAtTime(0.06, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.08);
+        audioSynth.playTyping({ volume: 0.85 });
       }
     } catch (_) {}
   };

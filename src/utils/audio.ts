@@ -235,7 +235,7 @@ export function resolveJapaneseSpeechPayload(
   };
 }
 
-export type TypingSoundStyle = "crisp" | "typewriter" | "bubble" | "soft";
+export type TypingSoundStyle = "crisp" | "typewriter" | "bubble";
 
 class RetroAudioSynth {
   private ctx: AudioContext | null = null;
@@ -262,9 +262,13 @@ class RetroAudioSynth {
             this.speechRate = parsed;
           }
         }
-        const savedStyle = localStorage.getItem("typing_sound_style") as TypingSoundStyle;
-        if (savedStyle && ["crisp", "typewriter", "bubble", "soft"].includes(savedStyle)) {
-          this.typingSoundStyle = savedStyle;
+        const savedStyle = localStorage.getItem("typing_sound_style") as string;
+        if (savedStyle && ["crisp", "typewriter", "bubble"].includes(savedStyle)) {
+          this.typingSoundStyle = savedStyle as TypingSoundStyle;
+        } else {
+          // If previously set to "soft" (the muffled sound) or anything else, auto-reset to "crisp"
+          this.typingSoundStyle = "crisp";
+          localStorage.setItem("typing_sound_style", "crisp");
         }
       } catch (_) {}
 
@@ -994,44 +998,8 @@ class RetroAudioSynth {
         sparkleGain.connect(masterGain);
         sparkleOsc.start(now + 0.002);
         sparkleOsc.stop(now + 0.035);
-      } else if (this.typingSoundStyle === "soft") {
-        // --- 2. CLEAN WOODBLOCK / MARIMBA TAP (清音木作 / 柔和茶轴) ---
-        // Organic, dry, high-pitched wooden block tap without any bass mud
-        const woodOsc = this.ctx.createOscillator();
-        const woodGain = this.ctx.createGain();
-        woodOsc.type = "triangle";
-        woodOsc.frequency.setValueAtTime(2600 * naturalPitch, now);
-        woodOsc.frequency.exponentialRampToValueAtTime(1500, now + 0.015);
-        woodGain.gain.setValueAtTime(0.0001, now);
-        woodGain.gain.linearRampToValueAtTime(0.20, now + 0.001);
-        woodGain.gain.exponentialRampToValueAtTime(0.001, now + 0.016);
-        woodOsc.connect(woodGain);
-        woodGain.connect(masterGain);
-        woodOsc.start(now);
-        woodOsc.stop(now + 0.018);
-
-        // Tactile contact snap
-        const bSize = Math.floor(this.ctx.sampleRate * 0.008);
-        const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
-        const d = b.getChannelData(0);
-        for (let i = 0; i < bSize; i++) d[i] = Math.random() * 2 - 1;
-        const nNode = this.ctx.createBufferSource();
-        nNode.buffer = b;
-        const bpFilter = this.ctx.createBiquadFilter();
-        bpFilter.type = "bandpass";
-        bpFilter.frequency.value = 3600;
-        bpFilter.Q.value = 2.5;
-        const nGain = this.ctx.createGain();
-        nGain.gain.setValueAtTime(0.0001, now);
-        nGain.gain.linearRampToValueAtTime(0.14, now + 0.001);
-        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.009);
-        nNode.connect(bpFilter);
-        bpFilter.connect(nGain);
-        nGain.connect(masterGain);
-        nNode.start(now);
-        nNode.stop(now + 0.010);
       } else if (this.typingSoundStyle === "typewriter") {
-        // --- 3. VINTAGE MECHANICAL TYPEWRITER (复古机械打字机) ---
+        // --- 2. VINTAGE MECHANICAL TYPEWRITER (复古机械打字机) ---
         // Metallic typebar hammer impact + chassis snap + carriage spring ping
         const metalOsc = this.ctx.createOscillator();
         const metalGain = this.ctx.createGain();
@@ -1079,7 +1047,7 @@ class RetroAudioSynth {
         springOsc.start(now + 0.001);
         springOsc.stop(now + 0.042);
       } else {
-        // --- 4. ULTRA-CRISP MECHANICAL SWITCH (清脆青轴 / Kailh Box White / Cherry Blue) ---
+        // --- 3. ULTRA-CRISP MECHANICAL SWITCH (清脆青轴 / Kailh Box White / Cherry Blue) ---
         // Sharp dual micro-click (leaf snap + bottom-out clack) + PBT keycap snap
         const click1 = this.ctx.createOscillator();
         const click1Gain = this.ctx.createGain();
@@ -1254,58 +1222,42 @@ class RetroAudioSynth {
     }
   }
 
-  // Gentle crystal pop when complete single character is resolved
+  // Character resolution sound is handled cleanly by playTyping({ isCompletion: true })
+  // Kept as no-op to prevent redundant audio layer overlap
   playCharacterResolved() {
+    // Intentionally no-op to avoid double-firing sounds during typing
+  }
+
+  // Crisp, polite high-frequency refusal tick for wrong key typed (no low-frequency buzz or muffled thump)
+  playError() {
     if (this.isMuted) return;
     this.init();
     if (!this.ctx) return;
 
     try {
       const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
       const hp = this.ctx.createBiquadFilter();
       hp.type = "highpass";
-      hp.frequency.value = 1200;
+      hp.frequency.value = 1400;
 
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(2600, now);
-      osc.frequency.exponentialRampToValueAtTime(3600, now + 0.025);
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(2200, now);
+      osc.frequency.exponentialRampToValueAtTime(1100, now + 0.025);
 
       gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.linearRampToValueAtTime(0.08, now + 0.002);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.001);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.030);
 
       osc.connect(gain);
       gain.connect(hp);
       hp.connect(this.ctx.destination);
 
       osc.start(now);
-      osc.stop(now + 0.040);
+      osc.stop(now + 0.035);
     } catch (e) {}
-  }
-
-  // Classic low buzzer sound for wrong key typed
-  playError() {
-    if (this.isMuted) return;
-    this.init();
-    if (!this.ctx) return;
-
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(160, this.ctx.currentTime);
-    osc.frequency.linearRampToValueAtTime(100, this.ctx.currentTime + 0.15);
-
-    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.18);
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.2);
   }
 
   // Retro 8-bit coin pickup sound effect (B5 then E6 rapid arpeggio)
