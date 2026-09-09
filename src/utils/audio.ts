@@ -931,175 +931,244 @@ class RetroAudioSynth {
         if (options.pitchMultiplier !== undefined) pitchMod = options.pitchMultiplier;
       }
 
-      // Natural acoustic micro-randomization (±4%)
+      // Natural acoustic micro-randomization (±3%)
       const naturalPitch = pitchMod * (0.98 + Math.random() * 0.04);
-      const effectiveVol = isCompletion ? Math.min(1.4, vol * 1.25) : vol;
+      const effectiveVol = isCompletion ? Math.min(1.4, vol * 1.2) : vol;
+
+      // --- MASTER HIGHPASS ISOLATION FILTER & SMOOTHED GAIN ---
+      // Crucial: A dedicated 2nd-order High-Pass Filter at 1000Hz (Q: 0.707) completely removes
+      // DC step discontinuities, sub-bass thump, and low-frequency speaker driver displacement.
+      // This mathematically guarantees that sounds CANNOT be muffled or thumpy!
+      const masterHp = this.ctx.createBiquadFilter();
+      masterHp.type = "highpass";
+      masterHp.frequency.value = 1000;
+      masterHp.Q.value = 0.707;
+
+      const masterGain = this.ctx.createGain();
+      // Fast 1.5ms linear ramp prevents digital edge clicking
+      masterGain.gain.setValueAtTime(0.0001, now);
+      masterGain.gain.linearRampToValueAtTime(Math.min(1.2, effectiveVol), now + 0.0015);
+
+      masterGain.connect(masterHp);
+      masterHp.connect(this.ctx.destination);
 
       if (this.typingSoundStyle === "bubble") {
-        // Crisp gentle water droplet / bubble pop (clean upward chirp, zero mud)
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime((isCompletion ? 1100 : 920) * naturalPitch, now);
-        osc.frequency.exponentialRampToValueAtTime(isCompletion ? 2200 : 1850, now + 0.032);
-        gain.gain.setValueAtTime(0.13 * effectiveVol, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.032);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.035);
-        return;
-      }
+        // --- 1. CRYSTAL WATER DROPLET / BUBBLE POP (清脆水滴气泡) ---
+        // A genuine crystal droplet: Rapid upward sweep (1600Hz -> 3600Hz) with front-edge micro-snap
+        const dropletOsc = this.ctx.createOscillator();
+        const dropletGain = this.ctx.createGain();
+        dropletOsc.type = "sine";
+        dropletOsc.frequency.setValueAtTime(1600 * naturalPitch, now);
+        dropletOsc.frequency.exponentialRampToValueAtTime(3600 * naturalPitch, now + 0.028);
+        dropletGain.gain.setValueAtTime(0.0001, now);
+        dropletGain.gain.linearRampToValueAtTime(0.24, now + 0.002);
+        dropletGain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+        dropletOsc.connect(dropletGain);
+        dropletGain.connect(masterGain);
+        dropletOsc.start(now);
+        dropletOsc.stop(now + 0.038);
 
-      if (this.typingSoundStyle === "soft") {
-        // Soft dampened tactile switch (quiet, pleasant, zero bass thump)
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(1800 * naturalPitch, now);
-        osc.frequency.exponentialRampToValueAtTime(900, now + 0.010);
-        gain.gain.setValueAtTime(0.08 * effectiveVol, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.010);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.012);
-        return;
-      }
+        // Front-edge surface tension snap (sharp micro-click at t=0 for instant crisp clarity)
+        const snapOsc = this.ctx.createOscillator();
+        const snapGain = this.ctx.createGain();
+        snapOsc.type = "triangle";
+        snapOsc.frequency.setValueAtTime(4500 * naturalPitch, now);
+        snapOsc.frequency.exponentialRampToValueAtTime(2200, now + 0.005);
+        snapGain.gain.setValueAtTime(0.0001, now);
+        snapGain.gain.linearRampToValueAtTime(0.18, now + 0.001);
+        snapGain.gain.exponentialRampToValueAtTime(0.001, now + 0.006);
+        snapOsc.connect(snapGain);
+        snapGain.connect(masterGain);
+        snapOsc.start(now);
+        snapOsc.stop(now + 0.008);
 
-      if (this.typingSoundStyle === "typewriter") {
-        // Vintage typewriter metal typebar strike (crisp steel clack + carriage spring ping)
-        const metalOsc = this.ctx.createOscillator();
-        const metalGain = this.ctx.createGain();
-        metalOsc.type = "triangle";
-        metalOsc.frequency.setValueAtTime((isCompletion ? 5200 : 4500) * naturalPitch, now);
-        metalOsc.frequency.exponentialRampToValueAtTime(2200, now + 0.012);
-        metalGain.gain.setValueAtTime(0.18 * effectiveVol, now);
-        metalGain.gain.exponentialRampToValueAtTime(0.001, now + 0.012);
-        metalOsc.connect(metalGain);
-        metalGain.connect(this.ctx.destination);
-        metalOsc.start(now);
-        metalOsc.stop(now + 0.014);
+        // High crystal sparkle overtone (5600Hz)
+        const sparkleOsc = this.ctx.createOscillator();
+        const sparkleGain = this.ctx.createGain();
+        sparkleOsc.type = "sine";
+        sparkleOsc.frequency.setValueAtTime(5600 * naturalPitch, now + 0.002);
+        sparkleGain.gain.setValueAtTime(0.0001, now + 0.002);
+        sparkleGain.gain.linearRampToValueAtTime(0.08, now + 0.004);
+        sparkleGain.gain.exponentialRampToValueAtTime(0.001, now + 0.030);
+        sparkleOsc.connect(sparkleGain);
+        sparkleGain.connect(masterGain);
+        sparkleOsc.start(now + 0.002);
+        sparkleOsc.stop(now + 0.035);
+      } else if (this.typingSoundStyle === "soft") {
+        // --- 2. CLEAN WOODBLOCK / MARIMBA TAP (清音木作 / 柔和茶轴) ---
+        // Organic, dry, high-pitched wooden block tap without any bass mud
+        const woodOsc = this.ctx.createOscillator();
+        const woodGain = this.ctx.createGain();
+        woodOsc.type = "triangle";
+        woodOsc.frequency.setValueAtTime(2600 * naturalPitch, now);
+        woodOsc.frequency.exponentialRampToValueAtTime(1500, now + 0.015);
+        woodGain.gain.setValueAtTime(0.0001, now);
+        woodGain.gain.linearRampToValueAtTime(0.20, now + 0.001);
+        woodGain.gain.exponentialRampToValueAtTime(0.001, now + 0.016);
+        woodOsc.connect(woodGain);
+        woodGain.connect(masterGain);
+        woodOsc.start(now);
+        woodOsc.stop(now + 0.018);
 
-        // Crisp mechanical noise snap
+        // Tactile contact snap
         const bSize = Math.floor(this.ctx.sampleRate * 0.008);
         const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
         const d = b.getChannelData(0);
         for (let i = 0; i < bSize; i++) d[i] = Math.random() * 2 - 1;
         const nNode = this.ctx.createBufferSource();
         nNode.buffer = b;
-        const nFilter = this.ctx.createBiquadFilter();
-        nFilter.type = "highpass";
-        nFilter.frequency.value = 4000;
+        const bpFilter = this.ctx.createBiquadFilter();
+        bpFilter.type = "bandpass";
+        bpFilter.frequency.value = 3600;
+        bpFilter.Q.value = 2.5;
         const nGain = this.ctx.createGain();
-        nGain.gain.setValueAtTime(0.14 * effectiveVol, now);
-        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.008);
-        nNode.connect(nFilter);
-        nFilter.connect(nGain);
-        nGain.connect(this.ctx.destination);
+        nGain.gain.setValueAtTime(0.0001, now);
+        nGain.gain.linearRampToValueAtTime(0.14, now + 0.001);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.009);
+        nNode.connect(bpFilter);
+        bpFilter.connect(nGain);
+        nGain.connect(masterGain);
         nNode.start(now);
-        nNode.stop(now + 0.009);
+        nNode.stop(now + 0.010);
+      } else if (this.typingSoundStyle === "typewriter") {
+        // --- 3. VINTAGE MECHANICAL TYPEWRITER (复古机械打字机) ---
+        // Metallic typebar hammer impact + chassis snap + carriage spring ping
+        const metalOsc = this.ctx.createOscillator();
+        const metalGain = this.ctx.createGain();
+        metalOsc.type = "triangle";
+        metalOsc.frequency.setValueAtTime(4800 * naturalPitch, now);
+        metalOsc.frequency.exponentialRampToValueAtTime(2400, now + 0.012);
+        metalGain.gain.setValueAtTime(0.0001, now);
+        metalGain.gain.linearRampToValueAtTime(0.26, now + 0.001);
+        metalGain.gain.exponentialRampToValueAtTime(0.001, now + 0.014);
+        metalOsc.connect(metalGain);
+        metalGain.connect(masterGain);
+        metalOsc.start(now);
+        metalOsc.stop(now + 0.016);
 
-        // Subtle bell ping harmonic
-        const ringOsc = this.ctx.createOscillator();
-        const ringGain = this.ctx.createGain();
-        ringOsc.type = "sine";
-        ringOsc.frequency.setValueAtTime(6200 * naturalPitch, now + 0.002);
-        ringGain.gain.setValueAtTime(0.05 * effectiveVol, now + 0.002);
-        ringGain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
-        ringOsc.connect(ringGain);
-        ringGain.connect(this.ctx.destination);
-        ringOsc.start(now + 0.002);
-        ringOsc.stop(now + 0.040);
-        return;
+        // High-pass mechanical rattle snap
+        const bSize = Math.floor(this.ctx.sampleRate * 0.010);
+        const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+        const d = b.getChannelData(0);
+        for (let i = 0; i < bSize; i++) d[i] = Math.random() * 2 - 1;
+        const nNode = this.ctx.createBufferSource();
+        nNode.buffer = b;
+        const hpFilter = this.ctx.createBiquadFilter();
+        hpFilter.type = "highpass";
+        hpFilter.frequency.value = 4200;
+        const nGain = this.ctx.createGain();
+        nGain.gain.setValueAtTime(0.0001, now);
+        nGain.gain.linearRampToValueAtTime(0.20, now + 0.001);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.010);
+        nNode.connect(hpFilter);
+        hpFilter.connect(nGain);
+        nGain.connect(masterGain);
+        nNode.start(now);
+        nNode.stop(now + 0.011);
+
+        // Distinct typewriter spring harmonic (6800Hz / 8200Hz)
+        const springOsc = this.ctx.createOscillator();
+        const springGain = this.ctx.createGain();
+        springOsc.type = "sine";
+        springOsc.frequency.setValueAtTime(6800 * naturalPitch, now + 0.001);
+        springGain.gain.setValueAtTime(0.0001, now + 0.001);
+        springGain.gain.linearRampToValueAtTime(0.09, now + 0.003);
+        springGain.gain.exponentialRampToValueAtTime(0.001, now + 0.038);
+        springOsc.connect(springGain);
+        springGain.connect(masterGain);
+        springOsc.start(now + 0.001);
+        springOsc.stop(now + 0.042);
+      } else {
+        // --- 4. ULTRA-CRISP MECHANICAL SWITCH (清脆青轴 / Kailh Box White / Cherry Blue) ---
+        // Sharp dual micro-click (leaf snap + bottom-out clack) + PBT keycap snap
+        const click1 = this.ctx.createOscillator();
+        const click1Gain = this.ctx.createGain();
+        click1.type = "triangle";
+        click1.frequency.setValueAtTime(5400 * naturalPitch, now);
+        click1.frequency.exponentialRampToValueAtTime(2600, now + 0.008);
+        click1Gain.gain.setValueAtTime(0.0001, now);
+        click1Gain.gain.linearRampToValueAtTime(0.24, now + 0.001);
+        click1Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.009);
+        click1.connect(click1Gain);
+        click1Gain.connect(masterGain);
+        click1.start(now);
+        click1.stop(now + 0.010);
+
+        // Secondary bottom-out micro-pulse (2ms delay)
+        const click2 = this.ctx.createOscillator();
+        const click2Gain = this.ctx.createGain();
+        click2.type = "sine";
+        click2.frequency.setValueAtTime(6400 * naturalPitch, now + 0.002);
+        click2.frequency.exponentialRampToValueAtTime(3200, now + 0.008);
+        click2Gain.gain.setValueAtTime(0.0001, now + 0.002);
+        click2Gain.gain.linearRampToValueAtTime(0.16, now + 0.003);
+        click2Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.009);
+        click2.connect(click2Gain);
+        click2Gain.connect(masterGain);
+        click2.start(now + 0.002);
+        click2.stop(now + 0.011);
+
+        // PBT keycap high-frequency clack burst
+        const bSize = Math.floor(this.ctx.sampleRate * 0.010);
+        const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+        const d = b.getChannelData(0);
+        for (let i = 0; i < bSize; i++) d[i] = Math.random() * 2 - 1;
+        const nNode = this.ctx.createBufferSource();
+        nNode.buffer = b;
+        const bpFilter = this.ctx.createBiquadFilter();
+        bpFilter.type = "bandpass";
+        bpFilter.frequency.value = 5200;
+        bpFilter.Q.value = 3.5;
+        const nGain = this.ctx.createGain();
+        nGain.gain.setValueAtTime(0.0001, now);
+        nGain.gain.linearRampToValueAtTime(0.22, now + 0.001);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.010);
+        nNode.connect(bpFilter);
+        bpFilter.connect(nGain);
+        nGain.connect(masterGain);
+        nNode.start(now);
+        nNode.stop(now + 0.011);
+
+        // Switch internal spring ting (4200Hz)
+        const springOsc = this.ctx.createOscillator();
+        const springGain = this.ctx.createGain();
+        springOsc.type = "sine";
+        springOsc.frequency.setValueAtTime(4200 * naturalPitch, now + 0.001);
+        springGain.gain.setValueAtTime(0.0001, now + 0.001);
+        springGain.gain.linearRampToValueAtTime(0.10, now + 0.002);
+        springGain.gain.exponentialRampToValueAtTime(0.001, now + 0.018);
+        springOsc.connect(springGain);
+        springGain.connect(masterGain);
+        springOsc.start(now + 0.001);
+        springOsc.stop(now + 0.020);
       }
 
-      // --- DEFAULT: ULTRA-CRISP MECHANICAL SWITCH (清脆青轴 / Kailh Box White / Cherry MX Blue) ---
-      // Real mechanical switches sound crisp because of high-frequency transients and ZERO low-frequency bass mud!
-      
-      // 1. Dual Tactile Micro-Clicks (simulates switch click jacket leaf snap at t=0 and bottom-out at t=2.5ms)
-      const click1 = this.ctx.createOscillator();
-      const click1Gain = this.ctx.createGain();
-      click1.type = "triangle";
-      click1.frequency.setValueAtTime((isCompletion ? 5200 : 4600) * naturalPitch, now);
-      click1.frequency.exponentialRampToValueAtTime(2400, now + 0.007);
-      click1Gain.gain.setValueAtTime(0.18 * effectiveVol, now);
-      click1Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.007);
-      click1.connect(click1Gain);
-      click1Gain.connect(this.ctx.destination);
-      click1.start(now);
-      click1.stop(now + 0.008);
-
-      const click2 = this.ctx.createOscillator();
-      const click2Gain = this.ctx.createGain();
-      click2.type = "sine";
-      click2.frequency.setValueAtTime((isCompletion ? 6800 : 6000) * naturalPitch, now + 0.0025);
-      click2.frequency.exponentialRampToValueAtTime(3200, now + 0.008);
-      click2Gain.gain.setValueAtTime(0.12 * effectiveVol, now + 0.0025);
-      click2Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.008);
-      click2.connect(click2Gain);
-      click2Gain.connect(this.ctx.destination);
-      click2.start(now + 0.0025);
-      click2.stop(now + 0.009);
-
-      // 2. High-pass Filtered Tactile Noise (clean, snappy keycap contact, zero bass mud)
-      const bufferSize = Math.floor(this.ctx.sampleRate * 0.010);
-      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-      }
-      const noiseNode = this.ctx.createBufferSource();
-      noiseNode.buffer = buffer;
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = "highpass";
-      filter.frequency.value = isCompletion ? 4200 : 3600;
-      const noiseGain = this.ctx.createGain();
-      noiseGain.gain.setValueAtTime(0.16 * effectiveVol, now);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.008);
-      noiseNode.connect(filter);
-      filter.connect(noiseGain);
-      noiseGain.connect(this.ctx.destination);
-      noiseNode.start(now);
-      noiseNode.stop(now + 0.010);
-
-      // 3. Crisp metallic switch spring ping (3600Hz, ultra-clean harmonic, decay 10ms)
-      const springOsc = this.ctx.createOscillator();
-      const springGain = this.ctx.createGain();
-      springOsc.type = "sine";
-      springOsc.frequency.setValueAtTime((isCompletion ? 3900 : 3400) * naturalPitch, now + 0.001);
-      springGain.gain.setValueAtTime(0.08 * effectiveVol, now + 0.001);
-      springGain.gain.exponentialRampToValueAtTime(0.001, now + 0.012);
-      springOsc.connect(springGain);
-      springGain.connect(this.ctx.destination);
-      springOsc.start(now + 0.001);
-      springOsc.stop(now + 0.014);
-
-      // 4. If completing word segment, add crisp high chime harmonic
+      // If completing word segment or kana match, add rewarding crystal chime
       if (isCompletion) {
         const chimeOsc = this.ctx.createOscillator();
         const chimeGain = this.ctx.createGain();
         chimeOsc.type = "sine";
-        chimeOsc.frequency.setValueAtTime(2200 * naturalPitch, now + 0.003);
-        chimeGain.gain.setValueAtTime(0.09 * effectiveVol, now + 0.003);
-        chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        chimeOsc.frequency.setValueAtTime(3135.96 * naturalPitch, now + 0.002); // G7 crystal bell
+        chimeGain.gain.setValueAtTime(0.0001, now + 0.002);
+        chimeGain.gain.linearRampToValueAtTime(0.12, now + 0.005);
+        chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.060);
         chimeOsc.connect(chimeGain);
-        chimeGain.connect(this.ctx.destination);
-        chimeOsc.start(now + 0.003);
-        chimeOsc.stop(now + 0.06);
+        chimeGain.connect(masterGain);
+        chimeOsc.start(now + 0.002);
+        chimeOsc.stop(now + 0.065);
       }
     } catch (e) {
-      // Fallback simple beep to guarantee no crashes
+      // Safe fallback
       try {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        osc.frequency.setValueAtTime(1200, this.ctx.currentTime);
-        gain.gain.setValueAtTime(0.04, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.03);
+        osc.frequency.setValueAtTime(2400, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.02);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start();
-        osc.stop(this.ctx.currentTime + 0.04);
+        osc.stop(this.ctx.currentTime + 0.025);
       } catch (err) {}
     }
   }
@@ -1185,27 +1254,35 @@ class RetroAudioSynth {
     }
   }
 
-  // Gentle pop when complete single character is resolved
+  // Gentle crystal pop when complete single character is resolved
   playCharacterResolved() {
     if (this.isMuted) return;
     this.init();
     if (!this.ctx) return;
 
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const hp = this.ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 1200;
 
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(440, this.ctx.currentTime);
-    osc.frequency.setValueAtTime(880, this.ctx.currentTime + 0.05);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(2600, now);
+      osc.frequency.exponentialRampToValueAtTime(3600, now + 0.025);
 
-    gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(0.08, now + 0.002);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
 
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
+      osc.connect(gain);
+      gain.connect(hp);
+      hp.connect(this.ctx.destination);
 
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.15);
+      osc.start(now);
+      osc.stop(now + 0.040);
+    } catch (e) {}
   }
 
   // Classic low buzzer sound for wrong key typed
@@ -1314,27 +1391,35 @@ class RetroAudioSynth {
     });
   }
 
-  // Whoosh slider / card sliding sound effect using audio synthesizer
+  // Airy crisp paper / card sliding sound effect
   playCardSlide() {
     if (this.isMuted) return;
     this.init();
     if (!this.ctx) return;
 
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const hp = this.ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 800;
 
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(600, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(150, this.ctx.currentTime + 0.15);
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(1200, now);
+      osc.frequency.exponentialRampToValueAtTime(600, now + 0.05);
 
-    gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.18);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(0.06, now + 0.002);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
 
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
+      osc.connect(gain);
+      gain.connect(hp);
+      hp.connect(this.ctx.destination);
 
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.2);
+      osc.start(now);
+      osc.stop(now + 0.07);
+    } catch (e) {}
   }
 
   // Procedural Zen environment pad and wind-chimes synthesizer
