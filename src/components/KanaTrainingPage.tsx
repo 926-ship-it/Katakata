@@ -746,8 +746,6 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
                           key={charKey}
                           onClick={() => {
                             processKeyChar(charKey);
-                            // Maintain input focus after click
-                            setTimeout(() => inputRef.current?.focus(), 10);
                           }}
                           className={`w-9 h-10 sm:w-10 sm:h-11 rounded-lg border-2 text-xs sm:text-sm font-mono font-bold flex items-center justify-center transition-all uppercase cursor-pointer select-none active:scale-90 ${
                             isNeeded

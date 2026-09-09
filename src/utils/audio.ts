@@ -246,7 +246,10 @@ class RetroAudioSynth {
   private activeFullWordUtterance: SpeechSynthesisUtterance | null = null;
   private cachedVoices: SpeechSynthesisVoice[] = [];
   private activeOnlineAudio: HTMLAudioElement | null = null;
+  private activeAudios: Set<HTMLAudioElement> = new Set();
   private currentSpeechId: number = 0;
+  private isWordSpeaking: boolean = false;
+  private lastFullWordRecord: { text: string; time: number } = { text: "", time: 0 };
   private typingSoundStyle: TypingSoundStyle = "crisp";
 
   constructor() {
@@ -301,14 +304,21 @@ class RetroAudioSynth {
   // Ensures zero audio overlaps or duplicate voices!
   stopAllSpeech() {
     this.currentSpeechId++;
-    if (this.activeOnlineAudio) {
+    this.isWordSpeaking = false;
+
+    // Hard terminate all active HTML5 Audio elements
+    this.activeAudios.forEach((audio) => {
       try {
-        this.activeOnlineAudio.pause();
-        this.activeOnlineAudio.currentTime = 0;
-        this.activeOnlineAudio.src = "";
+        audio.onended = null;
+        audio.onerror = null;
+        audio.pause();
+        audio.currentTime = 0;
+        audio.src = "";
       } catch (_) {}
-      this.activeOnlineAudio = null;
-    }
+    });
+    this.activeAudios.clear();
+    this.activeOnlineAudio = null;
+
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       try {
         window.speechSynthesis.cancel();
@@ -345,11 +355,13 @@ class RetroAudioSynth {
 
     // Stop any existing speech first to avoid overlapping voices!
     this.stopAllSpeech();
+    this.isWordSpeaking = true;
     const requestId = this.currentSpeechId;
 
     try {
       const clean = encodeURIComponent((text || "").trim().replace(/[¡¿\?!]/g, ""));
       if (!clean) {
+        this.isWordSpeaking = false;
         if (onEnd) onEnd();
         return false;
       }
@@ -365,21 +377,25 @@ class RetroAudioSynth {
 
       const audio = new Audio(audioUrl);
       this.activeOnlineAudio = audio;
+      this.activeAudios.add(audio);
       audio.playbackRate = Math.max(0.8, Math.min(1.3, this.speechRate));
       
       let triggered = false;
       const finish = () => {
         if (!triggered && this.currentSpeechId === requestId) {
           triggered = true;
+          this.activeAudios.delete(audio);
           if (this.activeOnlineAudio === audio) {
             this.activeOnlineAudio = null;
           }
+          this.isWordSpeaking = false;
           if (onEnd) onEnd();
         }
       };
 
       audio.onended = finish;
       audio.onerror = () => {
+        this.activeAudios.delete(audio);
         if (this.currentSpeechId === requestId) {
           // If online audio network fails, fallback to synthesized resonant vocal chime
           this.playPhoneticVocalChime(text, finish);
@@ -396,6 +412,7 @@ class RetroAudioSynth {
       const playPromise = audio.play();
       if (playPromise) {
         playPromise.catch(() => {
+          this.activeAudios.delete(audio);
           if (this.currentSpeechId === requestId) {
             this.playPhoneticVocalChime(text, finish);
           }
@@ -403,6 +420,7 @@ class RetroAudioSynth {
       }
       return true;
     } catch (_) {
+      this.isWordSpeaking = false;
       this.playPhoneticVocalChime(text, onEnd);
       return false;
     }
@@ -512,7 +530,8 @@ class RetroAudioSynth {
 
   // Speaks an individual kana or syllable instantly with zero lag and optimized brisk rate
   speakKanaInstant(text: string) {
-    if (this.isMuted || !text || text.trim() === "") return;
+    // If muted or a full word is currently being pronounced, DO NOT interrupt or overlap!
+    if (this.isMuted || this.isWordSpeaking || !text || text.trim() === "") return;
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       try {
         if (window.speechSynthesis.paused) {
@@ -585,6 +604,17 @@ class RetroAudioSynth {
       if (onEnd) onEnd();
       return;
     }
+
+    // Deduplication guard: if the exact same word is called within 650ms, do not trigger twice!
+    const now = Date.now();
+    const cleanWordKey = text.trim().toLowerCase();
+    if (
+      this.lastFullWordRecord.text === cleanWordKey &&
+      now - this.lastFullWordRecord.time < 650
+    ) {
+      return;
+    }
+    this.lastFullWordRecord = { text: cleanWordKey, time: now };
 
     if (this.isMuted || typeof window === "undefined" || !("speechSynthesis" in window)) {
       if (onEnd) {
@@ -756,6 +786,7 @@ class RetroAudioSynth {
       }
 
       this.stopAllSpeech();
+      this.isWordSpeaking = true;
       const requestId = this.currentSpeechId;
 
       let hasStarted = false;
@@ -765,6 +796,7 @@ class RetroAudioSynth {
       const triggerCompletion = () => {
         if (hasTriggered || this.currentSpeechId !== requestId) return;
         hasTriggered = true;
+        this.isWordSpeaking = false;
         if (safetyWatchdog) clearTimeout(safetyWatchdog);
         this.activeFullWordUtterance = null;
         if (typeof window !== "undefined") {
@@ -777,7 +809,7 @@ class RetroAudioSynth {
 
       // Safety watchdog: ensure callback is always reached even if speech is slow
       const cleanLen = spokenText.length;
-      const maxEstimatedMs = Math.min(10000, Math.max(2800, (cleanLen * 450 + 1500) / this.speechRate));
+      const maxEstimatedMs = Math.min(8000, Math.max(2000, (cleanLen * 400 + 1200) / this.speechRate));
       safetyWatchdog = setTimeout(() => {
         triggerCompletion();
       }, maxEstimatedMs);
@@ -833,17 +865,14 @@ class RetroAudioSynth {
           };
 
           freshUtterance.onerror = (e) => {
-            console.warn(`Speech synthesis notice (attempt ${attempt}):`, e);
-
-            // If interrupted before speech even started and attempts remain, retry with fresh utterance
-            if (!hasStarted && attempt < 2 && this.currentSpeechId === requestId) {
-              setTimeout(() => {
-                attemptNativeSpeak(attempt + 1);
-              }, 75);
+            // Crucial: In WebKit/Blink, 'interrupted' or 'canceled' means a cancellation occurred.
+            // Never retry or trigger online audio on interrupted, as that causes duplicate double-speech!
+            if (e.error === "interrupted" || e.error === "canceled") {
+              triggerCompletion();
               return;
             }
 
-            // If native speech fails, gracefully fall back to online audio player with single voice
+            // If native speech fails with a real error, gracefully fall back to online audio player
             if (!hasStarted && !hasTriggered && this.currentSpeechId === requestId) {
               this.playOnlineTTSAudio(text, langCategory, triggerCompletion);
             } else {
@@ -907,81 +936,114 @@ class RetroAudioSynth {
       const effectiveVol = isCompletion ? Math.min(1.4, vol * 1.25) : vol;
 
       if (this.typingSoundStyle === "bubble") {
-        // Crisp gentle water droplet / bubble pop
+        // Crisp gentle water droplet / bubble pop (clean upward chirp, zero mud)
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = "sine";
-        osc.frequency.setValueAtTime((isCompletion ? 950 : 780) * naturalPitch, now);
-        osc.frequency.exponentialRampToValueAtTime(isCompletion ? 1800 : 1550, now + 0.035);
-        gain.gain.setValueAtTime(0.12 * effectiveVol, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+        osc.frequency.setValueAtTime((isCompletion ? 1100 : 920) * naturalPitch, now);
+        osc.frequency.exponentialRampToValueAtTime(isCompletion ? 2200 : 1850, now + 0.032);
+        gain.gain.setValueAtTime(0.13 * effectiveVol, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.032);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.04);
+        osc.stop(now + 0.035);
         return;
       }
 
       if (this.typingSoundStyle === "soft") {
-        // Soft dampened tactile switch (quiet, pleasant, non-intrusive)
+        // Soft dampened tactile switch (quiet, pleasant, zero bass thump)
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = "triangle";
-        osc.frequency.setValueAtTime(1400 * naturalPitch, now);
-        osc.frequency.exponentialRampToValueAtTime(600, now + 0.012);
-        gain.gain.setValueAtTime(0.09 * effectiveVol, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.012);
+        osc.frequency.setValueAtTime(1800 * naturalPitch, now);
+        osc.frequency.exponentialRampToValueAtTime(900, now + 0.010);
+        gain.gain.setValueAtTime(0.08 * effectiveVol, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.010);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.015);
+        osc.stop(now + 0.012);
         return;
       }
 
       if (this.typingSoundStyle === "typewriter") {
-        // Vintage typewriter metal typebar strike
+        // Vintage typewriter metal typebar strike (crisp steel clack + carriage spring ping)
         const metalOsc = this.ctx.createOscillator();
         const metalGain = this.ctx.createGain();
         metalOsc.type = "triangle";
-        metalOsc.frequency.setValueAtTime((isCompletion ? 4500 : 3900) * naturalPitch, now);
-        metalOsc.frequency.exponentialRampToValueAtTime(1200, now + 0.015);
-        metalGain.gain.setValueAtTime(0.16 * effectiveVol, now);
-        metalGain.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
+        metalOsc.frequency.setValueAtTime((isCompletion ? 5200 : 4500) * naturalPitch, now);
+        metalOsc.frequency.exponentialRampToValueAtTime(2200, now + 0.012);
+        metalGain.gain.setValueAtTime(0.18 * effectiveVol, now);
+        metalGain.gain.exponentialRampToValueAtTime(0.001, now + 0.012);
         metalOsc.connect(metalGain);
         metalGain.connect(this.ctx.destination);
         metalOsc.start(now);
-        metalOsc.stop(now + 0.018);
+        metalOsc.stop(now + 0.014);
 
-        // Subtle spring rebound
+        // Crisp mechanical noise snap
+        const bSize = Math.floor(this.ctx.sampleRate * 0.008);
+        const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+        const d = b.getChannelData(0);
+        for (let i = 0; i < bSize; i++) d[i] = Math.random() * 2 - 1;
+        const nNode = this.ctx.createBufferSource();
+        nNode.buffer = b;
+        const nFilter = this.ctx.createBiquadFilter();
+        nFilter.type = "highpass";
+        nFilter.frequency.value = 4000;
+        const nGain = this.ctx.createGain();
+        nGain.gain.setValueAtTime(0.14 * effectiveVol, now);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.008);
+        nNode.connect(nFilter);
+        nFilter.connect(nGain);
+        nGain.connect(this.ctx.destination);
+        nNode.start(now);
+        nNode.stop(now + 0.009);
+
+        // Subtle bell ping harmonic
         const ringOsc = this.ctx.createOscillator();
         const ringGain = this.ctx.createGain();
         ringOsc.type = "sine";
-        ringOsc.frequency.setValueAtTime(5200 * naturalPitch, now + 0.003);
-        ringGain.gain.setValueAtTime(0.06 * effectiveVol, now + 0.003);
-        ringGain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+        ringOsc.frequency.setValueAtTime(6200 * naturalPitch, now + 0.002);
+        ringGain.gain.setValueAtTime(0.05 * effectiveVol, now + 0.002);
+        ringGain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
         ringOsc.connect(ringGain);
         ringGain.connect(this.ctx.destination);
-        ringOsc.start(now + 0.003);
-        ringOsc.stop(now + 0.05);
+        ringOsc.start(now + 0.002);
+        ringOsc.stop(now + 0.040);
         return;
       }
 
-      // --- DEFAULT: ULTRA-CRISP MECHANICAL SWITCH (清脆青轴 / Kailh Box White) ---
-      // 1. High-frequency metallic switch contact leaf click (3800Hz -> 1800Hz, 11ms)
-      const clickOsc = this.ctx.createOscillator();
-      const clickGain = this.ctx.createGain();
-      clickOsc.type = "triangle";
-      clickOsc.frequency.setValueAtTime((isCompletion ? 4200 : 3800) * naturalPitch, now);
-      clickOsc.frequency.exponentialRampToValueAtTime(1600, now + 0.011);
-      clickGain.gain.setValueAtTime(0.18 * effectiveVol, now);
-      clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.011);
-      clickOsc.connect(clickGain);
-      clickGain.connect(this.ctx.destination);
-      clickOsc.start(now);
-      clickOsc.stop(now + 0.014);
+      // --- DEFAULT: ULTRA-CRISP MECHANICAL SWITCH (清脆青轴 / Kailh Box White / Cherry MX Blue) ---
+      // Real mechanical switches sound crisp because of high-frequency transients and ZERO low-frequency bass mud!
+      
+      // 1. Dual Tactile Micro-Clicks (simulates switch click jacket leaf snap at t=0 and bottom-out at t=2.5ms)
+      const click1 = this.ctx.createOscillator();
+      const click1Gain = this.ctx.createGain();
+      click1.type = "triangle";
+      click1.frequency.setValueAtTime((isCompletion ? 5200 : 4600) * naturalPitch, now);
+      click1.frequency.exponentialRampToValueAtTime(2400, now + 0.007);
+      click1Gain.gain.setValueAtTime(0.18 * effectiveVol, now);
+      click1Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.007);
+      click1.connect(click1Gain);
+      click1Gain.connect(this.ctx.destination);
+      click1.start(now);
+      click1.stop(now + 0.008);
 
-      // 2. Tactile actuation snap (Bandpass filtered white noise burst at 4800Hz, crisp & snappy)
-      const bufferSize = Math.floor(this.ctx.sampleRate * 0.012);
+      const click2 = this.ctx.createOscillator();
+      const click2Gain = this.ctx.createGain();
+      click2.type = "sine";
+      click2.frequency.setValueAtTime((isCompletion ? 6800 : 6000) * naturalPitch, now + 0.0025);
+      click2.frequency.exponentialRampToValueAtTime(3200, now + 0.008);
+      click2Gain.gain.setValueAtTime(0.12 * effectiveVol, now + 0.0025);
+      click2Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.008);
+      click2.connect(click2Gain);
+      click2Gain.connect(this.ctx.destination);
+      click2.start(now + 0.0025);
+      click2.stop(now + 0.009);
+
+      // 2. High-pass Filtered Tactile Noise (clean, snappy keycap contact, zero bass mud)
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.010);
       const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
       const data = buffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
@@ -990,43 +1052,41 @@ class RetroAudioSynth {
       const noiseNode = this.ctx.createBufferSource();
       noiseNode.buffer = buffer;
       const filter = this.ctx.createBiquadFilter();
-      filter.type = "bandpass";
-      filter.frequency.value = isCompletion ? 5400 : 4800;
-      filter.Q.value = 7.5; // High Q for crisp, metallic mechanical actuation snap
+      filter.type = "highpass";
+      filter.frequency.value = isCompletion ? 4200 : 3600;
       const noiseGain = this.ctx.createGain();
-      noiseGain.gain.setValueAtTime(0.14 * effectiveVol, now);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.010);
+      noiseGain.gain.setValueAtTime(0.16 * effectiveVol, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.008);
       noiseNode.connect(filter);
       filter.connect(noiseGain);
       noiseGain.connect(this.ctx.destination);
       noiseNode.start(now);
-      noiseNode.stop(now + 0.012);
+      noiseNode.stop(now + 0.010);
 
-      // 3. Crisp plate contact (650Hz -> 380Hz, 8ms, absolutely zero 75Hz muffled sub-bass!)
-      const plateOsc = this.ctx.createOscillator();
-      const plateGain = this.ctx.createGain();
-      plateOsc.type = "sine";
-      plateOsc.frequency.setValueAtTime((isCompletion ? 750 : 640) * naturalPitch, now);
-      plateOsc.frequency.exponentialRampToValueAtTime(320, now + 0.009);
-      plateGain.gain.setValueAtTime(0.035 * effectiveVol, now);
-      plateGain.gain.exponentialRampToValueAtTime(0.001, now + 0.009);
-      plateOsc.connect(plateGain);
-      plateGain.connect(this.ctx.destination);
-      plateOsc.start(now);
-      plateOsc.stop(now + 0.011);
+      // 3. Crisp metallic switch spring ping (3600Hz, ultra-clean harmonic, decay 10ms)
+      const springOsc = this.ctx.createOscillator();
+      const springGain = this.ctx.createGain();
+      springOsc.type = "sine";
+      springOsc.frequency.setValueAtTime((isCompletion ? 3900 : 3400) * naturalPitch, now + 0.001);
+      springGain.gain.setValueAtTime(0.08 * effectiveVol, now + 0.001);
+      springGain.gain.exponentialRampToValueAtTime(0.001, now + 0.012);
+      springOsc.connect(springGain);
+      springGain.connect(this.ctx.destination);
+      springOsc.start(now + 0.001);
+      springOsc.stop(now + 0.014);
 
       // 4. If completing word segment, add crisp high chime harmonic
       if (isCompletion) {
         const chimeOsc = this.ctx.createOscillator();
         const chimeGain = this.ctx.createGain();
         chimeOsc.type = "sine";
-        chimeOsc.frequency.setValueAtTime(1760 * naturalPitch, now + 0.004); // A6 bright ping
-        chimeGain.gain.setValueAtTime(0.07 * effectiveVol, now + 0.004);
-        chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+        chimeOsc.frequency.setValueAtTime(2200 * naturalPitch, now + 0.003);
+        chimeGain.gain.setValueAtTime(0.09 * effectiveVol, now + 0.003);
+        chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
         chimeOsc.connect(chimeGain);
         chimeGain.connect(this.ctx.destination);
-        chimeOsc.start(now + 0.004);
-        chimeOsc.stop(now + 0.08);
+        chimeOsc.start(now + 0.003);
+        chimeOsc.stop(now + 0.06);
       }
     } catch (e) {
       // Fallback simple beep to guarantee no crashes

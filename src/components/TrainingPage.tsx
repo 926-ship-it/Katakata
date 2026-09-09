@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Keyboard, ArrowLeft, RefreshCw, Volume2, VolumeX, AlertTriangle, Play, Pause, AlertCircle, HelpCircle, ChevronLeft, ChevronRight, PenTool, Maximize2, Minimize2, Zap } from "lucide-react";
 import { DictionaryItem } from "../data/dictionary";
 import { TracingKana } from "./TracingKana";
-import { audioSynth } from "../utils/audio";
+import { audioSynth, TypingSoundStyle } from "../utils/audio";
 import { CardIllustration } from "./CardIllustration";
 import { CalligraphyCanvas } from "./CalligraphyCanvas";
 import { uiTranslate, LANG_MAPPING } from "../utils/lang";
@@ -50,6 +50,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   // Sound control
   const [muted, setMuted] = useState<boolean>(() => audioSynth.getMuted());
   const [speechRate, setSpeechRate] = useState<number>(() => audioSynth.getSpeechRate());
+  const [typingSoundStyle, setTypingSoundStyle] = useState<TypingSoundStyle>(() => audioSynth.getTypingSoundStyle());
 
   const handleCycleSpeechRate = () => {
     const rates = [1.0, 1.25, 1.5, 1.75, 0.8];
@@ -59,6 +60,20 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
     audioSynth.setSpeechRate(newRate);
     setSpeechRate(newRate);
     audioSynth.playCardSlide();
+  };
+
+  const handleCycleTypingSound = () => {
+    const styles: { id: TypingSoundStyle; label: string }[] = [
+      { id: "crisp", label: "清脆青轴" },
+      { id: "typewriter", label: "打字机" },
+      { id: "bubble", label: "清脆水滴" },
+      { id: "soft", label: "静音轻触" },
+    ];
+    const currentIdx = styles.findIndex((s) => s.id === typingSoundStyle);
+    const nextStyle = styles[(currentIdx + 1) % styles.length].id;
+    audioSynth.setTypingSoundStyle(nextStyle);
+    setTypingSoundStyle(nextStyle);
+    audioSynth.playTyping({ volume: 1.0, isCompletion: true });
   };
 
   // Loop/Typewriter spelling states
@@ -125,14 +140,14 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   const mainTerminalRef = useRef<HTMLDivElement>(null);
   const lastProcessedKeyRef = useRef<{ key: string; time: number } | null>(null);
 
-  // Automatically keep the keyboard focused on load / item changes for mobile typing comfort.
-  // On desktop, focusing a hidden input is unnecessary and can cause double-triggering or focus conflicts with extensions.
+  // Automatically keep keyboard focus on initial mount if desired, but NEVER re-focus on currentItemIdx changes
+  // Calling .focus() on item transitions causes mobile WebKit/Chrome to violently scroll to the top!
   useEffect(() => {
-    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
-    if (isMobileDevice && practiceMode !== "handwriting" && !isPaused && !timerFinished && !showQuitConfirm) {
+    // Only on initial mount or when unpausing
+    if (practiceMode !== "handwriting" && !isPaused && !timerFinished && !showQuitConfirm) {
       inputRef.current?.focus({ preventScroll: true });
     }
-  }, [currentItemIdx, isPaused, timerFinished, showQuitConfirm, practiceMode]);
+  }, [isPaused, timerFinished, showQuitConfirm, practiceMode]);
 
   // Background and minimization resilience:
   // Instead of subtracting 1 second progressively, we compute the delta against endTime.
@@ -192,7 +207,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   // Core spelling engine input validator
   const processInputKey = (key: string, fromHardwareListener: boolean = false) => {
     if (practiceMode === "handwriting") return;
-    if (isPaused || timerFinished || wordCorrect) return;
+    if (isPaused || timerFinished || wordCorrect || isPronouncing) return;
 
     // Normalize full-width or alternative dots / hyphens / quotes from various keyboards & IMEs
     let normalizedKey = key;
@@ -423,15 +438,12 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
   return (
     <div 
-      className="max-w-3xl mx-auto space-y-2.5 sm:space-y-6 px-2 md:px-0 cursor-pointer"
+      className="max-w-3xl mx-auto space-y-2.5 sm:space-y-6 px-2 md:px-0"
       onClick={() => {
         if (practiceMode !== "handwriting" && !isPaused && !timerFinished && !showQuitConfirm) {
           const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
           if (isMobileDevice) {
             inputRef.current?.focus({ preventScroll: true });
-            if (mainTerminalRef.current && window.innerWidth < 768) {
-              mainTerminalRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-            }
           }
         }
       }}
@@ -456,6 +468,17 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
           >
             <Zap className="w-3.5 h-3.5 text-amber-600" />
             <span>{speechRate}x</span>
+          </button>
+
+          {/* Typing Sound Style Switcher */}
+          <button
+            type="button"
+            onClick={handleCycleTypingSound}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-stone-300 bg-white hover:bg-amber-50 text-stone-700 text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+            title={`点击切换键盘击键音效 (当前: ${typingSoundStyle === "crisp" ? "清脆青轴" : typingSoundStyle === "typewriter" ? "打字机" : typingSoundStyle === "bubble" ? "水滴" : "轻触"})`}
+          >
+            <Keyboard className="w-3.5 h-3.5 text-amber-600" />
+            <span>{typingSoundStyle === "crisp" ? "清脆青轴" : typingSoundStyle === "typewriter" ? "打字机" : typingSoundStyle === "bubble" ? "水滴" : "轻触"}</span>
           </button>
 
           {onToggleFullscreen && (
@@ -799,7 +822,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                         }}
                         onClick={() => {
                           processInputKey(char.toLowerCase());
-                          setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 10);
                         }}
                         className={`w-6 h-6 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center rounded text-[9px] sm:text-xs font-mono font-bold transition-all select-none cursor-pointer ${
                           isPressed
@@ -826,7 +848,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     }}
                     onClick={() => {
                       processInputKey(" ");
-                      setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 10);
                     }}
                     className={`w-28 sm:w-40 h-5.5 sm:h-7 flex items-center justify-center rounded text-[9px] sm:text-[10px] font-mono font-bold uppercase transition-all select-none border cursor-pointer ${
                       pressedKey === "SPACE"
@@ -846,7 +867,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     }}
                     onClick={() => {
                       processInputKey(".");
-                      setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 10);
                     }}
                     title="Dot / Period (.)"
                     className={`w-8 sm:w-10 h-5.5 sm:h-7 flex items-center justify-center rounded text-xs font-mono font-bold transition-all select-none border cursor-pointer ${
@@ -867,7 +887,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     }}
                     onClick={() => {
                       processInputKey("-");
-                      setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 10);
                     }}
                     title="Hyphen (-)"
                     className={`w-8 sm:w-10 h-5.5 sm:h-7 flex items-center justify-center rounded text-xs font-mono font-bold transition-all select-none border cursor-pointer ${
@@ -884,7 +903,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
               )}
             </div>
 
-            {/* Hidden Input for Mobile Native Keyboard Triggering */}
+            {/* Hidden Input for Mobile Native Keyboard Triggering (Centered without jumping) */}
             <div className="flex flex-col items-center justify-center pt-1.5 sm:pt-3 gap-1 sm:gap-2 relative">
               <input
                 ref={inputRef}
@@ -898,14 +917,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                   }
                   e.target.value = "";
                 }}
-                onFocus={() => {
-                  if (mainTerminalRef.current && typeof window !== "undefined" && window.innerWidth < 768) {
-                    setTimeout(() => {
-                      mainTerminalRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-                    }, 150);
-                  }
-                }}
-                className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-0"
+                className="opacity-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 pointer-events-none z-0"
                 aria-hidden="true"
                 autoCapitalize="none"
                 autoCorrect="off"
@@ -918,17 +930,14 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                   e.stopPropagation();
                   audioSynth.playCardSlide();
                   inputRef.current?.focus({ preventScroll: true });
-                  if (mainTerminalRef.current && typeof window !== "undefined" && window.innerWidth < 768) {
-                    mainTerminalRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-                  }
                 }}
                 className="md:hidden relative z-10 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-95 transition-all"
               >
                 <Keyboard className="w-3.5 h-3.5 text-stone-950" />
-                <span>唤起手机虚拟键盘 (防滚屏聚焦)</span>
+                <span>唤起手机键盘</span>
               </button>
               <p className="md:hidden relative z-10 text-[8px] sm:text-[9px] text-stone-400 font-mono text-center leading-normal">
-                (提示: 触摸屏幕中央或点击按钮，自动防滚屏激活手机键盘输入)
+                (提示: 点击上方虚拟按键或点击唤起键盘)
               </p>
             </div>
           </div>

@@ -745,7 +745,6 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
                             key={char} 
                             onClick={() => {
                               handleTypewriterInput(char.toLowerCase());
-                              setTimeout(() => inputRef.current?.focus(), 10);
                             }}
                             className={`w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded border flex items-center justify-center font-bold transition-all cursor-pointer active:scale-90 select-none ${
                               isPrimaryTarget 
