@@ -268,7 +268,7 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
   // Auto focus input
   useEffect(() => {
     if (gameState === "playing" && inputRef.current) {
-      inputRef.current.focus();
+      inputRef.current.focus({ preventScroll: true });
     }
   }, [gameState, currentIndex]);
 
@@ -776,8 +776,7 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
                 }
                 e.target.value = "";
               }}
-              className="opacity-0 fixed top-0 left-0 w-0 h-0 pointer-events-none"
-              autoFocus
+              className="opacity-0 fixed bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 pointer-events-none"
               autoComplete="off"
               autoCapitalize="off"
               spellCheck={false}
@@ -785,10 +784,10 @@ export const KanaTrainingPage: React.FC<KanaTrainingPageProps> = ({
 
             {/* Safety trigger helper overlay to keep focus */}
             <div 
-              onClick={() => inputRef.current?.focus()}
-              className="py-1 text-center text-[10px] font-mono text-amber-700/60 cursor-pointer hover:underline animate-pulse select-none bg-amber-500/5 rounded border border-amber-500/10"
+              onClick={() => inputRef.current?.focus({ preventScroll: true })}
+              className="py-1 text-center text-[10px] font-mono text-amber-700/60 cursor-pointer hover:underline select-none bg-amber-500/5 rounded border border-amber-500/10"
             >
-              打字无反应？点击此处重新聚焦键盘录入
+              打字无反应？点击此处重新聚焦键盘录入 (防跳屏)
             </div>
 
           </motion.div>

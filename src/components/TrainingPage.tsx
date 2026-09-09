@@ -122,6 +122,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const mainTerminalRef = useRef<HTMLDivElement>(null);
   const lastProcessedKeyRef = useRef<{ key: string; time: number } | null>(null);
 
   // Automatically keep the keyboard focused on load / item changes for mobile typing comfort.
@@ -129,7 +130,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   useEffect(() => {
     const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
     if (isMobileDevice && practiceMode !== "handwriting" && !isPaused && !timerFinished && !showQuitConfirm) {
-      inputRef.current?.focus();
+      inputRef.current?.focus({ preventScroll: true });
     }
   }, [currentItemIdx, isPaused, timerFinished, showQuitConfirm, practiceMode]);
 
@@ -427,7 +428,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         if (practiceMode !== "handwriting" && !isPaused && !timerFinished && !showQuitConfirm) {
           const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
           if (isMobileDevice) {
-            inputRef.current?.focus();
+            inputRef.current?.focus({ preventScroll: true });
+            if (mainTerminalRef.current && window.innerWidth < 768) {
+              mainTerminalRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
           }
         }
       }}
@@ -481,7 +485,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       </div>
 
       {/* Main retro Terminal casing */}
-      <div className={`p-3 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 relative ${
+      <div ref={mainTerminalRef} className={`p-3 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 relative scroll-mt-6 ${
         errorFlash 
           ? "border-red-600 bg-red-50/20 shadow-[0_0_20px_rgba(239,68,68,0.25)]" 
           : "border-stone-800 bg-stone-50 shadow-md"
@@ -795,7 +799,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                         }}
                         onClick={() => {
                           processInputKey(char.toLowerCase());
-                          setTimeout(() => inputRef.current?.focus(), 10);
+                          setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 10);
                         }}
                         className={`w-6 h-6 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center rounded text-[9px] sm:text-xs font-mono font-bold transition-all select-none cursor-pointer ${
                           isPressed
@@ -822,7 +826,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     }}
                     onClick={() => {
                       processInputKey(" ");
-                      setTimeout(() => inputRef.current?.focus(), 10);
+                      setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 10);
                     }}
                     className={`w-28 sm:w-40 h-5.5 sm:h-7 flex items-center justify-center rounded text-[9px] sm:text-[10px] font-mono font-bold uppercase transition-all select-none border cursor-pointer ${
                       pressedKey === "SPACE"
@@ -842,7 +846,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     }}
                     onClick={() => {
                       processInputKey(".");
-                      setTimeout(() => inputRef.current?.focus(), 10);
+                      setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 10);
                     }}
                     title="Dot / Period (.)"
                     className={`w-8 sm:w-10 h-5.5 sm:h-7 flex items-center justify-center rounded text-xs font-mono font-bold transition-all select-none border cursor-pointer ${
@@ -863,7 +867,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     }}
                     onClick={() => {
                       processInputKey("-");
-                      setTimeout(() => inputRef.current?.focus(), 10);
+                      setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 10);
                     }}
                     title="Hyphen (-)"
                     className={`w-8 sm:w-10 h-5.5 sm:h-7 flex items-center justify-center rounded text-xs font-mono font-bold transition-all select-none border cursor-pointer ${
@@ -881,7 +885,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
             </div>
 
             {/* Hidden Input for Mobile Native Keyboard Triggering */}
-            <div className="flex flex-col items-center justify-center pt-1.5 sm:pt-3 gap-1 sm:gap-2">
+            <div className="flex flex-col items-center justify-center pt-1.5 sm:pt-3 gap-1 sm:gap-2 relative">
               <input
                 ref={inputRef}
                 type="text"
@@ -894,7 +898,14 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                   }
                   e.target.value = "";
                 }}
-                className="opacity-0 fixed top-4 left-4 -z-50 w-1 h-1 pointer-events-none"
+                onFocus={() => {
+                  if (mainTerminalRef.current && typeof window !== "undefined" && window.innerWidth < 768) {
+                    setTimeout(() => {
+                      mainTerminalRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }, 150);
+                  }
+                }}
+                className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-0"
                 aria-hidden="true"
                 autoCapitalize="none"
                 autoCorrect="off"
@@ -906,15 +917,18 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                 onClick={(e) => {
                   e.stopPropagation();
                   audioSynth.playCardSlide();
-                  inputRef.current?.focus();
+                  inputRef.current?.focus({ preventScroll: true });
+                  if (mainTerminalRef.current && typeof window !== "undefined" && window.innerWidth < 768) {
+                    mainTerminalRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }
                 }}
-                className="md:hidden px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-95 transition-all"
+                className="md:hidden relative z-10 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-95 transition-all"
               >
                 <Keyboard className="w-3.5 h-3.5 text-stone-950" />
-                <span>唤起手机虚拟键盘 / 录入按键</span>
+                <span>唤起手机虚拟键盘 (防滚屏聚焦)</span>
               </button>
-              <p className="md:hidden text-[8px] sm:text-[9px] text-stone-400 font-mono text-center leading-normal">
-                (提示: 触摸屏幕任意空白位置，亦可自动触发并激活手机键盘输入)
+              <p className="md:hidden relative z-10 text-[8px] sm:text-[9px] text-stone-400 font-mono text-center leading-normal">
+                (提示: 触摸屏幕中央或点击按钮，自动防滚屏激活手机键盘输入)
               </p>
             </div>
           </div>

@@ -79,7 +79,7 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
   // Automatically focus on typing input for mobile devices
   useEffect(() => {
     if (gameState === "playing" && inputRef.current) {
-      inputRef.current.focus();
+      inputRef.current.focus({ preventScroll: true });
     }
   }, [gameState, currentCard, currentSegmentIdx]);
 
@@ -477,8 +477,7 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
             }
             e.target.value = "";
           }}
-          className="opacity-0 fixed top-0 left-0 w-0 h-0 pointer-events-none"
-          autoFocus
+          className="opacity-0 fixed bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 pointer-events-none"
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="none"

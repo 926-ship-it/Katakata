@@ -202,7 +202,8 @@ export function resolveJapaneseSpeechPayload(
 
   if (entry) {
     return {
-      speechText: entry.kanji || entry.phonetic,
+      // Strictly phonetic Katakana - NEVER raw Kanji, which browser TTS might read in Chinese!
+      speechText: entry.phonetic,
       isEnglish: false,
       isSpanish: false,
       lang: "ja-JP",
@@ -210,10 +211,13 @@ export function resolveJapaneseSpeechPayload(
     };
   }
 
-  // If Kanji hint is provided and has Kanji characters, prefer Kanji for Japanese TTS
-  if (cleanKanji && /[\u4e00-\u9faf]/.test(cleanKanji)) {
+  // Convert Hiragana to Katakana to prevent "ha" -> "wa" particle confusion and Chinese reading
+  const katakanaText = toPhoneticKatakana(cleanText);
+
+  // If text does not contain Kanji, phonetic Katakana is 100% unambiguous Japanese
+  if (!/[\u4e00-\u9faf]/.test(katakanaText)) {
     return {
-      speechText: cleanKanji,
+      speechText: katakanaText,
       isEnglish: false,
       isSpanish: false,
       lang: "ja-JP",
@@ -221,20 +225,9 @@ export function resolveJapaneseSpeechPayload(
     };
   }
 
-  // If text itself has Kanji
-  if (/[\u4e00-\u9faf]/.test(cleanText)) {
-    return {
-      speechText: cleanText,
-      isEnglish: false,
-      isSpanish: false,
-      lang: "ja-JP",
-      romajiFallback: romajiHint || cleanText,
-    };
-  }
-
-  // Otherwise convert to phonetic Katakana to prevent "ha" -> "wa" particle confusion
+  // If cleanText contained Kanji and we have romajiHint or cleanKanji
   return {
-    speechText: toPhoneticKatakana(cleanText),
+    speechText: katakanaText,
     isEnglish: false,
     isSpanish: false,
     lang: "ja-JP",
@@ -489,14 +482,20 @@ class RetroAudioSynth {
         }
 
         if (targetVoice) {
+          if (targetVoice.lang.toLowerCase().startsWith("zh") || targetVoice.name.toLowerCase().includes("chinese")) {
+            this.playOnlineTTSAudio(payload.speechText, payload.isEnglish ? "en" : "ja");
+            return;
+          }
           utterance.voice = targetVoice;
           if (targetVoice.lang.toLowerCase().startsWith("en") && !payload.isEnglish) {
             utterance.text = payload.romajiFallback;
             utterance.lang = "en-US";
           }
+          window.speechSynthesis.speak(utterance);
+        } else {
+          // If no authentic native voice exists, NEVER fall back to system default (which is Chinese on many devices)!
+          this.playOnlineTTSAudio(payload.speechText, payload.isEnglish ? "en" : "ja");
         }
-
-        window.speechSynthesis.speak(utterance);
       } catch (err) {
         console.warn("Instant kana speech synthesis failed:", err);
       }
@@ -505,137 +504,7 @@ class RetroAudioSynth {
 
   // Speaks Japanese syllable or full word using SpeechSynthesis API (with automatic English detection for English Mode)
   speakJapanese(text: string, cancelActive: boolean = true, kanjiHint?: string, romajiHint?: string) {
-    if (this.isMuted || !text || text.trim() === "") return;
-    this.lastSpeakTime = Date.now();
-
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      try {
-        if (window.speechSynthesis.paused) {
-          window.speechSynthesis.resume();
-        }
-
-        const payload = resolveJapaneseSpeechPayload(text, kanjiHint, romajiHint);
-        const utterance = new SpeechSynthesisUtterance(payload.speechText);
-        utterance.lang = payload.isEnglish ? "en-US" : "ja-JP";
-        
-        // Custom pitch/rate based on selected speaker gender/type
-        let baseRate = 1.12;
-        if (this.voiceType === "male") {
-          baseRate = payload.isEnglish ? 1.02 : 1.08; // clear, authoritative cadence
-          utterance.pitch = payload.isEnglish ? 0.90 : 0.82; // deeper masculine register
-        } else if (this.voiceType === "child") {
-          baseRate = 1.18; // bouncy and energetic
-          utterance.pitch = 1.38; // high-pitched cute anime guide
-        } else if (this.voiceType === "alien") {
-          baseRate = 1.48; // ultra-fast cyber alien
-          utterance.pitch = 1.95; // maximum high pitch electronic squeal
-        } else if (this.voiceType === "elderly") {
-          baseRate = 0.88; // steady wise grandpa pace
-          utterance.pitch = 0.65; // deep, weathered hoarse quality
-        } else {
-          // female (default)
-          baseRate = payload.isEnglish ? 1.08 : 1.15; // snappy, crisp, immediate feedback
-          utterance.pitch = payload.isEnglish ? 1.00 : 1.05; // bright, high contrast clarity
-        }
-        utterance.rate = Math.min(2.5, Math.max(0.5, baseRate * this.speechRate));
-
-        // Try selecting a specific voice package if available
-        const voices = this.getAvailableVoices();
-        let targetVoice = null;
-
-        if (payload.isEnglish) {
-          if (this.voiceType === "male" || this.voiceType === "elderly") {
-            targetVoice = voices.find((v) => {
-              const name = v.name.toLowerCase();
-              const lang = v.lang.toLowerCase();
-              return (lang === "en-us" || lang.startsWith("en")) &&
-                (name.includes("male") || name.includes("man") || name.includes("guy") || name.includes("david") || name.includes("mark"));
-            });
-          } else {
-            targetVoice = voices.find((v) => {
-              const name = v.name.toLowerCase();
-              const lang = v.lang.toLowerCase();
-              return (lang === "en-us" || lang.startsWith("en")) &&
-                (name.includes("female") || name.includes("woman") || name.includes("girl") || name.includes("zira") || name.includes("samantha"));
-            });
-          }
-          if (!targetVoice) {
-            targetVoice = voices.find((v) => v.lang.toLowerCase().startsWith("en"));
-          }
-        } else {
-          if (this.voiceType === "male") {
-            // Look for male Japanese voices
-            targetVoice = voices.find((v) => {
-              const name = v.name.toLowerCase();
-              const lang = v.lang.toLowerCase();
-              return (lang === "ja-jp" || lang.startsWith("ja")) &&
-                (name.includes("ichiro") || name.includes("otoya") || name.includes("male") || name.includes("man") || name.includes("guy"));
-            });
-          } else if (this.voiceType === "child") {
-            // Look for cute / young sounding voices or standard female
-            targetVoice = voices.find((v) => {
-              const name = v.name.toLowerCase();
-              const lang = v.lang.toLowerCase();
-              return (lang === "ja-jp" || lang.startsWith("ja")) &&
-                (name.includes("ayumi") || name.includes("haruka") || name.includes("sakura") || name.includes("child") || name.includes("xiaoxiao"));
-            });
-          } else if (this.voiceType === "alien") {
-            // Cosmic / Google-synthesized robotic character voice
-            targetVoice = voices.find((v) => {
-              const name = v.name.toLowerCase();
-              const lang = v.lang.toLowerCase();
-              return (lang === "ja-jp" || lang.startsWith("ja")) && (name.includes("google") || name.includes("natural"));
-            });
-          } else if (this.voiceType === "elderly") {
-            // Elderly can try to find a deep male voice (e.g. Ichiro / Otoya)
-            targetVoice = voices.find((v) => {
-              const name = v.name.toLowerCase();
-              const lang = v.lang.toLowerCase();
-              return (lang === "ja-jp" || lang.startsWith("ja")) &&
-                (name.includes("ichiro") || name.includes("otoya") || name.includes("male") || name.includes("keiji"));
-            });
-          } else {
-            // Look for elegant female voices
-            targetVoice = voices.find((v) => {
-              const name = v.name.toLowerCase();
-              const lang = v.lang.toLowerCase();
-              return (lang === "ja-jp" || lang.startsWith("ja")) &&
-                (name.includes("kyoko") || name.includes("nanami") || name.includes("female") || name.includes("woman") || name.includes("ayumi"));
-            });
-          }
-
-          // Fallback to generic Japanese speakers if the customized searches yielded nothing
-          if (!targetVoice) {
-            targetVoice = voices.find((v) => v.lang === "ja-JP" || v.lang.toLowerCase().startsWith("ja"));
-          }
-        }
-
-        if (targetVoice) {
-          utterance.voice = targetVoice;
-          if (targetVoice.lang.toLowerCase().startsWith("en") && !payload.isEnglish) {
-            utterance.text = payload.romajiFallback;
-            utterance.lang = "en-US";
-          }
-        }
-
-        if (cancelActive && window.speechSynthesis.speaking) {
-          window.speechSynthesis.cancel();
-          setTimeout(() => {
-            if (!this.isMuted) {
-              try {
-                if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-                window.speechSynthesis.speak(utterance);
-              } catch (_) {}
-            }
-          }, 85);
-        } else {
-          if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-          window.speechSynthesis.speak(utterance);
-        }
-      } catch (err) {
-        console.warn("Speech synthesis failed or was interrupted:", err);
-      }
-    }
+    this.speakFullWord(text, undefined, kanjiHint, romajiHint, "ja");
   }
 
   // Speaks Spanish word with authentic native cadence and accent support
@@ -718,20 +587,20 @@ class RetroAudioSynth {
         if (targetVoice) {
           spokenLang = targetVoice.lang || "es-ES";
         } else {
-          // CRITICAL: If no Spanish voice is installed in the client OS,
-          // NEVER force a Chinese (zh) or Japanese (ja) voice because they CANNOT speak Latin Spanish text!
-          // Instead, select an English (en-*) voice which CAN read Spanish words with clear Latin phonetics.
+          // If no Spanish voice is installed in the client OS, NEVER fall back to Chinese or default OS voice!
+          // Try a clean English voice if available, otherwise IMMEDIATELY use authentic Spanish online audio!
           const englishVoice = voices.find((v) => {
             const lang = (v.lang || "").toLowerCase().replace("_", "-");
             return lang.startsWith("en-") || lang === "en";
           });
 
-          if (englishVoice) {
+          if (englishVoice && !englishVoice.lang.toLowerCase().startsWith("zh")) {
             targetVoice = englishVoice;
             spokenLang = englishVoice.lang || "en-US";
           } else {
-            targetVoice = null;
-            spokenLang = "es-ES";
+            // Immediately use authentic online human Spanish pronunciation!
+            this.playOnlineTTSAudio(text, "es", onEnd);
+            return;
           }
         }
       } else if (payload.isEnglish) {
@@ -759,6 +628,12 @@ class RetroAudioSynth {
         }
         if (!targetVoice) {
           targetVoice = voices.find((v) => v.lang.toLowerCase().startsWith("en")) || null;
+        }
+
+        if (!targetVoice) {
+          // No English voice: immediately use authentic English online audio!
+          this.playOnlineTTSAudio(text, "en", onEnd);
+          return;
         }
       } else {
         // Japanese voice lookup
@@ -808,20 +683,22 @@ class RetroAudioSynth {
           targetVoice = voices.find((v) => v.lang === "ja-JP" || v.lang.toLowerCase().startsWith("ja")) || null;
         }
 
-        // CRITICAL AUDIO FALLBACK:
-        // If the client system lacks a Japanese voice, fall back to Romaji reading using default/English voice!
-        // This ensures pronunciation audio ALWAYS sounds for every word on all operating systems!
-        if (!targetVoice && voices.length > 0) {
-          targetVoice =
-            voices.find((v) => v.lang.toLowerCase().startsWith("en")) ||
-            voices.find((v) => v.default) ||
-            voices[0];
-          spokenText = payload.romajiFallback;
-          spokenLang = "en-US";
+        // CRITICAL ANTI-CHINESE AUDIO PROTECTION:
+        // If the client system lacks a genuine Japanese voice, NEVER read in Chinese!
+        // Immediately trigger authentic native Japanese online audio!
+        if (!targetVoice) {
+          this.playOnlineTTSAudio(text, "ja", onEnd);
+          return;
         }
       }
 
       const langCategory: "ja" | "es" | "en" = payload.isSpanish ? "es" : payload.isEnglish ? "en" : "ja";
+
+      // Safeguard: NEVER allow a Chinese voice to speak non-Chinese words!
+      if (targetVoice && (targetVoice.lang.toLowerCase().startsWith("zh") || targetVoice.name.toLowerCase().includes("chinese"))) {
+        this.playOnlineTTSAudio(text, langCategory, onEnd);
+        return;
+      }
 
       let hasStarted = false;
       let hasTriggered = false;

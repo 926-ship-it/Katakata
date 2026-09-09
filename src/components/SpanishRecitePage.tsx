@@ -169,6 +169,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   const [romajiBuffer, setRomajiBuffer] = useState<string>("");
   const [shakeIndex, setShakeIndex] = useState<number | null>(null);
   const hiddenInputRef = useRef<HTMLInputElement>(null);
+  const dictationCardRef = useRef<HTMLDivElement>(null);
 
   const [dictationInput, setDictationInput] = useState<string>("");
   const [dictationSuccess, setDictationSuccess] = useState<boolean>(false);
@@ -350,8 +351,11 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
       pronounceCurrentWord();
       setTimeout(() => {
-        dictationInputRef.current?.focus();
-        hiddenInputRef.current?.focus();
+        if (useTypewriterGrid) {
+          hiddenInputRef.current?.focus({ preventScroll: true });
+        } else {
+          dictationInputRef.current?.focus({ preventScroll: true });
+        }
       }, 100);
     }
   }, [currentIndex, activeTab, selectedCategory, currentWord?.id]);
@@ -1060,7 +1064,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
         {activeTab === "dictation" && (
           <div className="max-w-3xl mx-auto space-y-6">
             {currentWord ? (
-              <div className="bg-white rounded-3xl border-2 border-stone-800 p-5 sm:p-8 shadow-lg space-y-6 text-center">
+              <div ref={dictationCardRef} className="bg-white rounded-3xl border-2 border-stone-800 p-5 sm:p-8 shadow-lg space-y-6 text-center scroll-mt-6">
                 {/* Header & Prompt Level Selector */}
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 pb-4">
                   <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl border border-stone-200 text-[11px] font-bold">
@@ -1173,41 +1177,75 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                   </button>
                 </div>
 
-                {/* Hidden Input for mobile & focus management */}
-                <input
-                  ref={hiddenInputRef}
-                  type="text"
-                  className="opacity-0 pointer-events-none absolute -left-9999px"
-                  onKeyDown={(e) => {
-                    if (e.key === "Backspace") {
-                      e.preventDefault();
-                      handleBackspace();
-                    } else if (e.key === "Enter") {
-                      e.preventDefault();
-                      pronounceCurrentWord();
-                    } else if (e.key.length === 1) {
-                      e.preventDefault();
-                      handleTypeCharacter(e.key);
-                    }
-                  }}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val) {
-                      const lastChar = val[val.length - 1];
-                      handleTypeCharacter(lastChar);
-                      e.target.value = "";
-                    }
-                  }}
-                />
-
                 {/* TYPEWRITER GUIDED LETTER BLOCKS */}
                 {useTypewriterGrid ? (
-                  <div className="space-y-5">
+                  <div className="space-y-5 relative">
+                    {/* Mobile helper trigger to activate keyboard safely */}
+                    <div className="md:hidden flex justify-center">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          hiddenInputRef.current?.focus({ preventScroll: true });
+                          if (dictationCardRef.current && typeof window !== "undefined" && window.innerWidth < 768) {
+                            dictationCardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+                          }
+                        }}
+                        className="px-3 py-1 rounded-full bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 text-xs font-bold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                      >
+                        <Keyboard className="w-3.5 h-3.5 text-amber-700" />
+                        <span>唤起手机键盘录入 (防滚屏聚焦)</span>
+                      </button>
+                    </div>
+
                     <div
-                      onClick={() => hiddenInputRef.current?.focus()}
-                      className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 py-4 cursor-text outline-none"
+                      onClick={() => {
+                        hiddenInputRef.current?.focus({ preventScroll: true });
+                        if (dictationCardRef.current && typeof window !== "undefined" && window.innerWidth < 768) {
+                          dictationCardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }
+                      }}
+                      className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 py-4 cursor-text outline-none relative"
                       tabIndex={0}
                     >
+                      {/* Integrated Mobile & Desktop Input: Sits inside the active typewriter grid */}
+                      <input
+                        ref={hiddenInputRef}
+                        type="text"
+                        value=""
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="opacity-0 absolute inset-0 w-full h-full cursor-text z-10"
+                        onKeyDown={(e) => {
+                          if (e.key === "Backspace") {
+                            e.preventDefault();
+                            handleBackspace();
+                          } else if (e.key === "Enter") {
+                            e.preventDefault();
+                            pronounceCurrentWord();
+                          } else if (e.key.length === 1) {
+                            e.preventDefault();
+                            handleTypeCharacter(e.key);
+                          }
+                        }}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            const lastChar = val[val.length - 1];
+                            handleTypeCharacter(lastChar);
+                            e.target.value = "";
+                          }
+                        }}
+                        onFocus={() => {
+                          if (dictationCardRef.current && typeof window !== "undefined" && window.innerWidth < 768) {
+                            setTimeout(() => {
+                              dictationCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                            }, 150);
+                          }
+                        }}
+                      />
                       {currentWord.segments.map((seg, idx) => {
                         const char = seg.display;
                         const isTyped = idx < typedChars.length;
@@ -1330,7 +1368,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
                     {/* Virtual Keypad Toolbar */}
                     {currentLang === "es" && (
-                      <div className="flex items-center justify-center flex-wrap gap-1.5 pt-1">
+                      <div className="flex items-center justify-center flex-wrap gap-1.5 pt-1 relative z-20">
                         <span className="text-[10px] font-mono text-stone-400 mr-1 hidden sm:inline">
                           变音快捷键:
                         </span>
@@ -1357,7 +1395,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                     )}
 
                     {currentLang === "ja" && (
-                      <div className="flex flex-col items-center gap-2 pt-1">
+                      <div className="flex flex-col items-center gap-2 pt-1 relative z-20">
                         <div className="flex items-center justify-center flex-wrap gap-1">
                           <span className="text-[10px] font-mono text-stone-400 mr-1">
                             假名/退格:
@@ -1388,7 +1426,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                     )}
 
                     {currentLang === "en" && (
-                      <div className="flex items-center justify-center gap-2 pt-1">
+                      <div className="flex items-center justify-center gap-2 pt-1 relative z-20">
                         <span className="text-[11px] text-stone-500 font-mono">
                           ⌨️ 请直接在实体键盘键入英文字母 (支持大小写自动校准)
                         </span>
@@ -1417,6 +1455,13 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                             handleCheckClassicDictation(dictationInput);
                           }
                         }}
+                        onFocus={() => {
+                          if (dictationCardRef.current && typeof window !== "undefined" && window.innerWidth < 768) {
+                            setTimeout(() => {
+                              dictationCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                            }, 150);
+                          }
+                        }}
                         placeholder={`请输入完整的拼写...`}
                         className={`w-full py-3 px-4 rounded-2xl border-2 text-center text-lg font-bold outline-none transition-all ${
                           dictationError
@@ -1425,7 +1470,6 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                             ? "border-emerald-500 bg-emerald-50"
                             : "border-stone-400 focus:border-stone-900 bg-white"
                         }`}
-                        autoFocus
                       />
                       {dictationSuccess && (
                         <div className="absolute right-3 top-3.5 text-emerald-600">

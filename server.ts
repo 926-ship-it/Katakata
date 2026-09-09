@@ -12,16 +12,23 @@ async function startServer() {
 
   app.use(express.json());
 
-  // Initialize Gemini client with proper User-Agent header and environment API key
-  const apiKey = process.env.GEMINI_API_KEY || "";
-  const ai = new GoogleGenAI({
-    apiKey: apiKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
-    },
-  });
+  // Lazy initialization of Gemini client with proper User-Agent header
+  let geminiClient: GoogleGenAI | null = null;
+  function getGeminiClient(): GoogleGenAI | null {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) return null;
+    if (!geminiClient) {
+      geminiClient = new GoogleGenAI({
+        apiKey: key,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
+    }
+    return geminiClient;
+  }
 
   // API endpoint for generating card stories/origins
   app.post("/api/card-origin", async (req, res) => {
@@ -31,7 +38,8 @@ async function startServer() {
       return res.status(400).json({ error: "Missing name or pronunciation details." });
     }
 
-    if (!apiKey) {
+    const ai = getGeminiClient();
+    if (!ai) {
       return res.status(500).json({ 
         error: isEnglish 
           ? "System GEMINI_API_KEY not configured. Please add your key in Settings > Secrets."
@@ -61,7 +69,7 @@ async function startServer() {
       }
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-3.8-flash",
         contents: prompt,
       });
 
@@ -87,7 +95,8 @@ async function startServer() {
       return res.status(400).json({ error: "Missing name or conversation history." });
     }
 
-    if (!apiKey) {
+    const ai = getGeminiClient();
+    if (!ai) {
       return res.status(500).json({ 
         error: isEnglish 
           ? "System GEMINI_API_KEY not configured. Please add your key in Settings > Secrets."
@@ -124,7 +133,7 @@ async function startServer() {
       }
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-3.8-flash",
         contents: contents,
         config: {
           systemInstruction: systemInstruction,
@@ -151,7 +160,8 @@ async function startServer() {
       return res.status(400).json({ error: "No text content provided." });
     }
 
-    if (!apiKey) {
+    const ai = getGeminiClient();
+    if (!ai) {
       return res.status(500).json({ 
         error: isEnglish 
           ? "System GEMINI_API_KEY not configured. Please add your key in Settings > Secrets."
@@ -216,7 +226,7 @@ ${text}
       }
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-3.8-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -278,7 +288,8 @@ ${text}
         return res.status(400).json({ error: "Word parameter is required." });
       }
 
-      if (!process.env.GEMINI_API_KEY) {
+      const ai = getGeminiClient();
+      if (!ai) {
         return res.status(200).json({
           success: false,
           message: "No GEMINI_API_KEY configured. Please enter fields manually.",
@@ -328,7 +339,7 @@ Output format must be valid JSON:
 }`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.8-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
