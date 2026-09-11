@@ -1,23 +1,38 @@
+export type SpanishCategory =
+  | "all"
+  | "daily"
+  | "travel"
+  | "business"
+  | "food"
+  | "emotion"
+  | "grammar"
+  | "greetings"
+  | "dining"
+  | "verbs_adj"
+  | "custom";
+
 export interface SpanishWord {
   id: string;
   word: string;
   phonetic?: string;
   partOfSpeech?: string;
   meaning: string;
-  category: "greetings" | "daily" | "travel" | "dining" | "verbs_adj" | "custom";
+  category: SpanishCategory | string;
   categoryName: string;
   exampleEs?: string;
   exampleZh?: string;
-  level: "A1" | "A2" | "B1";
+  level: "A1" | "A2" | "B1" | "B2";
   isCustom?: boolean;
 }
 
-export const SPANISH_CATEGORIES: { id: SpanishWord["category"]; label: string; icon: string }[] = [
-  { id: "greetings", label: "基础问候", icon: "👋" },
-  { id: "daily", label: "日常生活", icon: "🏠" },
-  { id: "travel", label: "旅行自然", icon: "✈️" },
-  { id: "dining", label: "西餐美食", icon: "☕" },
-  { id: "verbs_adj", label: "动词与形容词", icon: "⚡" },
+export const SPANISH_CATEGORIES: { id: SpanishCategory | string; label: string; icon: string }[] = [
+  { id: "all", label: "全部词汇", icon: "🇪🇸" },
+  { id: "daily", label: "日常交流", icon: "💬" },
+  { id: "travel", label: "旅行交通", icon: "✈️" },
+  { id: "business", label: "职场商务", icon: "💼" },
+  { id: "food", label: "美食餐饮", icon: "🥘" },
+  { id: "emotion", label: "情绪性格", icon: "❤️" },
+  { id: "grammar", label: "动词语法", icon: "📖" },
   { id: "custom", label: "自定义生词", icon: "✍️" },
 ];
 
@@ -655,9 +670,38 @@ export function deleteCustomSpanishWord(id: string): void {
   } catch (_) {}
 }
 
+import { SIELE_2800_WORDS } from "./siele2800Data";
+
 export function getAllSpanishWords(): SpanishWord[] {
   const customs = getCustomSpanishWords();
-  return [...customs, ...BASE_SPANISH_WORDS];
+  const seen = new Set<string>();
+  const result: SpanishWord[] = [];
+
+  for (const w of customs) {
+    const key = w.word.trim().toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(w);
+    }
+  }
+
+  for (const w of SIELE_2800_WORDS) {
+    const key = w.word.trim().toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(w);
+    }
+  }
+
+  for (const w of BASE_SPANISH_WORDS) {
+    const key = w.word.trim().toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(w);
+    }
+  }
+
+  return result;
 }
 
 export type MasteryStatus = "learning" | "familiar" | "mastered";
@@ -724,7 +768,7 @@ export function spanishWordToDictionaryItem(w: SpanishWord): any {
     category: "custom",
     categoryName: w.categoryName || "西语沉浸",
     meaning: `${w.phonetic ? `${w.phonetic} ` : ""}${w.meaning}`,
-    rarity: w.level === "B1" ? "SR" : w.level === "A2" ? "R" : "N",
+    rarity: w.level === "B2" ? "UR" : w.level === "B1" ? "SR" : w.level === "A2" ? "R" : "N",
     rarityName: w.level,
     glowColor: "rgba(245, 158, 11, 0.25)",
     borderColor: "border-amber-400",

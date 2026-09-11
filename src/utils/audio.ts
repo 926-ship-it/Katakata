@@ -283,16 +283,24 @@ class RetroAudioSynth {
             } catch (_) {}
           };
           syncVoices();
-          window.speechSynthesis.addEventListener("voiceschanged", syncVoices);
+          window.speechSynthesis.onvoiceschanged = syncVoices;
+          if (typeof window.speechSynthesis.addEventListener === "function") {
+            window.speechSynthesis.addEventListener("voiceschanged", syncVoices);
+          }
           setTimeout(syncVoices, 100);
           setTimeout(syncVoices, 500);
-          setTimeout(syncVoices, 1500);
+          setTimeout(syncVoices, 1200);
 
-          // User interaction unblocker for SpeechSynthesis in iframe / strict policy environments
+          // User interaction unblocker for SpeechSynthesis & Web Audio in strict autoplay environments
           const unlockSpeech = () => {
             try {
               if (window.speechSynthesis.paused) {
                 window.speechSynthesis.resume();
+              }
+            } catch (_) {}
+            try {
+              if (this.ctx && this.ctx.state === "suspended") {
+                this.ctx.resume();
               }
             } catch (_) {}
           };
@@ -346,7 +354,7 @@ class RetroAudioSynth {
   }
 
   // Plays human pronunciation using online dictionary audio endpoint with HTML5 Audio element
-  // Works reliably across iframes and mobile webviews where native SpeechSynthesis might be restricted
+  // Works reliably across iframes and mobile webviews with multi-source fallback and zero-silence guarantee
   playOnlineTTSAudio(
     text: string,
     langHint: "ja" | "es" | "en",
@@ -363,65 +371,99 @@ class RetroAudioSynth {
     const requestId = this.currentSpeechId;
 
     try {
-      const clean = encodeURIComponent((text || "").trim().replace(/[¡¿\?!]/g, ""));
+      const rawText = (text || "").trim();
+      // Remove bracketed furigana/annotations like (..), clean punctuation
+      const sanitized = rawText
+        .replace(/[\(（\[【].*?[\)）\]】]/g, "")
+        .replace(/[¡¿\?!.,'"·~～\-_/\\#@$%^&*()]/g, " ")
+        .trim();
+      const clean = encodeURIComponent(sanitized || rawText);
       if (!clean) {
         this.isWordSpeaking = false;
         if (onEnd) onEnd();
         return false;
       }
 
-      let audioUrl = "";
+      // Candidate online sources
+      const sources: string[] = [];
       if (langHint === "es") {
-        audioUrl = `https://dict.youdao.com/dictvoice?le=spa&audio=${clean}`;
+        sources.push(`https://dict.youdao.com/dictvoice?audio=${clean}&le=es`);
+        sources.push(`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=es&q=${clean}`);
       } else if (langHint === "en") {
-        audioUrl = `https://dict.youdao.com/dictvoice?type=2&audio=${clean}`;
+        sources.push(`https://dict.youdao.com/dictvoice?audio=${clean}&type=2`);
+        sources.push(`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=${clean}`);
       } else {
-        audioUrl = `https://dict.youdao.com/dictvoice?le=jap&audio=${clean}`;
+        sources.push(`https://dict.youdao.com/dictvoice?audio=${clean}&le=ja`);
+        sources.push(`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ja&q=${clean}`);
       }
 
-      const audio = new Audio(audioUrl);
-      this.activeOnlineAudio = audio;
-      this.activeAudios.add(audio);
-      audio.playbackRate = Math.max(0.8, Math.min(1.3, this.speechRate));
-      
+      let sourceIdx = 0;
       let triggered = false;
+
       const finish = () => {
         if (!triggered && this.currentSpeechId === requestId) {
           triggered = true;
-          this.activeAudios.delete(audio);
-          if (this.activeOnlineAudio === audio) {
-            this.activeOnlineAudio = null;
-          }
           this.isWordSpeaking = false;
+          this.activeOnlineAudio = null;
           if (onEnd) onEnd();
         }
       };
 
-      audio.onended = finish;
-      audio.onerror = () => {
-        this.activeAudios.delete(audio);
-        if (this.currentSpeechId === requestId) {
-          // If online audio network fails, fallback to synthesized resonant vocal chime
+      const tryNextSource = () => {
+        if (triggered || this.currentSpeechId !== requestId) return;
+
+        if (sourceIdx < sources.length) {
+          const url = sources[sourceIdx++];
+          const audio = new Audio();
+          audio.src = url;
+          audio.preload = "auto";
+          this.activeOnlineAudio = audio;
+          this.activeAudios.add(audio);
+          audio.playbackRate = Math.max(0.8, Math.min(1.3, this.speechRate));
+
+          let sourceFinished = false;
+          let timeoutHandle: any = null;
+
+          const onSourceEnd = () => {
+            if (sourceFinished) return;
+            sourceFinished = true;
+            if (timeoutHandle) clearTimeout(timeoutHandle);
+            this.activeAudios.delete(audio);
+            finish();
+          };
+
+          const onSourceFail = () => {
+            if (sourceFinished) return;
+            sourceFinished = true;
+            if (timeoutHandle) clearTimeout(timeoutHandle);
+            this.activeAudios.delete(audio);
+            tryNextSource();
+          };
+
+          audio.onended = onSourceEnd;
+          audio.onerror = onSourceFail;
+
+          // Responsive 1400ms timeout per online audio source
+          timeoutHandle = setTimeout(() => {
+            if (!sourceFinished) {
+              onSourceFail();
+            }
+          }, 1400);
+
+          const playPromise = audio.play();
+          if (playPromise) {
+            playPromise.catch(() => {
+              onSourceFail();
+            });
+          }
+        } else {
+          // If all online endpoints fail or are blocked, play resonant harmonic chime
+          // Guaranteed audible acoustic feedback that never fails offline
           this.playPhoneticVocalChime(text, finish);
         }
       };
 
-      // Safeguard watchdog: don't hang if audio takes too long to load
-      setTimeout(() => {
-        if (!triggered && this.currentSpeechId === requestId) {
-          finish();
-        }
-      }, 3500);
-
-      const playPromise = audio.play();
-      if (playPromise) {
-        playPromise.catch(() => {
-          this.activeAudios.delete(audio);
-          if (this.currentSpeechId === requestId) {
-            this.playPhoneticVocalChime(text, finish);
-          }
-        });
-      }
+      tryNextSource();
       return true;
     } catch (_) {
       this.isWordSpeaking = false;
@@ -609,13 +651,15 @@ class RetroAudioSynth {
       return;
     }
 
-    // Deduplication guard: if the exact same word is called within 650ms, do not trigger twice!
+    // Micro-throttle (100ms) only for identical rapid-fire calls while already actively speaking
     const now = Date.now();
     const cleanWordKey = text.trim().toLowerCase();
     if (
+      this.isWordSpeaking &&
       this.lastFullWordRecord.text === cleanWordKey &&
-      now - this.lastFullWordRecord.time < 650
+      now - this.lastFullWordRecord.time < 100
     ) {
+      if (onEnd) onEnd();
       return;
     }
     this.lastFullWordRecord = { text: cleanWordKey, time: now };
@@ -891,6 +935,23 @@ class RetroAudioSynth {
           this.lastSpeakTime = Date.now();
 
           window.speechSynthesis.speak(freshUtterance);
+          // Immediate resume trigger to unstick Chromium paused speech queue
+          try {
+            if (window.speechSynthesis.paused) {
+              window.speechSynthesis.resume();
+            }
+          } catch (_) {}
+
+          // Watchdog: If native speech does not fire 'onstart' within 420ms, it is stalled/hung.
+          // Switch cleanly to online audio so the user never experiences awkward silence!
+          setTimeout(() => {
+            if (!hasStarted && !hasTriggered && this.currentSpeechId === requestId) {
+              try {
+                window.speechSynthesis.cancel();
+              } catch (_) {}
+              this.playOnlineTTSAudio(text, langCategory, triggerCompletion);
+            }
+          }, 420);
         } catch (err) {
           console.warn("Exception during native speak:", err);
           if (!hasStarted && !hasTriggered && this.currentSpeechId === requestId) {

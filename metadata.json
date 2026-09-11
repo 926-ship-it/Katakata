@@ -1,6 +1,6 @@
 {
   "name": "Katakata 咔嗒 · 多语言沉浸练习工坊",
-  "description": "Katakata 咔嗒 · 多语言沉浸练习工坊。融合日语五十音深度练习、西班牙语闪卡默写工坊、英语词汇盲打与自定词库录入，纯正机械击键音效与手写描红沉浸体验。",
+  "description": "Katakata 咔嗒 · 多语言沉浸练习工坊。融合日语五十音深度练习、西班牙语 SIELE 必背 2800 词闪卡默写工坊、英语词汇盲打与自定词库录入，纯正机械击键音效与手写描红沉浸体验。",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

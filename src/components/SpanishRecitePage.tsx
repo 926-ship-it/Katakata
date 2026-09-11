@@ -152,6 +152,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   // Word Deck & Filtering
   const [allWords, setAllWords] = useState<UnifiedReciteWord[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedLevel, setSelectedLevel] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [masteryMap, setMasteryMap] = useState<Record<string, { status: MasteryStatus; reviewCount: number }>>({});
 
@@ -273,6 +274,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
     reloadWords(currentLang);
     setCurrentIndex(0);
     setSelectedCategory("all");
+    setSelectedLevel("all");
     setTypedChars([]);
     setRomajiBuffer("");
     setDictationSuccess(false);
@@ -282,14 +284,15 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   const activeDeck = useMemo(() => {
     return allWords.filter((w) => {
       const matchCat = selectedCategory === "all" || w.category === selectedCategory;
+      const matchLevel = selectedLevel === "all" || w.level === selectedLevel;
       const matchSearch =
         !searchQuery.trim() ||
         w.displayTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (w.kanaStr && w.kanaStr.toLowerCase().includes(searchQuery.toLowerCase())) ||
         w.meaning.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchCat && matchSearch;
+      return matchCat && matchLevel && matchSearch;
     });
-  }, [allWords, selectedCategory, searchQuery]);
+  }, [allWords, selectedCategory, selectedLevel, searchQuery]);
 
   const currentWord: UnifiedReciteWord | undefined = activeDeck[currentIndex] || activeDeck[0];
 
@@ -872,6 +875,44 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
             </div>
           </div>
         </div>
+
+        {/* SIELE Level Filter (Spanish Mode) */}
+        {currentLang === "es" && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+            <span className="text-[11px] font-bold text-stone-500 shrink-0 font-serif mr-1">SIELE 考级分阶:</span>
+            {[
+              { id: "all", label: "全部 2800 词", badge: "A1-B2" },
+              { id: "A1", label: "A1 起步必背", badge: "550词" },
+              { id: "A2", label: "A2 初级进阶", badge: "750词" },
+              { id: "B1", label: "B1 中级提高", badge: "850词" },
+              { id: "B2", label: "B2 高级精通", badge: "650词" },
+            ].map((lvl) => {
+              const isSelected = selectedLevel === lvl.id;
+              const count = lvl.id === "all" ? allWords.length : allWords.filter((w) => w.level === lvl.id).length;
+              return (
+                <button
+                  key={lvl.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedLevel(lvl.id);
+                    setCurrentIndex(0);
+                    audioSynth.playCardSlide();
+                  }}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1.5 ${
+                    isSelected
+                      ? "bg-amber-500 text-stone-950 shadow-xs font-black"
+                      : "bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200"
+                  }`}
+                >
+                  <span>{lvl.label}</span>
+                  <span className={`text-[10px] font-mono px-1 rounded ${isSelected ? "bg-amber-600/30 text-stone-900" : "bg-stone-200 text-stone-500"}`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Category Pills Filter */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">

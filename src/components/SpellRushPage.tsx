@@ -66,7 +66,7 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
   // References
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const lastProcessedKeyRef = useRef<{ key: string; time: number } | null>(null);
+  const lastProcessedKeyRef = useRef<{ key: string; time: number; fromHardware?: boolean } | null>(null);
 
   // Popups for XP or Score points
   const [scorePopups, setScorePopups] = useState<{ id: number; text: string; x: number; y: number }[]>([]);
@@ -89,6 +89,9 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
     if (gameState !== "playing") return;
 
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Disallow key repeat skipping repeated characters
+      if (e.repeat) return;
+
       const target = e.target as HTMLElement | null;
       const isInput = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
 
@@ -122,7 +125,7 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
         lowerKey === "&";
       
       if (isValidKey) {
-        handleTypewriterInput(lowerKey);
+        handleTypewriterInput(lowerKey, true);
       }
     };
 
@@ -213,7 +216,7 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
   }, [gameState, endTime, practicedIds]);
 
   // Handle Keystrokes
-  const handleTypewriterInput = (key: string) => {
+  const handleTypewriterInput = (key: string, fromHardware: boolean = false) => {
     if (gameState !== "playing" || !currentCard || isWordPronouncing) return;
 
     let lowerKey = key.toLowerCase();
@@ -232,14 +235,18 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
       lowerKey === "&";
     if (!isValidKey) return;
 
-    // Throttle duplicate keystrokes
+    // Throttle duplicate keystrokes to prevent double-dispatch from DOM echoes and hardware chatter
     const now = Date.now();
-    if (lastProcessedKeyRef.current && 
-        lastProcessedKeyRef.current.key === lowerKey && 
-        now - lastProcessedKeyRef.current.time < 35) {
-      return;
+    if (lastProcessedKeyRef.current && lastProcessedKeyRef.current.key === lowerKey) {
+      const elapsed = now - lastProcessedKeyRef.current.time;
+      if (lastProcessedKeyRef.current.fromHardware !== fromHardware && elapsed < 150) {
+        return;
+      }
+      if (elapsed < 55) {
+        return;
+      }
     }
-    lastProcessedKeyRef.current = { key: lowerKey, time: now };
+    lastProcessedKeyRef.current = { key: lowerKey, time: now, fromHardware };
 
     setKeysTyped(prev => prev + 1);
 

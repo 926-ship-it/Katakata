@@ -122,6 +122,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
   useEffect(() => {
     setHandwritingPassed(false);
+    currentSegmentIdxRef.current = 0;
+    romajiProgressRef.current = "";
+    completedSegmentsCountRef.current = 0;
+    lastProcessedKeyRef.current = null;
   }, [currentItemIdx]);
 
   // Monitor physical keystrokes
@@ -137,7 +141,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const mainTerminalRef = useRef<HTMLDivElement>(null);
-  const lastProcessedKeyRef = useRef<{ key: string; time: number } | null>(null);
+  const lastProcessedKeyRef = useRef<{ key: string; time: number; fromHardware?: boolean } | null>(null);
+  const currentSegmentIdxRef = useRef<number>(0);
+  const romajiProgressRef = useRef<string>("");
+  const completedSegmentsCountRef = useRef<number>(0);
 
   // Automatically keep keyboard focus on initial mount if desired, but NEVER re-focus on currentItemIdx changes
   // Calling .focus() on item transitions causes mobile WebKit/Chrome to violently scroll to the top!
@@ -204,6 +211,8 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   ];
 
   // Core spelling engine input validator
+  // Enforces strict 1-to-1 character matching and exact word length correspondence.
+  // Prohibits short-circuiting or skipping of repeated letters (e.g. "auu").
   const processInputKey = (key: string, fromHardwareListener: boolean = false) => {
     if (practiceMode === "handwriting") return;
     if (isPaused || timerFinished || wordCorrect || isPronouncing) return;
@@ -232,46 +241,62 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       normalizedKey === "&";
     if (!isValidKey) return;
 
-    // De-duplicate rapid duplicate events (e.g. from keydown + onChange firing together within 30ms)
+    // De-duplicate rapid duplicate events to prevent synthetic DOM echoes (e.g. keydown + onChange firing together)
+    // 1) Alternating source filter: if identical key arrives from an alternate event source within 150ms, discard echo.
+    // 2) Mechanical bounce filter: humans cannot physically strike, release, and strike the same key in < 55ms.
     const now = Date.now();
-    if (lastProcessedKeyRef.current && 
-        lastProcessedKeyRef.current.key === normalizedKey && 
-        now - lastProcessedKeyRef.current.time < 30) {
-      return;
+    if (lastProcessedKeyRef.current && lastProcessedKeyRef.current.key === normalizedKey) {
+      const elapsed = now - lastProcessedKeyRef.current.time;
+      if (lastProcessedKeyRef.current.fromHardware !== fromHardwareListener && elapsed < 150) {
+        return;
+      }
+      if (elapsed < 55) {
+        return;
+      }
     }
-    lastProcessedKeyRef.current = { key: normalizedKey, time: now };
+    lastProcessedKeyRef.current = { key: normalizedKey, time: now, fromHardware: fromHardwareListener };
 
     setPressedKey(normalizedKey === " " ? "SPACE" : (normalizedKey === "." ? "." : normalizedKey.toUpperCase()));
     setTimeout(() => setPressedKey(null), 150);
 
-    const segment = item.segments[currentSegmentIdx];
-    const proposedString = romajiProgress + normalizedKey;
+    const activeSegIdx = currentSegmentIdxRef.current;
+    if (activeSegIdx >= item.segments.length) return;
 
-    // Check if proposedString is a prefix match of any acceptable romaji
+    const segment = item.segments[activeSegIdx];
+    const currentProgress = romajiProgressRef.current;
+    const proposedString = currentProgress + normalizedKey;
+
+    // Check if proposedString is a prefix match or complete match of any acceptable romaji for THIS segment
     const isPrefixOfAny = segment.romaji.some(r => r.startsWith(proposedString));
     const isMatchOfAny = segment.romaji.some(r => r === proposedString);
 
     if (isMatchOfAny) {
-      // Correct character fully completed! Play crystal-clear completion strike
+      // Correct character/segment fully matched! Play crisp completion strike
       audioSynth.playTyping({ isCompletion: true, volume: 1.0 });
-      
+
+      // Synchronously record completed segment and advance pointer
+      completedSegmentsCountRef.current += 1;
+      const nextSegmentIdx = activeSegIdx + 1;
+      currentSegmentIdxRef.current = nextSegmentIdx;
+      romajiProgressRef.current = "";
+
+      setCurrentSegmentIdx(nextSegmentIdx);
+      setRomajiProgress("");
+
       setCorrectCount(prev => prev + 1);
       const nextCombo = combo + 1;
       setCombo(nextCombo);
       if (nextCombo > maxCombo) setMaxCombo(nextCombo);
 
-      // Standard XP reward
       triggerXpGain(3, "XP");
-      
-      // Extra combo rewards for multiples of 5
       if (nextCombo >= 5 && nextCombo % 5 === 0) {
         triggerXpGain(Math.floor(nextCombo / 5) * 2, "Combo! 🔥");
       }
 
-      setRomajiProgress("");
-      
-      // Advance segment index or complete whole word
-      if (currentSegmentIdx + 1 >= item.segments.length) {
+      // Check if entire word is finished:
+      // STRICT CONSTRAINT: user input length must equal target segment length exactly
+      // and every segment from 0 to length-1 must have been completed.
+      if (nextSegmentIdx === item.segments.length && completedSegmentsCountRef.current === item.segments.length) {
         // Entire phrase/word spelled correctly!
         setWordCorrect(true);
         setIsPronouncing(true);
@@ -279,13 +304,12 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         audioSynth.playFanfare();
         if (onKeyStrike) onKeyStrike("complete");
 
-        // Reward major word-complete bonus!
         triggerXpGain(10 + item.segments.length * 2, "Word Mastery ✨");
         
         const romajiHint = item.segments.map(s => s.displayRomaji || (s.romaji && s.romaji[0]) || "").join("");
         const langHint: "ja" | "es" | "en" = (item as any).lang || (isEnglishMode ? "en" : "ja");
 
-        // Speak full word clearly with automatic language detection, kanji hints, and romaji fallback
+        // Speak full word clearly with automatic language detection, kanji hints, and multi-source fallback
         audioSynth.speakFullWord(
           item.kanaStr || item.kanji,
           () => {
@@ -297,6 +321,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
               setSlideDirection(1);
               audioSynth.playCarriageReturn();
               setCurrentItemIdx((prevIdx) => (prevIdx + 1) % items.length);
+              currentSegmentIdxRef.current = 0;
+              romajiProgressRef.current = "";
+              completedSegmentsCountRef.current = 0;
+              lastProcessedKeyRef.current = null;
               setCurrentSegmentIdx(0);
               setRomajiProgress("");
               setWordCorrect(false);
@@ -311,12 +339,12 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         if (!isEnglishMode && (item as any).lang !== "es") {
           audioSynth.speakKanaInstant(segment.kana);
         }
-        setCurrentSegmentIdx(currentSegmentIdx + 1);
         if (onKeyStrike) onKeyStrike("correct");
       }
     } else if (isPrefixOfAny) {
       // Mid-spelling of romaji character (e.g. typed 't' of 'tsu')
       audioSynth.playTyping({ volume: 0.85 });
+      romajiProgressRef.current = proposedString;
       setRomajiProgress(proposedString);
       
       setCorrectCount(prev => prev + 1);
@@ -339,7 +367,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       setErrorCount(prev => prev + 1);
       setCombo(0);
 
-      // Reset to first kana segment on error (forced deep learning reinforcement!)
+      // Reset to first segment on error
+      currentSegmentIdxRef.current = 0;
+      romajiProgressRef.current = "";
+      completedSegmentsCountRef.current = 0;
       setCurrentSegmentIdx(0);
       setRomajiProgress("");
       if (onKeyStrike) onKeyStrike("error");
@@ -354,6 +385,9 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
+      // Strict prohibition on hardware key repeat auto-advancing consecutive duplicate letters (e.g. holding 'u' in 'auu')
+      if (e.repeat) return;
+
       // If the user is typing inside an input or textarea element, ignore the window-level keydown 
       // listener to prevent double-triggering. We use tagNames instead of instanceof to be robust inside iframes/realms.
       const target = e.target as HTMLElement | null;
