@@ -1380,7 +1380,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   <div className="flex gap-0.5 justify-center flex-wrap scale-95 origin-center">
                     {selectedCard.segments.map((s, idx) => (
                       <div key={idx} className="bg-stone-900/5 px-1.5 py-0.5 rounded text-[9px] flex flex-col items-center min-w-[32px]">
-                        <span className="font-serif font-black">{s.text || s.kana}</span>
+                        <span className="font-serif font-black">{(s as any).text || s.kana}</span>
                         <span className="font-mono text-[7px] text-stone-500 scale-90">{s.displayRomaji}</span>
                       </div>
                     ))}

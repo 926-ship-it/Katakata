@@ -4,7 +4,7 @@ import { Volume2, VolumeX, Sparkles, MessageCircle, Heart, Minus } from "lucide-
 import { audioSynth } from "../utils/audio";
 
 interface MascotComponentProps {
-  currentPage: "start" | "training" | "library" | "unlocked_ceremony";
+  currentPage: string;
   lastAction?: "correct" | "error" | "complete" | "";
   voiceType?: string;
   isEnglishMode?: boolean;

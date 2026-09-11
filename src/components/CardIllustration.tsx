@@ -2,7 +2,7 @@ import React from "react";
 
 interface CardIllustrationProps {
   id: string;
-  category: "name" | "nature" | "culture" | "food";
+  category: "name" | "nature" | "culture" | "food" | "custom" | string;
   className?: string;
 }
 

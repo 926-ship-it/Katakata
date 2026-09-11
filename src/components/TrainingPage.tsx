@@ -35,14 +35,15 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 }) => {
   // Loop sequential indices
   const [currentItemIdx, setCurrentItemIdx] = useState<number>(0);
-  const item = items[currentItemIdx] || items[0];
+  const item = (items && items.length > 0) ? (items[currentItemIdx] || items[0]) : null;
 
   // Animated sliding direction indicator
   const [slideDirection, setSlideDirection] = useState<number>(1);
 
-  // Timer states
-  const [endTime, setEndTime] = useState<number>(() => Date.now() + durationMs);
-  const [timeLeftMs, setTimeLeftMs] = useState<number>(durationMs);
+  // Timer states with minimum duration protection (prevent instant timeout)
+  const effectiveDuration = durationMs > 0 ? durationMs : 3 * 60 * 1000;
+  const [endTime, setEndTime] = useState<number>(() => Date.now() + effectiveDuration);
+  const [timeLeftMs, setTimeLeftMs] = useState<number>(effectiveDuration);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [timerFinished, setTimerFinished] = useState<boolean>(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState<boolean>(false);
@@ -415,6 +416,24 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
     };
   }, [isPaused, timerFinished, wordCorrect, practiceMode]);
 
+  // Global Escape key listener to guarantee an immediate exit path
+  useEffect(() => {
+    const handleGlobalEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (timerFinished) {
+          onQuit();
+        } else if (showQuitConfirm) {
+          setShowQuitConfirm(false);
+        } else {
+          setShowQuitConfirm(true);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleGlobalEsc);
+    return () => window.removeEventListener("keydown", handleGlobalEsc);
+  }, [timerFinished, showQuitConfirm, onQuit]);
+
   // Formatter for time display
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
@@ -423,7 +442,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
     return `${mm}:${ss}`;
   };
 
-  const currentSegment = item.segments[currentSegmentIdx];
+  const currentSegment = item?.segments?.[currentSegmentIdx] || item?.segments?.[0];
 
   // Helper to determine active alphabet guidelines
   const getExpectedPrefixHelp = () => {
@@ -437,7 +456,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
     }
     
     // Provide neat prompt of expected correct letter keys to tap
-    const currentExpecteds = currentSegment.romaji.map(r => r.substring(romajiProgress.length));
+    const currentExpecteds = (currentSegment?.romaji || []).map(r => r.substring(romajiProgress.length));
     return isEnglishMode 
       ? `Press: ${currentExpecteds.map(x => {
           const char = x[0] || "";
@@ -459,9 +478,24 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
     onFinished(completedRounds, finalKpm, finalAccuracy, sessionXpEarned);
   };
 
+  if (!item || !item.segments || item.segments.length === 0) {
+    return (
+      <div className="max-w-md mx-auto my-12 p-8 text-center space-y-4 bg-white rounded-2xl border border-stone-200 shadow-lg">
+        <p className="text-sm font-serif text-stone-700">暂无待训练词汇或数据已完成</p>
+        <button
+          type="button"
+          onClick={onQuit}
+          className="px-5 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-serif font-bold cursor-pointer transition-all"
+        >
+          返回上一页
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div 
-      className="max-w-3xl mx-auto space-y-2.5 sm:space-y-6 px-2 md:px-0"
+      className="max-w-3xl mx-auto space-y-2.5 sm:space-y-6 px-2 md:px-0 relative"
       onClick={() => {
         if (practiceMode !== "handwriting" && !isPaused && !timerFinished && !showQuitConfirm) {
           const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
@@ -471,14 +505,32 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         }
       }}
     >
+      {/* Universal Floating Exit Button: always visible & clickable at all times */}
+      <button
+        type="button"
+        onClick={() => {
+          if (timerFinished) {
+            onQuit();
+          } else {
+            setShowQuitConfirm(true);
+          }
+        }}
+        className="fixed top-3 right-3 z-50 px-3.5 py-1.5 rounded-full bg-stone-900/90 hover:bg-red-600 text-stone-100 border border-stone-700 shadow-xl flex items-center gap-1.5 text-xs font-bold font-serif cursor-pointer transition-all backdrop-blur-md select-none active:scale-95"
+        title="随时退出联训 (快捷键 Esc)"
+      >
+        <ArrowLeft className="w-3.5 h-3.5" />
+        <span>退出训练 (Esc)</span>
+      </button>
+
       {/* Upper bar: Quit & Controls */}
       <div className="flex items-center justify-between">
         <button
           onClick={() => setShowQuitConfirm(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-300 text-stone-600 bg-white hover:bg-stone-50 hover:text-stone-900 text-xs font-bold transition-all cursor-pointer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-300 text-stone-700 bg-white hover:bg-red-50 hover:border-red-300 hover:text-red-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+          title="退出训练"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>作废并退出</span>
+          <span>退出练习</span>
         </button>
 
         <div className="flex items-center gap-2">
@@ -765,27 +817,25 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     </div>
 
                     {/* Live Game Combo and XP Info Overlay */}
-                    {practiceMode !== "handwriting" && (
-                      <div className="flex items-center justify-between gap-2 sm:gap-4 mt-1 sm:mt-2 px-2 sm:px-3 py-0.5 sm:py-1 bg-stone-900/5 rounded-lg border border-stone-200/50 text-[10px] sm:text-xs font-mono select-none">
-                        <div className="flex items-center gap-1.5 text-stone-500">
-                          <span>LEVEL</span>
-                          <span className="font-black text-stone-800">{Math.floor(xp / 250) + 1}</span>
-                          <span className="text-[10px] text-stone-400">({xp % 250}/250 XP)</span>
-                        </div>
-                        
-                        {combo > 0 && (
-                          <motion.div
-                            key={combo}
-                            initial={{ scale: 0.8, rotate: -5 }}
-                            animate={{ scale: [1, 1.25, 1], rotate: [0, 5, 0] }}
-                            className="flex items-center gap-1 font-black text-amber-600 tracking-wider"
-                          >
-                            <span>{combo} COMBO</span>
-                            <span className="animate-pulse">🔥</span>
-                          </motion.div>
-                        )}
+                    <div className="flex items-center justify-between gap-2 sm:gap-4 mt-1 sm:mt-2 px-2 sm:px-3 py-0.5 sm:py-1 bg-stone-900/5 rounded-lg border border-stone-200/50 text-[10px] sm:text-xs font-mono select-none">
+                      <div className="flex items-center gap-1.5 text-stone-500">
+                        <span>LEVEL</span>
+                        <span className="font-black text-stone-800">{Math.floor(xp / 250) + 1}</span>
+                        <span className="text-[10px] text-stone-400">({xp % 250}/250 XP)</span>
                       </div>
-                    )}
+                      
+                      {combo > 0 && (
+                        <motion.div
+                          key={combo}
+                          initial={{ scale: 0.8, rotate: -5 }}
+                          animate={{ scale: [1, 1.25, 1], rotate: [0, 5, 0] }}
+                          className="flex items-center gap-1 font-black text-amber-600 tracking-wider"
+                        >
+                          <span>{combo} COMBO</span>
+                          <span className="animate-pulse">🔥</span>
+                        </motion.div>
+                      )}
+                    </div>
                   </>
                 )}
               </motion.div>
@@ -830,10 +880,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     
                     // Highlight keys that could be next character targets
                     const isGuideKey = !isPaused && !timerFinished && !wordCorrect &&
-                      currentSegment.romaji.some(
+                      Boolean(currentSegment?.romaji?.some(
                         r => r.startsWith(romajiProgress) && 
                         r[romajiProgress.length]?.toUpperCase() === char
-                      );
+                      ));
 
                     return (
                       <motion.button
@@ -875,7 +925,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     className={`w-28 sm:w-40 h-5.5 sm:h-7 flex items-center justify-center rounded text-[9px] sm:text-[10px] font-mono font-bold uppercase transition-all select-none border cursor-pointer ${
                       pressedKey === "SPACE"
                         ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"
-                        : (!isPaused && !timerFinished && !wordCorrect && currentSegment.romaji.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === " "))
+                        : (!isPaused && !timerFinished && !wordCorrect && Boolean(currentSegment?.romaji?.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === " ")))
                         ? "bg-emerald-950 text-emerald-400 border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse"
                         : "bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-750"
                     }`}
@@ -895,7 +945,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     className={`w-8 sm:w-10 h-5.5 sm:h-7 flex items-center justify-center rounded text-xs font-mono font-bold transition-all select-none border cursor-pointer ${
                       pressedKey === "."
                         ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"
-                        : (!isPaused && !timerFinished && !wordCorrect && currentSegment.romaji.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === "."))
+                        : (!isPaused && !timerFinished && !wordCorrect && Boolean(currentSegment?.romaji?.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === ".")))
                         ? "bg-emerald-950 text-emerald-400 border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse"
                         : "bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-750"
                     }`}
@@ -915,7 +965,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     className={`w-8 sm:w-10 h-5.5 sm:h-7 flex items-center justify-center rounded text-xs font-mono font-bold transition-all select-none border cursor-pointer ${
                       pressedKey === "-"
                         ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"
-                        : (!isPaused && !timerFinished && !wordCorrect && currentSegment.romaji.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === "-"))
+                        : (!isPaused && !timerFinished && !wordCorrect && Boolean(currentSegment?.romaji?.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === "-")))
                         ? "bg-emerald-950 text-emerald-400 border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse"
                         : "bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-750"
                     }`}
@@ -979,8 +1029,18 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
             <motion.div
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              className="max-w-md w-full bg-stone-50 rounded-2xl border-2 border-stone-800 p-6 md:p-8 text-center space-y-6 shadow-xl relative overflow-hidden"
+              className="max-w-md w-full max-h-[85vh] overflow-y-auto bg-stone-50 rounded-2xl border-2 border-stone-800 p-6 md:p-8 text-center space-y-6 shadow-2xl relative"
             >
+              {/* Close Button at top-right */}
+              <button
+                type="button"
+                onClick={onQuit}
+                className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-stone-200 hover:bg-stone-300 text-stone-700 font-bold flex items-center justify-center cursor-pointer transition-colors"
+                title="退出并返回 (Esc)"
+              >
+                ✕
+              </button>
+
               {/* Gold laurels stamp */}
               <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl" />
 
@@ -1000,7 +1060,11 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                   <p>
                     你对{isEnglishMode ? (items.length > 1 ? "单词组合" : "单词") : (items.length > 1 ? "人名组合" : "人名")}{" "}
                     <span className="font-bold text-stone-900 font-serif">
-                      “{items.length > 1 ? items.map((it) => it.kanji).join("、") : item.kanji}”
+                      {items.length > 5
+                        ? `“${items.slice(0, 4).map((it) => it.kanji).join("”、“")}” 等共 ${items.length} 词`
+                        : items.length > 1
+                        ? `“${items.map((it) => it.kanji).join("”、“")}”`
+                        : `“${item.kanji}”`}
                     </span>{" "}
                     完成了连续{" "}
                     <span className="font-mono text-lg font-black text-amber-600">
@@ -1017,7 +1081,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                   <div>
                     <span className="text-[10px] font-mono text-stone-400 block uppercase">{isEnglishMode ? "SPEED (KPM)" : "打字速率 (KPM)"}</span>
                     <span className="text-base font-black text-stone-900 font-mono">
-                      {correctCount > 0 ? Math.round(correctCount / ((durationMs - Math.max(0, timeLeftMs)) / 60000 || 0.1)) : 0} <span className="text-[10px] font-normal text-stone-500">键/分</span>
+                      {correctCount > 0 ? Math.round(correctCount / ((effectiveDuration - Math.max(0, timeLeftMs)) / 60000 || 0.1)) : 0} <span className="text-[10px] font-normal text-stone-500">键/分</span>
                     </span>
                   </div>
                   <div>
@@ -1074,8 +1138,8 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     </button>
                     <button
                       onClick={() => {
-                        setEndTime(Date.now() + durationMs);
-                        setTimeLeftMs(durationMs);
+                        setEndTime(Date.now() + effectiveDuration);
+                        setTimeLeftMs(effectiveDuration);
                         setCompletedRounds(0);
                         setCurrentSegmentIdx(0);
                         setRomajiProgress("");

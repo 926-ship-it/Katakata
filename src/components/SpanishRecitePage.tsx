@@ -19,7 +19,14 @@ import {
   RefreshCw,
   Trash2,
   Zap,
-  Globe
+  Globe,
+  Bookmark,
+  BookmarkCheck,
+  History,
+  Clock,
+  X,
+  AlertCircle,
+  BookMarked
 } from "lucide-react";
 import {
   SpanishWord,
@@ -32,6 +39,23 @@ import {
 } from "../data/spanishData";
 import { getDictionary, DictionaryItem } from "../data/dictionary";
 import { audioSynth, TypingSoundStyle } from "../utils/audio";
+import {
+  MistakeRecord,
+  ReciteProgress,
+  ReciteHistoryLog,
+  getMistakes,
+  addMistake,
+  removeMistake,
+  clearMistakes,
+  isWordInMistakes,
+  getMistakeList,
+  saveReciteProgress,
+  getReciteProgress,
+  clearReciteProgress,
+  recordReciteAction,
+  getReciteHistoryLogs,
+  clearReciteHistoryLogs
+} from "../utils/reciteStorage";
 
 export type ReciteLanguage = "ja" | "en" | "es";
 
@@ -93,7 +117,7 @@ const CATEGORIES_MAP: Record<ReciteLanguage, { id: string; label: string; icon: 
     { id: "business", label: "职场商务", icon: "💼" },
     { id: "food", label: "美食餐饮", icon: "🥘" },
     { id: "emotion", label: "情绪性格", icon: "❤️" },
-    { id: "grammar", label: "动词介词", icon: "📖" },
+    { id: "grammar", label: "动词语法", icon: "📖" },
     { id: "custom", label: "自定义词", icon: "✍️" },
   ],
 };
@@ -143,18 +167,66 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   refreshTrigger = 0,
   initialLanguage = "es",
 }) => {
+  const resolvedInitialLang: ReciteLanguage =
+    initialLanguage === "ja" || initialLanguage === "en" || initialLanguage === "es"
+      ? initialLanguage
+      : "es";
+
   // Current active language: Japanese | English | Spanish
-  const [currentLang, setCurrentLang] = useState<ReciteLanguage>(initialLanguage);
+  const [currentLang, setCurrentLang] = useState<ReciteLanguage>(() => {
+    try {
+      const saved = localStorage.getItem("recite_last_lang");
+      if (saved === "es" || saved === "en" || saved === "ja") return saved;
+    } catch (_) {}
+    return resolvedInitialLang;
+  });
 
   // Mode: "flashcard" (翻卡背诵) | "dictation" (活字拼写默写) | "library" (词库查阅)
-  const [activeTab, setActiveTab] = useState<"flashcard" | "dictation" | "library">("dictation");
+  const [activeTab, setActiveTab] = useState<"flashcard" | "dictation" | "library">(() => {
+    try {
+      const p = getReciteProgress(resolvedInitialLang);
+      if (p?.tab) return p.tab;
+    } catch (_) {}
+    return "dictation";
+  });
 
   // Word Deck & Filtering
   const [allWords, setAllWords] = useState<UnifiedReciteWord[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedLevel, setSelectedLevel] = useState<string>("all");
+  const [selectedCategory, setSelectedCategory] = useState<string>(() => {
+    try {
+      const p = getReciteProgress(resolvedInitialLang);
+      if (p?.category) return p.category;
+    } catch (_) {}
+    return "all";
+  });
+  const [selectedLevel, setSelectedLevel] = useState<string>(() => {
+    try {
+      const p = getReciteProgress(resolvedInitialLang);
+      if (p?.level) return p.level;
+    } catch (_) {}
+    return "all";
+  });
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [masteryMap, setMasteryMap] = useState<Record<string, { status: MasteryStatus; reviewCount: number }>>({});
+
+  // Mistake Notebook & Dedicated Collection State
+  const [mistakesMap, setMistakesMap] = useState<Record<string, MistakeRecord>>(() => getMistakes(currentLang));
+  const [isMistakesOnly, setIsMistakesOnly] = useState<boolean>(false);
+  const [libraryFilter, setLibraryFilter] = useState<"all" | "mastered" | "mistakes" | "custom">("all");
+
+  // History & Progress Memory State
+  const [restoredBanner, setRestoredBanner] = useState<{ wordTitle: string; index: number; total: number } | null>(null);
+  const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
+  const [historyLogs, setHistoryLogs] = useState<ReciteHistoryLog[]>(() => getReciteHistoryLogs(currentLang));
+  const pendingRestoreTargetRef = useRef<{ wordId?: string; index?: number; wordText?: string } | null>(null);
+
+  // Initialize pendingRestoreTarget on mount
+  useEffect(() => {
+    const p = getReciteProgress(currentLang);
+    if (p) {
+      pendingRestoreTargetRef.current = { wordId: p.wordId, index: p.index, wordText: p.wordText };
+    }
+  }, []);
 
   // Flashcard State
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -190,9 +262,22 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
         const letterSegments = cleanWord.split("").map((char) => {
           const lower = char.toLowerCase();
           const unaccented = lower.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          const romajiOptions: string[] = [];
+          if (char === " ") {
+            romajiOptions.push(" ");
+          } else if (char === "¡") {
+            romajiOptions.push("¡", "!", "i");
+          } else if (char === "¿") {
+            romajiOptions.push("¿", "?");
+          } else {
+            romajiOptions.push(lower);
+            if (lower !== unaccented) {
+              romajiOptions.push(unaccented);
+            }
+          }
           return {
             display: char,
-            romaji: char === " " ? [" "] : lower === unaccented ? [lower] : [lower, unaccented],
+            romaji: romajiOptions,
             displayRomaji: char,
           };
         });
@@ -272,9 +357,8 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
   useEffect(() => {
     reloadWords(currentLang);
-    setCurrentIndex(0);
-    setSelectedCategory("all");
-    setSelectedLevel("all");
+    setMistakesMap(getMistakes(currentLang));
+    setHistoryLogs(getReciteHistoryLogs(currentLang));
     setTypedChars([]);
     setRomajiBuffer("");
     setDictationSuccess(false);
@@ -283,8 +367,12 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   // Filtered Deck
   const activeDeck = useMemo(() => {
     return allWords.filter((w) => {
-      const matchCat = selectedCategory === "all" || w.category === selectedCategory;
-      const matchLevel = selectedLevel === "all" || w.level === selectedLevel;
+      // Mistake-only filter
+      if (isMistakesOnly) {
+        if (!mistakesMap[w.id]) return false;
+      }
+      const matchCat = isMistakesOnly ? true : selectedCategory === "all" || w.category === selectedCategory;
+      const matchLevel = isMistakesOnly ? true : selectedLevel === "all" || w.level === selectedLevel;
       const matchSearch =
         !searchQuery.trim() ||
         w.displayTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -292,13 +380,42 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
         w.meaning.toLowerCase().includes(searchQuery.toLowerCase());
       return matchCat && matchLevel && matchSearch;
     });
-  }, [allWords, selectedCategory, selectedLevel, searchQuery]);
+  }, [allWords, selectedCategory, selectedLevel, searchQuery, isMistakesOnly, mistakesMap]);
+
+  // Check pending restoration after activeDeck is ready
+  useEffect(() => {
+    if (pendingRestoreTargetRef.current && activeDeck.length > 0) {
+      const { wordId, index, wordText } = pendingRestoreTargetRef.current;
+      pendingRestoreTargetRef.current = null;
+      let targetIdx = 0;
+      if (wordId) {
+        const found = activeDeck.findIndex((w) => w.id === wordId);
+        if (found >= 0) targetIdx = found;
+        else if (typeof index === "number" && index >= 0) {
+          targetIdx = Math.min(index, activeDeck.length - 1);
+        }
+      } else if (typeof index === "number" && index >= 0) {
+        targetIdx = Math.min(index, activeDeck.length - 1);
+      }
+
+      if (targetIdx >= 0 && activeDeck[targetIdx]) {
+        setCurrentIndex(targetIdx);
+        if (targetIdx > 0 || wordText) {
+          setRestoredBanner({
+            wordTitle: activeDeck[targetIdx].displayTitle,
+            index: targetIdx,
+            total: activeDeck.length,
+          });
+        }
+      }
+    }
+  }, [activeDeck]);
 
   const currentWord: UnifiedReciteWord | undefined = activeDeck[currentIndex] || activeDeck[0];
 
   // Target blocks for typewriter grid
   const targetChars = useMemo(() => {
-    if (!currentWord) return [];
+    if (!currentWord || !currentWord.segments) return [];
     return currentWord.segments.map((s) => s.display);
   }, [currentWord]);
 
@@ -353,7 +470,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       setRomajiBuffer("");
 
       // Auto-advance inverted punctuation (¡, ¿) if word starts with it in Spanish
-      const first = currentWord.segments[0]?.display;
+      const first = currentWord?.segments?.[0]?.display;
       if (first === "¡" || first === "¿") {
         setTypedChars([first]);
       } else {
@@ -374,6 +491,78 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       }, 100);
     }
   }, [currentIndex, activeTab, selectedCategory, currentWord?.id]);
+
+  // Save recite progress whenever word or position changes
+  useEffect(() => {
+    if (!currentWord) return;
+    saveReciteProgress({
+      lang: currentLang,
+      wordId: currentWord.id,
+      wordText: currentWord.displayTitle,
+      index: currentIndex,
+      total: activeDeck.length,
+      category: selectedCategory,
+      level: selectedLevel,
+      tab: activeTab,
+      timestamp: Date.now(),
+    });
+  }, [currentIndex, currentWord?.id, activeTab, selectedCategory, selectedLevel, currentLang, activeDeck.length]);
+
+  const handleToggleMistake = (word?: UnifiedReciteWord) => {
+    const target = word || currentWord;
+    if (!target) return;
+    if (mistakesMap[target.id]) {
+      const next = removeMistake(currentLang, target.id);
+      setMistakesMap(next);
+      audioSynth.playTypewriterBell();
+    } else {
+      const next = addMistake(currentLang, target.id, target.displayTitle, target.meaning);
+      setMistakesMap(next);
+      audioSynth.playTyping({ volume: 0.9 });
+    }
+    setHistoryLogs(getReciteHistoryLogs(currentLang));
+  };
+
+  const handleResolveMistake = (wordId: string) => {
+    const next = removeMistake(currentLang, wordId);
+    setMistakesMap(next);
+    audioSynth.playFanfare();
+    setHistoryLogs(getReciteHistoryLogs(currentLang));
+  };
+
+  const handleClearAllMistakes = () => {
+    if (confirm(`确定清空当前${currentLang === "es" ? "西语" : currentLang === "en" ? "英语" : "日语"}错题本吗？`)) {
+      clearMistakes(currentLang);
+      setMistakesMap({});
+      setIsMistakesOnly(false);
+      audioSynth.playCardSlide();
+      setHistoryLogs(getReciteHistoryLogs(currentLang));
+    }
+  };
+
+  const handleSwitchLanguage = (lang: ReciteLanguage) => {
+    if (lang === currentLang) return;
+    setCurrentLang(lang);
+    try {
+      localStorage.setItem("recite_last_lang", lang);
+    } catch (_) {}
+    setMistakesMap(getMistakes(lang));
+    setIsMistakesOnly(false);
+    setRestoredBanner(null);
+
+    const savedP = getReciteProgress(lang);
+    if (savedP) {
+      setSelectedCategory(savedP.category || "all");
+      setSelectedLevel(savedP.level || "all");
+      if (savedP.tab) setActiveTab(savedP.tab);
+      pendingRestoreTargetRef.current = { wordId: savedP.wordId, index: savedP.index, wordText: savedP.wordText };
+    } else {
+      setSelectedCategory("all");
+      setSelectedLevel("all");
+      setCurrentIndex(0);
+    }
+    audioSynth.playCardSlide();
+  };
 
   // Statistics
   const stats = useMemo(() => {
@@ -412,12 +601,20 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
     if (status === "mastered") {
       audioSynth.playFanfare();
       setSessionStreak((prev) => prev + 1);
+      recordReciteAction(currentLang, currentWord.id, currentWord.displayTitle, "mastered", currentWord.meaning);
     } else if (status === "familiar") {
       audioSynth.playTypewriterBell();
+      recordReciteAction(currentLang, currentWord.id, currentWord.displayTitle, "familiar", currentWord.meaning);
     } else {
       audioSynth.playTyping({ volume: 0.8 });
       setSessionStreak(0);
+      // Auto record as mistake
+      const nextMistakes = addMistake(currentLang, currentWord.id, currentWord.displayTitle, currentWord.meaning);
+      setMistakesMap(nextMistakes);
+      recordReciteAction(currentLang, currentWord.id, currentWord.displayTitle, "learning", currentWord.meaning);
     }
+
+    setHistoryLogs(getReciteHistoryLogs(currentLang));
 
     // Advance to next word
     if (activeDeck.length > 1) {
@@ -448,6 +645,8 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
         updateSpanishWordMastery(currentWord.id, "mastered");
       }
       setSessionStreak((prev) => prev + 1);
+      recordReciteAction(currentLang, currentWord.id, currentWord.displayTitle, "dictation_pass", currentWord.meaning);
+      setHistoryLogs(getReciteHistoryLogs(currentLang));
 
       // Pronounce completed word and advance ONLY after pronunciation completes!
       pronounceCurrentWord(() => {
@@ -512,6 +711,11 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
         audioSynth.playError();
         setShakeIndex(currIdx);
         setTimeout(() => setShakeIndex(null), 400);
+        if (currentWord) {
+          const nextMistakes = addMistake(currentLang, currentWord.id, currentWord.displayTitle, currentWord.meaning, charLower);
+          setMistakesMap(nextMistakes);
+          setHistoryLogs(getReciteHistoryLogs(currentLang));
+        }
       }
       return;
     }
@@ -549,6 +753,11 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       audioSynth.playError();
       setShakeIndex(currIdx);
       setTimeout(() => setShakeIndex(null), 400);
+      if (currentWord) {
+        const nextMistakes = addMistake(currentLang, currentWord.id, currentWord.displayTitle, currentWord.meaning, inputChar);
+        setMistakesMap(nextMistakes);
+        setHistoryLogs(getReciteHistoryLogs(currentLang));
+      }
     }
   };
 
@@ -633,6 +842,8 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       if (currentLang === "es") {
         updateSpanishWordMastery(currentWord.id, "mastered");
       }
+      recordReciteAction(currentLang, currentWord.id, currentWord.displayTitle, "dictation_pass", currentWord.meaning);
+      setHistoryLogs(getReciteHistoryLogs(currentLang));
 
       pronounceCurrentWord(() => {
         const pauseDelay = Math.max(120, Math.round(180 / Math.max(0.8, audioSynth.getSpeechRate())));
@@ -646,6 +857,9 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       setDictationError(true);
       audioSynth.playError();
       setTimeout(() => setDictationError(false), 800);
+      const nextMistakes = addMistake(currentLang, currentWord.id, currentWord.displayTitle, currentWord.meaning, inputVal);
+      setMistakesMap(nextMistakes);
+      setHistoryLogs(getReciteHistoryLogs(currentLang));
     }
   };
 
@@ -684,10 +898,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
           <div className="flex items-center bg-stone-200/80 p-1 rounded-2xl border border-stone-300/80 shadow-inner">
             <button
               type="button"
-              onClick={() => {
-                setCurrentLang("ja");
-                audioSynth.playCardSlide();
-              }}
+              onClick={() => handleSwitchLanguage("ja")}
               className={`px-3 py-1.5 rounded-xl text-xs font-serif font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 currentLang === "ja"
                   ? "bg-red-700 text-stone-50 shadow-xs font-black"
@@ -700,10 +911,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
             <button
               type="button"
-              onClick={() => {
-                setCurrentLang("en");
-                audioSynth.playCardSlide();
-              }}
+              onClick={() => handleSwitchLanguage("en")}
               className={`px-3 py-1.5 rounded-xl text-xs font-serif font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 currentLang === "en"
                   ? "bg-stone-900 text-stone-50 shadow-xs font-black"
@@ -716,10 +924,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
             <button
               type="button"
-              onClick={() => {
-                setCurrentLang("es");
-                audioSynth.playCardSlide();
-              }}
+              onClick={() => handleSwitchLanguage("es")}
               className={`px-3 py-1.5 rounded-xl text-xs font-serif font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 currentLang === "es"
                   ? "bg-amber-500 text-stone-950 shadow-xs font-black"
@@ -731,6 +936,87 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Restored Learning Progress Notification Banner */}
+        {restoredBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="bg-amber-50 border border-amber-300/80 rounded-2xl p-3 px-4 flex flex-wrap items-center justify-between gap-3 text-xs font-serif shadow-2xs"
+          >
+            <div className="flex items-center gap-2 text-stone-800">
+              <span className="text-base">📍</span>
+              <span>
+                已自动恢复上次学习进度：第 <strong>{restoredBanner.index + 1}</strong> / {restoredBanner.total} 词 · 「<strong>{restoredBanner.wordTitle}</strong>」
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentIndex(0);
+                  setRestoredBanner(null);
+                  audioSynth.playCardSlide();
+                }}
+                className="px-2.5 py-1 rounded-lg bg-white border border-stone-300 hover:bg-stone-100 text-stone-800 font-bold text-[11px] transition-all cursor-pointer shadow-2xs active:scale-95"
+              >
+                从头学起 (第1词)
+              </button>
+              <button
+                type="button"
+                onClick={() => setRestoredBanner(null)}
+                className="p-1 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
+                title="关闭提示"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Dedicated Mistakes Review Banner */}
+        {isMistakesOnly && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-rose-50 border-2 border-rose-300 rounded-2xl p-3.5 px-4 flex flex-wrap items-center justify-between gap-3 text-xs font-serif shadow-xs"
+          >
+            <div className="flex items-center gap-2.5 text-rose-900">
+              <span className="text-lg">📕</span>
+              <div>
+                <span className="font-black text-sm">错题集攻克专练中</span>
+                <p className="text-[11px] text-rose-700 mt-0.5">
+                  已汇集 <strong>{Object.keys(mistakesMap).length}</strong> 个生词。在背诵或默写攻克后，可随时点击「消灭移出」从错题本清除。
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {Object.keys(mistakesMap).length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllMistakes}
+                  className="px-2.5 py-1 rounded-lg bg-white border border-rose-200 hover:bg-rose-100 text-rose-700 font-bold text-[11px] transition-all cursor-pointer shadow-2xs"
+                  title="清空当前语言的所有错题"
+                >
+                  清空错题本
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMistakesOnly(false);
+                  setCurrentIndex(0);
+                  audioSynth.playCardSlide();
+                }}
+                className="px-3 py-1 rounded-lg bg-rose-700 hover:bg-rose-600 text-white font-bold text-[11px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
+              >
+                <span>✕</span>
+                <span>退出错题专练</span>
+              </button>
+            </div>
+          </motion.div>
+        )}
 
         {/* Mode Navigation Tabs & Action Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -814,7 +1100,11 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  const trainingItems = allWords.map((w) => ({
+                  const source = activeDeck.length > 0 ? activeDeck : allWords;
+                  // Take up to 20 words starting from current word for a focused typing session
+                  const batch = source.slice(currentIndex, currentIndex + 20);
+                  const selectedBatch = batch.length > 0 ? batch : source.slice(0, 20);
+                  const trainingItems = selectedBatch.map((w) => ({
                     id: w.id,
                     kanji: w.displayTitle,
                     kanaStr: w.kanaStr || w.displayTitle,
@@ -826,14 +1116,17 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                     glowColor: "rgba(245, 158, 11, 0.25)",
                     borderColor: "border-amber-400",
                     bgGradient: "from-amber-50 to-orange-100",
-                    segments: w.segments.map((s) => ({
+                    segments: (w.segments || []).map((s) => ({
                       kana: s.display,
-                      romaji: s.romaji,
-                      displayRomaji: s.displayRomaji || s.romaji[0],
+                      romaji: s.romaji && s.romaji.length > 0 ? s.romaji : [s.display.toLowerCase()],
+                      displayRomaji: s.displayRomaji || (s.romaji && s.romaji[0]) || s.display,
                     })),
                     lang: w.lang,
                   }));
-                  onStartTraining(trainingItems, 0);
+                  if (trainingItems.length > 0) {
+                    // 3 minutes structured typing session
+                    onStartTraining(trainingItems, 3 * 60 * 1000);
+                  }
                 }}
                 className="px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-50 text-xs font-serif font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-95"
                 title="开启全屏活字打字机联训"
@@ -847,13 +1140,13 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
         {/* Stats & Streak Banner */}
         <div className="bg-white rounded-2xl border border-stone-200/90 p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4 text-xs font-mono">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-mono">
             <div className="flex items-center gap-1.5 text-amber-600 font-black">
               <Flame className="w-4 h-4 fill-current" />
               <span>连续熟练 {sessionStreak} 词</span>
             </div>
 
-            <span className="text-stone-300">|</span>
+            <span className="text-stone-300 hidden sm:inline">|</span>
 
             <div className="flex items-center gap-1 text-emerald-600 font-bold">
               <span>🟢 已牢记 {stats.mastered}</span>
@@ -866,22 +1159,60 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
             <div className="flex items-center gap-1 text-rose-600 font-bold">
               <span>🔴 待复习 {stats.learning}</span>
             </div>
+
+            {/* Clickable Mistake Notebook Filter */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsMistakesOnly((prev) => !prev);
+                setCurrentIndex(0);
+                audioSynth.playCardSlide();
+              }}
+              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                isMistakesOnly
+                  ? "bg-rose-700 text-white shadow-xs font-black ring-2 ring-rose-400/50"
+                  : Object.keys(mistakesMap).length > 0
+                  ? "bg-rose-50 text-rose-800 border border-rose-300 hover:bg-rose-100"
+                  : "bg-stone-100 text-stone-400 border border-stone-200 hover:bg-stone-200"
+              }`}
+              title={isMistakesOnly ? "退出错题本模式，回到全词库" : "进入错题本，专练做错/生疏的生词"}
+            >
+              <span>📕 错题本</span>
+              <span className={`px-1.5 py-0.2 rounded font-mono text-[11px] ${isMistakesOnly ? "bg-white/25 text-white" : "bg-rose-200 text-rose-900"}`}>
+                {Object.keys(mistakesMap).length}
+              </span>
+              {isMistakesOnly && <span className="text-[10px] ml-0.5">✕</span>}
+            </button>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="text-right">
+            {/* Learning History Footprints Button */}
+            <button
+              type="button"
+              onClick={() => setShowHistoryModal(true)}
+              className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-700 text-xs font-serif font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-95"
+              title="查看学习历史足迹与进度断点"
+            >
+              <Clock className="w-3.5 h-3.5 text-stone-500" />
+              <span>学习足迹</span>
+            </button>
+
+            <div className="text-right border-l border-stone-200 pl-3">
               <div className="text-[10px] text-stone-400 font-mono">总收录</div>
               <div className="text-sm font-black text-stone-800">{stats.total} 词</div>
             </div>
           </div>
         </div>
 
-        {/* SIELE Level Filter (Spanish Mode) */}
+        {/* CEFR Level Filter (Spanish Mode) */}
         {currentLang === "es" && (
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
-            <span className="text-[11px] font-bold text-stone-500 shrink-0 font-serif mr-1">SIELE 考级分阶:</span>
+            <span className="text-[11px] font-bold text-stone-500 shrink-0 font-serif mr-1 flex items-center gap-1">
+              <span>🎓</span>
+              <span>CEFR 西语考级分阶:</span>
+            </span>
             {[
-              { id: "all", label: "全部 2800 词", badge: "A1-B2" },
+              { id: "all", label: "全部核心词", badge: "A1-B2" },
               { id: "A1", label: "A1 起步必背", badge: "550词" },
               { id: "A2", label: "A2 初级进阶", badge: "750词" },
               { id: "B1", label: "B1 中级提高", badge: "850词" },
@@ -916,6 +1247,26 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
         {/* Category Pills Filter */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+          {/* Mistake Collection Pill */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsMistakesOnly((prev) => !prev);
+              setCurrentIndex(0);
+              audioSynth.playCardSlide();
+            }}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1.5 ${
+              isMistakesOnly
+                ? "bg-rose-700 text-white shadow-xs font-black ring-2 ring-rose-400"
+                : Object.keys(mistakesMap).length > 0
+                ? "bg-rose-50 border border-rose-300 text-rose-800 hover:bg-rose-100"
+                : "bg-white border border-stone-200 text-stone-400 hover:bg-stone-50"
+            }`}
+          >
+            <span>📕</span>
+            <span>错题集专练</span>
+            <span className="text-[10px] font-mono opacity-80">({Object.keys(mistakesMap).length})</span>
+          </button>
           {categories.map((cat) => {
             const count =
               cat.id === "all"
@@ -957,13 +1308,38 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                   >
                     {/* Header bar inside card */}
                     <div className="w-full flex items-center justify-between text-xs font-mono">
-                      <span className="px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-900 font-bold">
-                        {currentWord.categoryName} {currentWord.level ? `・ ${currentWord.level}` : ""}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-900 font-bold">
+                          {currentWord.categoryName} {currentWord.level ? `・ ${currentWord.level}` : ""}
+                        </span>
+                        {mistakesMap[currentWord.id] && (
+                          <span className="px-2 py-0.5 rounded-full bg-rose-100 border border-rose-300 text-rose-800 text-[10px] font-bold flex items-center gap-1">
+                            <span>⚠️ 错题</span>
+                            <span>({mistakesMap[currentWord.id].mistakeCount}次)</span>
+                          </span>
+                        )}
+                      </div>
 
-                      <span className="text-stone-400">
-                        {currentIndex + 1} / {activeDeck.length}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleMistake(currentWord);
+                          }}
+                          className={`px-2 py-1 rounded-lg text-[11px] font-sans font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                            mistakesMap[currentWord.id]
+                              ? "bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300"
+                              : "bg-stone-100 hover:bg-stone-200 text-stone-600 border border-stone-200"
+                          }`}
+                          title={mistakesMap[currentWord.id] ? "已在错题本，点击移出" : "记入错题本"}
+                        >
+                          <span>{mistakesMap[currentWord.id] ? "📕 移出错题" : "🔖 记入错题"}</span>
+                        </button>
+                        <span className="text-stone-400">
+                          {currentIndex + 1} / {activeDeck.length}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Word Display & Pronunciation */}
@@ -1201,6 +1577,24 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                       title="切换逐字活字格与经典整行输入框"
                     >
                       {useTypewriterGrid ? "⌨️ 活字格" : "📝 整行输入"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleMistake(currentWord)}
+                      className={`px-2 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer flex items-center gap-1 ${
+                        mistakesMap[currentWord.id]
+                          ? "bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 font-bold"
+                          : "bg-stone-100 hover:bg-stone-200 text-stone-600 border border-stone-200"
+                      }`}
+                      title={mistakesMap[currentWord.id] ? "已在错题本，点击移出" : "记入错题本"}
+                    >
+                      <span>{mistakesMap[currentWord.id] ? "📕 移出错题" : "🔖 记入错题"}</span>
+                      {mistakesMap[currentWord.id] && (
+                        <span className="text-[10px] bg-rose-200 text-rose-900 px-1 rounded">
+                          {mistakesMap[currentWord.id].mistakeCount}次
+                        </span>
+                      )}
                     </button>
 
                     <div className="text-xs font-mono text-stone-400">
@@ -1640,18 +2034,86 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
         {activeTab === "library" && (
           <div className="space-y-6">
             {/* Search Bar & Header */}
-            <div className="relative">
-              <Search className="w-5 h-5 absolute left-3.5 top-3.5 text-stone-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentIndex(0);
-                }}
-                placeholder={`在 ${currentLang === "ja" ? "日语" : currentLang === "en" ? "英语" : "西语"} 词库中搜索词条、假名或中文释义...`}
-                className="w-full pl-11 pr-4 py-3 bg-white rounded-2xl border border-stone-300 focus:border-stone-900 outline-none text-sm font-serif shadow-xs"
-              />
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="w-5 h-5 absolute left-3.5 top-3.5 text-stone-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentIndex(0);
+                  }}
+                  placeholder={`在 ${currentLang === "ja" ? "日语" : currentLang === "en" ? "英语" : "西语"} 词库中搜索词条、假名或中文释义...`}
+                  className="w-full pl-11 pr-4 py-3 bg-white rounded-2xl border border-stone-300 focus:border-stone-900 outline-none text-sm font-serif shadow-xs"
+                />
+              </div>
+
+              {/* Library Quick Filter Tabs */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMistakesOnly(false);
+                      setCurrentIndex(0);
+                      audioSynth.playCardSlide();
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-serif font-bold transition-all cursor-pointer ${
+                      !isMistakesOnly
+                        ? "bg-stone-900 text-stone-50 shadow-xs"
+                        : "bg-white border border-stone-300 text-stone-700 hover:bg-stone-100"
+                    }`}
+                  >
+                    全部词库 ({allWords.length})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMistakesOnly(true);
+                      setCurrentIndex(0);
+                      audioSynth.playCardSlide();
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-serif font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      isMistakesOnly
+                        ? "bg-rose-700 text-white shadow-xs font-black ring-2 ring-rose-400"
+                        : Object.keys(mistakesMap).length > 0
+                        ? "bg-rose-50 border border-rose-300 text-rose-800 hover:bg-rose-100 font-bold"
+                        : "bg-white border border-stone-200 text-stone-400 hover:bg-stone-50"
+                    }`}
+                  >
+                    <span>📕 错题集</span>
+                    <span className="text-[10px] font-mono px-1 rounded bg-black/10">
+                      {Object.keys(mistakesMap).length}
+                    </span>
+                  </button>
+                </div>
+
+                {isMistakesOnly && Object.keys(mistakesMap).length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleClearAllMistakes}
+                      className="px-2.5 py-1 rounded-xl bg-white border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-serif font-bold transition-all cursor-pointer shadow-2xs"
+                    >
+                      清空错题本
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab("dictation");
+                        setCurrentIndex(0);
+                        audioSynth.playCardSlide();
+                      }}
+                      className="px-3 py-1 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs font-serif font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1"
+                    >
+                      <Keyboard className="w-3.5 h-3.5" />
+                      <span>默写错题</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Word Cards Grid */}
@@ -1659,16 +2121,29 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
               {activeDeck.map((w, idx) => {
                 const isMastered = masteryMap[w.id]?.status === "mastered";
                 const isFamiliar = masteryMap[w.id]?.status === "familiar";
+                const isMistake = Boolean(mistakesMap[w.id]);
+                const mistakeInfo = mistakesMap[w.id];
 
                 return (
                   <div
                     key={w.id}
-                    className="p-4 bg-white rounded-2xl border border-stone-200/90 shadow-xs hover:shadow-md transition-all space-y-2 relative group"
+                    className={`p-4 bg-white rounded-2xl border transition-all space-y-2.5 relative group shadow-xs hover:shadow-md ${
+                      isMistake
+                        ? "border-rose-300 bg-rose-50/20 ring-1 ring-rose-300/60"
+                        : "border-stone-200/90"
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <div className="text-base font-black font-serif text-stone-900">
-                          {w.displayTitle}
+                        <div className="flex items-center gap-2">
+                          <span className="text-base font-black font-serif text-stone-900">
+                            {w.displayTitle}
+                          </span>
+                          {isMistake && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                              错 {mistakeInfo?.mistakeCount || 1} 次
+                            </span>
+                          )}
                         </div>
                         {w.subTitle && (
                           <div className="text-xs font-mono text-stone-500">
@@ -1695,6 +2170,19 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                           <Volume2 className="w-4 h-4" />
                         </button>
 
+                        <button
+                          type="button"
+                          onClick={() => handleToggleMistake(w)}
+                          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                            isMistake
+                              ? "bg-rose-100 text-rose-800 hover:bg-rose-200"
+                              : "hover:bg-stone-100 text-stone-400 hover:text-stone-700"
+                          }`}
+                          title={isMistake ? "已在错题本，点击移出" : "加入错题本"}
+                        >
+                          <span className="text-xs">{isMistake ? "📕" : "🔖"}</span>
+                        </button>
+
                         {w.isCustom && currentLang === "es" && (
                           <button
                             type="button"
@@ -1717,19 +2205,41 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                       {w.meaning}
                     </p>
 
-                    <div className="pt-1 flex items-center justify-between text-[10px] font-mono text-stone-400">
-                      <span>{w.categoryName}</span>
-                      <span
-                        className={`font-bold ${
-                          isMastered
-                            ? "text-emerald-600"
-                            : isFamiliar
-                            ? "text-amber-600"
-                            : "text-stone-400"
-                        }`}
-                      >
-                        {isMastered ? "🟢 已牢记" : isFamiliar ? "🟡 略知" : "🔴 待复习"}
-                      </span>
+                    <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-[10px] font-mono">
+                      <div className="flex items-center gap-1.5 text-stone-400">
+                        <span>{w.categoryName}</span>
+                        {w.level && <span>· {w.level}</span>}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const foundIdx = activeDeck.findIndex((d) => d.id === w.id);
+                            if (foundIdx !== -1) {
+                              setCurrentIndex(foundIdx);
+                            }
+                            setActiveTab("dictation");
+                            audioSynth.playCardSlide();
+                          }}
+                          className="px-2 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-serif font-bold transition-all cursor-pointer"
+                          title="立刻默写此词"
+                        >
+                          去默写 ✍️
+                        </button>
+
+                        <span
+                          className={`font-bold ${
+                            isMastered
+                              ? "text-emerald-600"
+                              : isFamiliar
+                              ? "text-amber-600"
+                              : "text-stone-400"
+                          }`}
+                        >
+                          {isMastered ? "🟢 已牢记" : isFamiliar ? "🟡 略知" : "🔴 待复习"}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1738,15 +2248,186 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
             {activeDeck.length === 0 && (
               <div className="p-12 text-center bg-white rounded-3xl border border-stone-200 space-y-3">
-                <p className="text-stone-500 font-serif">未查找到匹配的词条</p>
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="px-3 py-1.5 rounded-xl bg-stone-100 text-stone-700 text-xs font-bold"
-                >
-                  清除搜索关键字
-                </button>
+                <p className="text-stone-500 font-serif">
+                  {isMistakesOnly ? "太棒了！当前错题本没有任何待攻克生词。" : "未查找到匹配的词条"}
+                </p>
+                {isMistakesOnly ? (
+                  <button
+                    onClick={() => {
+                      setIsMistakesOnly(false);
+                      setCurrentIndex(0);
+                      audioSynth.playCardSlide();
+                    }}
+                    className="px-4 py-2 rounded-xl bg-amber-500 text-stone-950 font-bold text-xs shadow-xs"
+                  >
+                    返回全量词库
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="px-3 py-1.5 rounded-xl bg-stone-100 text-stone-700 text-xs font-bold"
+                  >
+                    清除搜索关键字
+                  </button>
+                )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* LEARNING FOOTPRINTS & HISTORY MODAL */}
+        {showHistoryModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl border border-stone-300 max-w-xl w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🕒</span>
+                  <div>
+                    <h3 className="text-base font-serif font-black text-stone-900">
+                      学习足迹与历史记录
+                    </h3>
+                    <p className="text-xs text-stone-500 font-serif">
+                      当前语言：{currentLang === "es" ? "西班牙语" : currentLang === "en" ? "英语" : "日语"} · 自动持久化记忆断点
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowHistoryModal(false)}
+                  className="p-1.5 rounded-xl hover:bg-stone-100 text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
+                  title="关闭"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Progress summary card */}
+              <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-3 px-4 flex items-center justify-between text-xs font-serif">
+                <div className="space-y-0.5">
+                  <div className="text-stone-800 font-bold">
+                    当前进度断点：第 {currentIndex + 1} / {activeDeck.length} 词
+                  </div>
+                  <div className="text-stone-500 font-mono text-[11px]">
+                    正在学习：{currentWord ? `「${currentWord.displayTitle}」 (${currentWord.meaning})` : "无"}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentIndex(0);
+                    setShowHistoryModal(false);
+                    audioSynth.playCardSlide();
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-white border border-stone-300 hover:bg-stone-100 text-stone-800 text-[11px] font-bold shadow-2xs cursor-pointer"
+                >
+                  从头学起
+                </button>
+              </div>
+
+              {/* History Logs list */}
+              <div className="flex-1 overflow-y-auto pr-1 space-y-2 max-h-80 [scrollbar-width:thin]">
+                {historyLogs.length > 0 ? (
+                  historyLogs.map((log) => {
+                    const actionBadge =
+                      log.action === "dictation_pass"
+                        ? { label: "默写过关", color: "bg-emerald-100 text-emerald-800 border-emerald-300" }
+                        : log.action === "mastered"
+                        ? { label: "标为牢记", color: "bg-emerald-100 text-emerald-800 border-emerald-300" }
+                        : log.action === "familiar"
+                        ? { label: "标为略知", color: "bg-amber-100 text-amber-800 border-amber-300" }
+                        : log.action === "mistake_add"
+                        ? { label: "记录错题", color: "bg-rose-100 text-rose-800 border-rose-300" }
+                        : log.action === "mistake_resolve"
+                        ? { label: "消灭错题", color: "bg-purple-100 text-purple-800 border-purple-300" }
+                        : { label: "复习中", color: "bg-stone-100 text-stone-700 border-stone-300" };
+
+                    const timeStr = new Date(log.timestamp).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
+
+                    return (
+                      <div
+                        key={log.id}
+                        className="p-2.5 bg-stone-50 hover:bg-stone-100/80 rounded-xl border border-stone-200/80 flex items-center justify-between gap-3 text-xs transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${actionBadge.color}`}
+                          >
+                            {actionBadge.label}
+                          </span>
+                          <span className="font-bold text-stone-900 font-serif truncate">
+                            {log.wordText}
+                          </span>
+                          {log.meaning && (
+                            <span className="text-stone-500 text-[11px] truncate hidden sm:inline">
+                              {log.meaning}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[10px] font-mono text-stone-400">
+                            {timeStr}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const foundIdx = activeDeck.findIndex((d) => d.id === log.wordId || d.displayTitle === log.wordText);
+                              if (foundIdx !== -1) {
+                                setCurrentIndex(foundIdx);
+                              }
+                              setShowHistoryModal(false);
+                              audioSynth.playCardSlide();
+                            }}
+                            className="px-2 py-0.5 rounded bg-white hover:bg-stone-200 border border-stone-300 text-stone-700 text-[11px] font-serif font-bold transition-all cursor-pointer shadow-2xs"
+                            title="跳至该生词"
+                          >
+                            跳转 ⏩
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="py-10 text-center text-stone-400 font-serif space-y-1">
+                    <p>暂无历史足迹记录</p>
+                    <p className="text-[11px]">背诵翻卡或活字默写后将在此自动记录</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Actions */}
+              <div className="flex items-center justify-between border-t border-stone-200 pt-3 text-xs">
+                {historyLogs.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm("确定清空近期的学习历史足迹吗？")) {
+                        clearReciteHistoryLogs(currentLang);
+                        setHistoryLogs([]);
+                        audioSynth.playTypewriterBell();
+                      }
+                    }}
+                    className="text-stone-400 hover:text-rose-600 transition-colors cursor-pointer"
+                  >
+                    清空足迹记录
+                  </button>
+                ) : (
+                  <div />
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowHistoryModal(false)}
+                  className="px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-white font-serif font-bold transition-all cursor-pointer shadow-xs"
+                >
+                  确定
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

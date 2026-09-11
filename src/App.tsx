@@ -12,6 +12,7 @@ import { SpanishRecitePage } from "./components/SpanishRecitePage";
 import { AddWordModal } from "./components/AddWordModal";
 import { BatchImportModal } from "./components/BatchImportModal";
 import { OnlineTimer } from "./components/OnlineTimer";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { DictionaryItem } from "./data/dictionary";
 import { audioSynth } from "./utils/audio";
 import { recordPracticeBatch } from "./utils/srs";
@@ -29,7 +30,25 @@ export function toHanNumerals(num: number): string {
 }
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<ScreenState>("start");
+  const [currentPage, setCurrentPage] = useState<ScreenState>(() => {
+    try {
+      const saved = localStorage.getItem("fifty_sound_last_screen");
+      // Never auto-restore into transient "training" mode without loaded active cards
+      if (saved && ["start", "library", "spell_rush", "memory_match", "kana_training", "spanish_recite"].includes(saved)) {
+        return saved as ScreenState;
+      }
+    } catch (_) {}
+    return "start";
+  });
+
+  useEffect(() => {
+    try {
+      if (currentPage !== "training") {
+        localStorage.setItem("fifty_sound_last_screen", currentPage);
+      }
+    } catch (_) {}
+  }, [currentPage]);
+
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [collectedIds, setCollectedIds] = useState<string[]>([]);
   const [practiceTimes, setPracticeTimes] = useState<Record<string, number>>({});
@@ -701,7 +720,7 @@ export default function App() {
         <header className="bg-[#F3EFE3] border-b border-stone-300 sticky top-0 z-40 select-none transition-all duration-300">
           <div className="max-w-4xl mx-auto px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-1 sm:gap-2">
             <div 
-              onClick={() => { if (currentPage !== "training") { setCurrentPage("start"); setIsDrawerOpen(false); } }} 
+              onClick={() => { setCurrentPage("start"); setActiveCards([]); setIsDrawerOpen(false); }} 
               className="flex items-center gap-1.5 cursor-pointer shrink-0 font-serif font-black tracking-wider sm:tracking-widest text-stone-900 text-xs sm:text-sm md:text-base uppercase"
             >
               <span className="text-[#C4482A] font-bold">Katakata</span>
@@ -1219,7 +1238,7 @@ export default function App() {
             </motion.div>
           )}
 
-          {currentPage === "training" && activeCards.length > 0 && (
+          {currentPage === "training" && (
             <motion.div
               key="training"
               initial={{ opacity: 0, scale: 0.98 }}
@@ -1227,25 +1246,27 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.2 }}
             >
-              <TrainingPage
-                items={activeCards}
-                durationMs={activeDurationMs}
-                onFinished={handleTrainingFinished}
-                practiceMode={practiceMode}
-                onKeyStrike={(action) => {
-                  setLastAction(action);
-                  // Quick timeout reset to avoid double-triggers
-                  setTimeout(() => setLastAction(""), 120);
-                }}
-                onQuit={() => {
-                  setCurrentPage("start");
-                  setActiveCards([]);
-                }}
-                isEnglishMode={isEnglishMode}
-                isKatakanaMode={isKatakanaMode}
-                isFullscreen={isFullscreen}
-                onToggleFullscreen={toggleFullscreen}
-              />
+              <ErrorBoundary onReset={() => { setCurrentPage("start"); setActiveCards([]); }}>
+                <TrainingPage
+                  items={activeCards}
+                  durationMs={activeDurationMs}
+                  onFinished={handleTrainingFinished}
+                  practiceMode={practiceMode}
+                  onKeyStrike={(action) => {
+                    setLastAction(action);
+                    // Quick timeout reset to avoid double-triggers
+                    setTimeout(() => setLastAction(""), 120);
+                  }}
+                  onQuit={() => {
+                    setCurrentPage("start");
+                    setActiveCards([]);
+                  }}
+                  isEnglishMode={isEnglishMode}
+                  isKatakanaMode={isKatakanaMode}
+                  isFullscreen={isFullscreen}
+                  onToggleFullscreen={toggleFullscreen}
+                />
+              </ErrorBoundary>
             </motion.div>
           )}
 
@@ -1353,35 +1374,45 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.2 }}
             >
-              <SpanishRecitePage
-                onBack={() => setCurrentPage("start")}
-                initialLanguage={isEnglishMode ? "en" : "ja"}
-                onOpenAddModal={(lang) => {
-                  setAddWordDefaultLang(lang || (isEnglishMode ? "en" : "ja"));
-                  setIsAddWordModalOpen(true);
-                }}
-                onOpenBatchModal={(lang) => {
-                  setBatchModalLang(lang || (isEnglishMode ? "en" : "ja"));
-                  setIsBatchModalOpen(true);
-                }}
-                onStartTraining={(reciteItems) => {
-                  const targetLang = reciteItems[0]?.lang;
-                  if (targetLang === "en") {
-                    setIsEnglishMode(true);
-                    setIsKatakanaMode(false);
-                  } else if (targetLang === "es") {
-                    setIsEnglishMode(false);
-                    setIsKatakanaMode(false);
-                  } else {
-                    setIsEnglishMode(false);
-                    setIsKatakanaMode(false);
-                  }
-                  setActiveCards(reciteItems);
-                  setActiveDurationMs(0);
-                  setCurrentPage("training");
-                }}
-                refreshTrigger={spanishRefreshTrigger}
-              />
+              <ErrorBoundary onReset={() => setCurrentPage("start")}>
+                <SpanishRecitePage
+                  onBack={() => setCurrentPage("start")}
+                  initialLanguage={(() => {
+                    try {
+                      const saved = localStorage.getItem("recite_last_lang");
+                      if (saved === "es" || saved === "en" || saved === "ja") return saved;
+                    } catch (_) {}
+                    return isEnglishMode ? "en" : "es";
+                  })()}
+                  onOpenAddModal={(lang) => {
+                    setAddWordDefaultLang(lang || (isEnglishMode ? "en" : "ja"));
+                    setIsAddWordModalOpen(true);
+                  }}
+                  onOpenBatchModal={(lang) => {
+                    setBatchModalLang(lang || (isEnglishMode ? "en" : "ja"));
+                    setIsBatchModalOpen(true);
+                  }}
+                  onStartTraining={(reciteItems, durationMs) => {
+                    const targetLang = reciteItems[0]?.lang;
+                    if (targetLang === "en") {
+                      setIsEnglishMode(true);
+                      setIsKatakanaMode(false);
+                    } else if (targetLang === "es") {
+                      setIsEnglishMode(false);
+                      setIsKatakanaMode(false);
+                    } else {
+                      setIsEnglishMode(false);
+                      setIsKatakanaMode(false);
+                    }
+                    // Cap to maximum 30 items so training is focused and doesn't overload UI
+                    const boundedItems = reciteItems && reciteItems.length > 0 ? reciteItems.slice(0, 30) : [];
+                    setActiveCards(boundedItems);
+                    setActiveDurationMs(durationMs && durationMs > 0 ? durationMs : 3 * 60 * 1000);
+                    setCurrentPage("training");
+                  }}
+                  refreshTrigger={spanishRefreshTrigger}
+                />
+              </ErrorBoundary>
             </motion.div>
           )}
         </AnimatePresence>

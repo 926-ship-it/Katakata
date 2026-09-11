@@ -671,6 +671,7 @@ export function deleteCustomSpanishWord(id: string): void {
 }
 
 import { SIELE_2800_WORDS } from "./siele2800Data";
+import { OPEN_SPANISH_WORDS } from "./openSpanishData";
 
 export function getAllSpanishWords(): SpanishWord[] {
   const customs = getCustomSpanishWords();
@@ -678,6 +679,15 @@ export function getAllSpanishWords(): SpanishWord[] {
   const result: SpanishWord[] = [];
 
   for (const w of customs) {
+    const key = w.word.trim().toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(w);
+    }
+  }
+
+  // High-priority open practical vocabulary (conversational idioms, dining, travel, digital life)
+  for (const w of OPEN_SPANISH_WORDS) {
     const key = w.word.trim().toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
