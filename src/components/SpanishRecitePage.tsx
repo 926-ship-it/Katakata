@@ -623,6 +623,28 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
     }
   };
 
+  // Dedicated, safe auto-advance helper that cleanly resets dictation state and moves to next card
+  const advanceToNextWord = () => {
+    setIsPronouncing(false);
+    setDictationSuccess(false);
+    setDictationError(false);
+    setShakeIndex(null);
+    setRomajiBuffer("");
+    setTypedChars([]);
+    setDictationInput("");
+    if (activeDeck.length > 1) {
+      setCurrentIndex((prev) => (prev + 1) % activeDeck.length);
+      setIsFlipped(false);
+    } else {
+      const first = currentWord?.segments?.[0]?.display;
+      if (first === "¡" || first === "¿") {
+        setTypedChars([first]);
+      } else {
+        setTypedChars([]);
+      }
+    }
+  };
+
   // Completion callback: rings bell, speaks word in authentic native voice, advances on end!
   const checkCompletion = (newTyped: string[]) => {
     if (!currentWord) return;
@@ -648,14 +670,22 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       recordReciteAction(currentLang, currentWord.id, currentWord.displayTitle, "dictation_pass", currentWord.meaning);
       setHistoryLogs(getReciteHistoryLogs(currentLang));
 
-      // Pronounce completed word and advance ONLY after pronunciation completes!
+      // Dual-layer advance guarantee:
+      // 1. Audio onEnd plays and advances naturally with brief acoustic pause
+      // 2. Ironclad safety watchdog (1200ms) guarantees advancing so user is NEVER stalled
+      let advanced = false;
+      const doAdvance = () => {
+        if (advanced) return;
+        advanced = true;
+        advanceToNextWord();
+      };
+
+      const failsafeTimer = setTimeout(doAdvance, 1200);
+
       pronounceCurrentWord(() => {
-        const pauseDelay = Math.max(120, Math.round(180 / Math.max(0.8, audioSynth.getSpeechRate())));
-        setTimeout(() => {
-          if (activeDeck.length > 1) {
-            setCurrentIndex((prev) => (prev + 1) % activeDeck.length);
-          }
-        }, pauseDelay);
+        clearTimeout(failsafeTimer);
+        const pauseDelay = Math.max(80, Math.round(140 / Math.max(0.8, audioSynth.getSpeechRate())));
+        setTimeout(doAdvance, pauseDelay);
       });
     }
   };
@@ -783,11 +813,20 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
   // Physical keyboard listener
   useEffect(() => {
-    if (activeTab !== "dictation" || !useTypewriterGrid || !currentWord || dictationSuccess) return;
+    if (activeTab !== "dictation" || !useTypewriterGrid || !currentWord) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.altKey || e.metaKey) return;
       if (document.activeElement?.tagName === "INPUT" && document.activeElement !== hiddenInputRef.current) {
+        return;
+      }
+
+      // If already succeeded, any key (Enter, Space, ArrowRight, Tab, or next letter) immediately jumps to the next word!
+      if (dictationSuccess) {
+        if (e.key === "Enter" || e.key === " " || e.key === "ArrowRight" || e.key === "Tab" || e.key.length === 1) {
+          e.preventDefault();
+          advanceToNextWord();
+        }
         return;
       }
 
@@ -811,7 +850,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeTab, useTypewriterGrid, currentWord, typedChars, romajiBuffer, dictationSuccess, targetChars, currentLang]);
+  }, [activeTab, useTypewriterGrid, currentWord, typedChars, romajiBuffer, dictationSuccess, targetChars, currentLang, activeDeck.length]);
 
   // Classic fallback input check
   const handleCheckClassicDictation = (inputVal: string) => {
@@ -845,13 +884,20 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       recordReciteAction(currentLang, currentWord.id, currentWord.displayTitle, "dictation_pass", currentWord.meaning);
       setHistoryLogs(getReciteHistoryLogs(currentLang));
 
+      // Dual-layer advance guarantee
+      let advanced = false;
+      const doAdvance = () => {
+        if (advanced) return;
+        advanced = true;
+        advanceToNextWord();
+      };
+
+      const failsafeTimer = setTimeout(doAdvance, 1200);
+
       pronounceCurrentWord(() => {
-        const pauseDelay = Math.max(120, Math.round(180 / Math.max(0.8, audioSynth.getSpeechRate())));
-        setTimeout(() => {
-          if (activeDeck.length > 1) {
-            setCurrentIndex((prev) => (prev + 1) % activeDeck.length);
-          }
-        }, pauseDelay);
+        clearTimeout(failsafeTimer);
+        const pauseDelay = Math.max(80, Math.round(140 / Math.max(0.8, audioSynth.getSpeechRate())));
+        setTimeout(doAdvance, pauseDelay);
       });
     } else {
       setDictationError(true);
@@ -1971,10 +2017,17 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="p-3 bg-emerald-100/90 border border-emerald-300 rounded-2xl text-emerald-950 flex items-center justify-center gap-2 font-bold text-sm shadow-xs"
+                    onClick={advanceToNextWord}
+                    className="p-3 bg-emerald-100/90 border border-emerald-300 rounded-2xl text-emerald-950 flex items-center justify-between gap-2 font-bold text-sm shadow-xs cursor-pointer hover:bg-emerald-200/90 transition-colors select-none"
+                    title="点击立即前往下一词 (或按空格/回车)"
                   >
-                    <span>🎉</span>
-                    <span>拼写正确！朗读中，正在自动前往下一词...</span>
+                    <div className="flex items-center gap-2">
+                      <span>🎉</span>
+                      <span>拼写正确！朗读中，正在自动前往下一词...</span>
+                    </div>
+                    <span className="text-xs text-emerald-800 font-medium bg-white/80 px-2.5 py-1 rounded-lg border border-emerald-300/60 hover:bg-white transition-all">
+                      立即跳至下词 ➔
+                    </span>
                   </motion.div>
                 )}
 
@@ -1986,12 +2039,16 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                       setTypedChars(targetChars);
                       setDictationSuccess(true);
                       audioSynth.playTypewriterBell();
+                      let advanced = false;
+                      const doAdvance = () => {
+                        if (advanced) return;
+                        advanced = true;
+                        advanceToNextWord();
+                      };
+                      const failsafe = setTimeout(doAdvance, 900);
                       pronounceCurrentWord(() => {
-                        setTimeout(() => {
-                          if (activeDeck.length > 1) {
-                            setCurrentIndex((prev) => (prev + 1) % activeDeck.length);
-                          }
-                        }, 500);
+                        clearTimeout(failsafe);
+                        setTimeout(doAdvance, 180);
                       });
                     }}
                     className="px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold transition-all cursor-pointer"
@@ -2002,11 +2059,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      if (activeDeck.length > 1) {
-                        setCurrentIndex((prev) => (prev + 1) % activeDeck.length);
-                        setTypedChars([]);
-                        setRomajiBuffer("");
-                      }
+                      advanceToNextWord();
                     }}
                     className="px-4 py-2 rounded-xl border border-stone-300 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-all cursor-pointer"
                   >

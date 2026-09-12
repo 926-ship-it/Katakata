@@ -358,15 +358,18 @@ class RetroAudioSynth {
   playOnlineTTSAudio(
     text: string,
     langHint: "ja" | "es" | "en",
-    onEnd?: () => void
+    onEnd?: () => void,
+    fromSpeakFullWord: boolean = false
   ): boolean {
     if (this.isMuted || typeof window === "undefined") {
       if (onEnd) onEnd();
       return false;
     }
 
-    // Stop any existing speech first to avoid overlapping voices!
-    this.stopAllSpeech();
+    // Stop any existing speech first if not called internally by speakFullWord
+    if (!fromSpeakFullWord) {
+      this.stopAllSpeech();
+    }
     this.isWordSpeaking = true;
     const requestId = this.currentSpeechId;
 
@@ -401,7 +404,7 @@ class RetroAudioSynth {
       let triggered = false;
 
       const finish = () => {
-        if (!triggered && this.currentSpeechId === requestId) {
+        if (!triggered) {
           triggered = true;
           this.isWordSpeaking = false;
           this.activeOnlineAudio = null;
@@ -410,7 +413,7 @@ class RetroAudioSynth {
       };
 
       const tryNextSource = () => {
-        if (triggered || this.currentSpeechId !== requestId) return;
+        if (triggered) return;
 
         if (sourceIdx < sources.length) {
           const url = sources[sourceIdx++];
@@ -443,12 +446,12 @@ class RetroAudioSynth {
           audio.onended = onSourceEnd;
           audio.onerror = onSourceFail;
 
-          // Responsive 1400ms timeout per online audio source
+          // Responsive 1200ms timeout per online audio source
           timeoutHandle = setTimeout(() => {
             if (!sourceFinished) {
               onSourceFail();
             }
-          }, 1400);
+          }, 1200);
 
           const playPromise = audio.play();
           if (playPromise) {
@@ -732,7 +735,7 @@ class RetroAudioSynth {
             spokenLang = englishVoice.lang || "en-US";
           } else {
             // Immediately use authentic online human Spanish pronunciation!
-            this.playOnlineTTSAudio(text, "es", onEnd);
+            this.playOnlineTTSAudio(text, "es", onEnd, true);
             return;
           }
         }
@@ -765,7 +768,7 @@ class RetroAudioSynth {
 
         if (!targetVoice) {
           // No English voice: immediately use authentic English online audio!
-          this.playOnlineTTSAudio(text, "en", onEnd);
+          this.playOnlineTTSAudio(text, "en", onEnd, true);
           return;
         }
       } else {
@@ -820,7 +823,7 @@ class RetroAudioSynth {
         // If the client system lacks a genuine Japanese voice, NEVER read in Chinese!
         // Immediately trigger authentic native Japanese online audio!
         if (!targetVoice) {
-          this.playOnlineTTSAudio(text, "ja", onEnd);
+          this.playOnlineTTSAudio(text, "ja", onEnd, true);
           return;
         }
       }
@@ -829,7 +832,7 @@ class RetroAudioSynth {
 
       // Safeguard: NEVER allow a Chinese voice to speak non-Chinese words!
       if (targetVoice && (targetVoice.lang.toLowerCase().startsWith("zh") || targetVoice.name.toLowerCase().includes("chinese"))) {
-        this.playOnlineTTSAudio(text, langCategory, onEnd);
+        this.playOnlineTTSAudio(text, langCategory, onEnd, true);
         return;
       }
 
@@ -842,10 +845,13 @@ class RetroAudioSynth {
       let safetyWatchdog: any = null;
 
       const triggerCompletion = () => {
-        if (hasTriggered || this.currentSpeechId !== requestId) return;
+        if (hasTriggered) return;
         hasTriggered = true;
         this.isWordSpeaking = false;
-        if (safetyWatchdog) clearTimeout(safetyWatchdog);
+        if (safetyWatchdog) {
+          clearTimeout(safetyWatchdog);
+          safetyWatchdog = null;
+        }
         this.activeFullWordUtterance = null;
         if (typeof window !== "undefined") {
           (window as any).__katakata_utterance = null;
@@ -855,9 +861,9 @@ class RetroAudioSynth {
         }
       };
 
-      // Safety watchdog: ensure callback is always reached even if speech is slow
+      // Safety watchdog: ensure callback is always reached promptly without stalling the UI
       const cleanLen = spokenText.length;
-      const maxEstimatedMs = Math.min(8000, Math.max(2000, (cleanLen * 400 + 1200) / this.speechRate));
+      const maxEstimatedMs = Math.min(2200, Math.max(750, (cleanLen * 140 + 350) / this.speechRate));
       safetyWatchdog = setTimeout(() => {
         triggerCompletion();
       }, maxEstimatedMs);
@@ -921,8 +927,8 @@ class RetroAudioSynth {
             }
 
             // If native speech fails with a real error, gracefully fall back to online audio player
-            if (!hasStarted && !hasTriggered && this.currentSpeechId === requestId) {
-              this.playOnlineTTSAudio(text, langCategory, triggerCompletion);
+            if (!hasStarted && !hasTriggered) {
+              this.playOnlineTTSAudio(text, langCategory, triggerCompletion, true);
             } else {
               triggerCompletion();
             }
@@ -942,20 +948,20 @@ class RetroAudioSynth {
             }
           } catch (_) {}
 
-          // Watchdog: If native speech does not fire 'onstart' within 420ms, it is stalled/hung.
+          // Watchdog: If native speech does not fire 'onstart' within 400ms, it is stalled/hung.
           // Switch cleanly to online audio so the user never experiences awkward silence!
           setTimeout(() => {
-            if (!hasStarted && !hasTriggered && this.currentSpeechId === requestId) {
+            if (!hasStarted && !hasTriggered) {
               try {
                 window.speechSynthesis.cancel();
               } catch (_) {}
-              this.playOnlineTTSAudio(text, langCategory, triggerCompletion);
+              this.playOnlineTTSAudio(text, langCategory, triggerCompletion, true);
             }
-          }, 420);
+          }, 400);
         } catch (err) {
           console.warn("Exception during native speak:", err);
-          if (!hasStarted && !hasTriggered && this.currentSpeechId === requestId) {
-            this.playOnlineTTSAudio(text, langCategory, triggerCompletion);
+          if (!hasStarted && !hasTriggered) {
+            this.playOnlineTTSAudio(text, langCategory, triggerCompletion, true);
           } else {
             triggerCompletion();
           }
@@ -970,7 +976,7 @@ class RetroAudioSynth {
     } catch (err) {
       console.warn("Full word speech synthesis failed:", err);
       const langCategory: "ja" | "es" | "en" = langHint === "es" ? "es" : langHint === "en" ? "en" : "ja";
-      this.playOnlineTTSAudio(text, langCategory, onEnd);
+      this.playOnlineTTSAudio(text, langCategory, onEnd, true);
     }
   }
 

@@ -311,25 +311,33 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         const langHint: "ja" | "es" | "en" = (item as any).lang || (isEnglishMode ? "en" : "ja");
 
         // Speak full word clearly with automatic language detection, kanji hints, and multi-source fallback
+        let roundAdvanced = false;
+        const doAdvanceRound = () => {
+          if (roundAdvanced) return;
+          roundAdvanced = true;
+          setIsPronouncing(false);
+          setCompletedRounds((prev) => prev + 1);
+          setSlideDirection(1);
+          audioSynth.playCarriageReturn();
+          setCurrentItemIdx((prevIdx) => (prevIdx + 1) % items.length);
+          currentSegmentIdxRef.current = 0;
+          romajiProgressRef.current = "";
+          completedSegmentsCountRef.current = 0;
+          lastProcessedKeyRef.current = null;
+          setCurrentSegmentIdx(0);
+          setRomajiProgress("");
+          setWordCorrect(false);
+        };
+
+        const roundFailsafe = setTimeout(doAdvanceRound, 1200);
+
         audioSynth.speakFullWord(
           item.kanaStr || item.kanji,
           () => {
+            clearTimeout(roundFailsafe);
             // Reading finished! Crisp micro-pause for natural acoustics, then advance to next word
             const advancePauseMs = Math.max(40, Math.round(70 / Math.max(0.8, audioSynth.getSpeechRate())));
-            setTimeout(() => {
-              setIsPronouncing(false);
-              setCompletedRounds(prev => prev + 1);
-              setSlideDirection(1);
-              audioSynth.playCarriageReturn();
-              setCurrentItemIdx((prevIdx) => (prevIdx + 1) % items.length);
-              currentSegmentIdxRef.current = 0;
-              romajiProgressRef.current = "";
-              completedSegmentsCountRef.current = 0;
-              lastProcessedKeyRef.current = null;
-              setCurrentSegmentIdx(0);
-              setRomajiProgress("");
-              setWordCorrect(false);
-            }, advancePauseMs);
+            setTimeout(doAdvanceRound, advancePauseMs);
           },
           item.kanji,
           romajiHint,
