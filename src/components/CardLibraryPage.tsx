@@ -857,7 +857,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                       audioSynth.speakJapanese(item.kanaStr);
                     }
                   }}
-                  className={`p-3 sm:p-3.5 rounded-xl border-2 flex flex-col justify-between h-56 transition-all relative overflow-hidden select-none ${
+                  className={`p-3 sm:p-3.5 rounded-xl border-2 flex flex-col justify-between min-h-[15rem] transition-all relative overflow-hidden select-none ${
                     isCollected ? "cursor-pointer shadow-sm" : "bg-stone-100/50 border-stone-200 opacity-60"
                   } ${cardBgClass}`}
                   style={{
@@ -943,6 +943,9 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                         </div>
                         <p className="text-[10px] font-mono text-stone-500 font-bold italic leading-none">
                           {isEnglishMode ? (item.phonetic || getEnglishPhonetic(item.kanji)) : `(${item.kanaStr})`}
+                        </p>
+                        <p className="text-[10px] text-stone-700 font-sans line-clamp-2 px-1 text-center mt-1 leading-snug">
+                          {item.meaning}
                         </p>
                       </>
                     ) : (
@@ -1411,7 +1414,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                       : "border-transparent text-stone-400 hover:text-stone-700"
                   }`}
                 >
-                  {isEnglishMode ? "📚 词汇释义" : "🔮 文化释义"}
+                  {isEnglishMode ? "📚 词汇释义与词源" : "📖 词汇释义与故事"}
                 </button>
                 <button
                   onClick={() => {
@@ -1458,8 +1461,10 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                 <>
                   {/* Explanatory metadata */}
                   <div className="space-y-2 bg-white p-4 rounded-xl border border-stone-200">
-                    <div className="text-xs text-stone-400 font-mono">STANDARD LEXICON MEANING</div>
-                    <p className="text-xs leading-relaxed text-stone-600 font-sans">
+                    <div className="text-xs font-bold text-amber-900 font-serif flex items-center gap-1.5">
+                      <span>📖 标准词意与释义 (STANDARD LEXICON MEANING)</span>
+                    </div>
+                    <p className="text-xs leading-relaxed text-stone-800 font-sans bg-amber-50/50 p-2.5 rounded-lg border border-amber-200/60">
                       {selectedCard.meaning}
                     </p>
                     <div className="pt-2 border-t border-stone-100 flex justify-between text-[11px] font-mono text-stone-500">

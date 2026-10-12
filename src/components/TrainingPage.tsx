@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Keyboard, ArrowLeft, RefreshCw, Volume2, VolumeX, AlertTriangle, Play, Pause, AlertCircle, HelpCircle, ChevronLeft, ChevronRight, PenTool, Maximize2, Minimize2, Zap } from "lucide-react";
+import { Keyboard, ArrowLeft, RefreshCw, Volume2, VolumeX, AlertTriangle, Play, Pause, AlertCircle, HelpCircle, ChevronLeft, ChevronRight, PenTool, Maximize2, Minimize2, Zap, BookOpen } from "lucide-react";
 import { DictionaryItem } from "../data/dictionary";
 import { TracingKana } from "./TracingKana";
 import { audioSynth, TypingSoundStyle } from "../utils/audio";
@@ -51,6 +51,13 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   const [timerFinished, setTimerFinished] = useState<boolean>(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState<boolean>(false);
   const [showPhonetic, setShowPhonetic] = useState<boolean>(true);
+  const [showMeaning, setShowMeaning] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("fifty_sound_show_meaning") !== "false";
+    } catch {
+      return true;
+    }
+  });
   const hasSavedSessionLogRef = useRef<boolean>(false);
   const advanceRoundRef = useRef<(() => void) | null>(null);
 
@@ -633,6 +640,27 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
             </button>
           )}
 
+          {/* Word Meaning toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowMeaning(prev => {
+                const next = !prev;
+                try { localStorage.setItem("fifty_sound_show_meaning", String(next)); } catch (_) {}
+                return next;
+              });
+            }}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95 ${
+              showMeaning
+                ? "border-amber-400 bg-amber-50 text-amber-900"
+                : "border-stone-300 bg-white text-stone-500 hover:bg-stone-50"
+            }`}
+            title={showMeaning ? "点击隐藏词意显示" : "点击开启词意显示"}
+          >
+            <BookOpen className="w-3.5 h-3.5 text-amber-700" />
+            <span>{showMeaning ? "词意: 显" : "词意: 隐"}</span>
+          </button>
+
           {/* Quick Speech Rate Cycler */}
           <button
             type="button"
@@ -838,6 +866,21 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     </button>
                   </div>
 
+                  {/* Target Word Main Title Display */}
+                  <div className="mt-1 flex items-baseline justify-center gap-2 flex-wrap">
+                    <span 
+                      className="text-2xl sm:text-3xl md:text-4xl font-black text-stone-900 font-serif tracking-wide drop-shadow-2xs select-none"
+                      style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
+                    >
+                      {item.kanji}
+                    </span>
+                    {!isEnglishMode && item.kanaStr && item.kanaStr !== item.kanji && (
+                      <span className="text-sm sm:text-base font-serif font-bold text-amber-800/90 select-none">
+                        ({item.kanaStr})
+                      </span>
+                    )}
+                  </div>
+
                   {/* English Mode Phonetic Symbol (IPA) Badge */}
                   {isEnglishMode && showPhonetic && (item.phonetic || getEnglishPhonetic(item.kanji)) && (
                     <div className="mt-1 flex items-center justify-center gap-2 select-none">
@@ -859,9 +902,18 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     </div>
                   )}
 
-                  <h3 className="text-stone-750 font-medium font-serif text-xs sm:text-sm mt-1 sm:mt-1.5 opacity-90 leading-relaxed max-w-lg mx-auto">
-                    {item.meaning}
-                  </h3>
+                  {/* Lexicon Meaning Banner - Clear, prominent, with toggle support */}
+                  {showMeaning && item.meaning && (
+                    <div className="mt-2 px-3.5 sm:px-4 py-1.5 sm:py-2 bg-amber-50/95 border border-amber-200/90 rounded-xl shadow-2xs max-w-xl mx-auto flex items-center justify-center gap-2 select-text">
+                      <span className="px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900 font-bold text-[10px] sm:text-xs shrink-0 font-mono flex items-center gap-1">
+                        <BookOpen className="w-3 h-3 text-amber-800" />
+                        <span>词意</span>
+                      </span>
+                      <p className="text-stone-850 font-medium font-serif text-xs sm:text-sm leading-relaxed text-center">
+                        {item.meaning}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Practice Mode Conditional Rendering */}

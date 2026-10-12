@@ -691,11 +691,16 @@ export const SpellRushPage: React.FC<SpellRushPageProps> = ({
                     className="w-14 h-14 opacity-100 contrast-105"
                   />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1.5 flex flex-col items-center">
                   <h4 className="text-4xl font-serif font-black text-stone-950 tracking-wide">{currentCard.kanji}</h4>
-                  <p className="text-xs text-stone-500 font-sans italic max-w-md">
-                    {currentCard.meaning}
-                  </p>
+                  <div className="flex items-center justify-center gap-1.5 bg-amber-50/90 border border-amber-200/90 px-3 py-1 rounded-full max-w-md shadow-2xs">
+                    <span className="text-[10px] bg-amber-200/80 text-amber-900 px-1.5 py-0.2 rounded font-bold shrink-0 font-mono">
+                      📖 词意
+                    </span>
+                    <p className="text-xs text-stone-800 font-sans font-medium text-center">
+                      {currentCard.meaning}
+                    </p>
+                  </div>
                 </div>
               </div>
 

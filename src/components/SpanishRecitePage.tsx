@@ -1457,14 +1457,15 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                             animate={{ opacity: 1, y: 0 }}
                             className="space-y-4"
                           >
-                            <div className="p-3 bg-stone-100/90 rounded-xl border border-stone-250 text-stone-900 font-bold text-base sm:text-lg">
+                            <div className="p-3.5 bg-amber-50/90 rounded-xl border border-amber-300 text-stone-900 font-bold text-base sm:text-lg text-center shadow-xs">
+                              <span className="text-[11px] font-mono text-amber-800 font-bold block mb-1">📖 词意释义</span>
                               {currentWord.meaning}
                             </div>
                           </motion.div>
                         ) : (
-                          <div className="text-xs text-stone-400 font-serif flex items-center justify-center gap-1.5">
-                            <RotateCw className="w-3.5 h-3.5 animate-spin-slow" />
-                            <span>点击卡片翻转查看释义与评级</span>
+                          <div className="text-xs text-amber-700/80 font-serif flex items-center justify-center gap-1.5 bg-stone-100/70 py-2 px-3 rounded-lg border border-dashed border-stone-300">
+                            <RotateCw className="w-3.5 h-3.5 text-amber-600" />
+                            <span>点击卡片或按空格翻转查看词意释义</span>
                           </div>
                         )}
                       </div>

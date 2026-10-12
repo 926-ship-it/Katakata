@@ -1996,9 +1996,14 @@ export const StartPage: React.FC<StartPageProps> = ({
                         {isEnglishMode ? (item.phonetic || getEnglishPhonetic(item.kanji)) : `(${item.kanaStr})`}
                       </span>
                     </div>
-                    <p className="text-stone-500 text-[11px] leading-relaxed line-clamp-3 pt-1 font-sans">
-                      {item.meaning}
-                    </p>
+                    <div className="flex items-start gap-1.5 pt-1.5">
+                      <span className="text-[9px] bg-amber-100/90 text-amber-900 border border-amber-300/60 px-1 py-0.2 rounded font-bold shrink-0 font-mono">
+                        📖 词意
+                      </span>
+                      <p className="text-stone-750 text-[11px] leading-relaxed line-clamp-3 font-sans font-medium">
+                        {item.meaning}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-dashed border-stone-200 flex items-center justify-between pl-6 z-10">
