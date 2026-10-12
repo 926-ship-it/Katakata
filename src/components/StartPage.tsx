@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { BookOpen, Sparkles, Trophy, Settings, HelpCircle, Flame, Keyboard, BarChart2, Calendar, Award, Clock, ArrowRight, RotateCw, Play, BookOpenCheck, Activity, Plus, FileText, Trash2, CheckCircle, AlertCircle, Upload, Gamepad2, Search, X, CheckSquare, Layers, Lock, KeyRound, ShieldCheck } from "lucide-react";
-import { isUploadPasskeyUnlocked, verifyUploadPasskey } from "../utils/passkeyAuth";
+import { isUploadPasskeyUnlocked, verifyUploadPasskey, lockUploadPasskey } from "../utils/passkeyAuth";
 import { DICTIONARY, DictionaryItem, getDictionary } from "../data/dictionary";
 import { getReviewSummary, getDueCardIds } from "../utils/srs";
 import { uiTranslate, LANG_MAPPING } from "../utils/lang";
@@ -56,8 +56,13 @@ export const StartPage: React.FC<StartPageProps> = ({
   useEffect(() => {
     setIsCustomPasskeyUnlocked(isUploadPasskeyUnlocked());
     const handleUnlocked = () => setIsCustomPasskeyUnlocked(true);
+    const handleLocked = () => setIsCustomPasskeyUnlocked(false);
     window.addEventListener("katakata_passkey_unlocked", handleUnlocked);
-    return () => window.removeEventListener("katakata_passkey_unlocked", handleUnlocked);
+    window.addEventListener("katakata_passkey_locked", handleLocked);
+    return () => {
+      window.removeEventListener("katakata_passkey_unlocked", handleUnlocked);
+      window.removeEventListener("katakata_passkey_locked", handleLocked);
+    };
   }, []);
 
   const handleCustomPasskeyUnlock = (e: React.FormEvent) => {
@@ -1690,6 +1695,24 @@ export const StartPage: React.FC<StartPageProps> = ({
                 </div>
               ) : (
                 <>
+                  {/* Unlocked Status Bar with Re-lock Button */}
+                  <div className="flex items-center justify-between py-2.5 px-3.5 bg-amber-500/10 border border-amber-300/60 rounded-xl mb-4 text-xs">
+                    <div className="flex items-center gap-2 text-stone-800 font-bold">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>通关卡密已验证通过（当前浏览器已解锁自主上传）</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        lockUploadPasskey();
+                      }}
+                      className="px-2.5 py-1 bg-white border border-stone-300 hover:border-rose-400 hover:text-rose-700 text-stone-600 rounded-lg text-[11px] font-mono font-bold transition-all shadow-2xs hover:shadow cursor-pointer flex items-center gap-1 active:scale-95"
+                      title="清除当前浏览器的卡密授权，重新锁定通道"
+                    >
+                      <Lock className="w-3 h-3 text-stone-400 group-hover:text-rose-600" />
+                      <span>重新锁定通道</span>
+                    </button>
+                  </div>
 
               {/* Status / Errors Feedback Banner */}
               {parseError && (

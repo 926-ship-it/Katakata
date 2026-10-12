@@ -25,7 +25,7 @@ import {
   KeyRound,
   ShieldCheck
 } from "lucide-react";
-import { isUploadPasskeyUnlocked, verifyUploadPasskey } from "../utils/passkeyAuth";
+import { isUploadPasskeyUnlocked, verifyUploadPasskey, lockUploadPasskey } from "../utils/passkeyAuth";
 import { audioSynth } from "../utils/audio";
 import { SpanishWord, saveBatchCustomSpanishWords, SPANISH_CATEGORIES, BASE_SPANISH_WORDS } from "../data/spanishData";
 import { DICTIONARY, DictionaryItem } from "../data/dictionary";
@@ -296,6 +296,14 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
       setPasskeyInput("");
       setPasskeyError("");
     }
+    const handleUnlock = () => setIsUnlocked(true);
+    const handleLock = () => setIsUnlocked(false);
+    window.addEventListener("katakata_passkey_unlocked", handleUnlock);
+    window.addEventListener("katakata_passkey_locked", handleLock);
+    return () => {
+      window.removeEventListener("katakata_passkey_unlocked", handleUnlock);
+      window.removeEventListener("katakata_passkey_locked", handleLock);
+    };
   }, [isOpen]);
 
   const handlePasskeySubmit = (e: React.FormEvent) => {
@@ -878,12 +886,25 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
               </div>
             </div>
 
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-stone-400 hover:text-stone-100 hover:bg-stone-800 transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              {isUnlocked && (
+                <button
+                  type="button"
+                  onClick={() => lockUploadPasskey()}
+                  className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold text-stone-300 hover:text-white bg-stone-800 hover:bg-stone-700 border border-stone-700 transition-colors cursor-pointer flex items-center gap-1 active:scale-95"
+                  title="清除当前浏览器卡密授权并重新加锁"
+                >
+                  <Lock className="w-3.5 h-3.5 text-stone-400" />
+                  <span className="hidden xs:inline">重新加锁</span>
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg text-stone-400 hover:text-stone-100 hover:bg-stone-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {!isUnlocked ? (
