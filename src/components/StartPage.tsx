@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { BookOpen, Sparkles, Trophy, Settings, HelpCircle, Flame, Keyboard, BarChart2, Calendar, Award, Clock, ArrowRight, RotateCw, Play, BookOpenCheck, Activity, Plus, FileText, Trash2, CheckCircle, AlertCircle, Upload, Gamepad2, Search, X, CheckSquare, Layers } from "lucide-react";
+import { BookOpen, Sparkles, Trophy, Settings, HelpCircle, Flame, Keyboard, BarChart2, Calendar, Award, Clock, ArrowRight, RotateCw, Play, BookOpenCheck, Activity, Plus, FileText, Trash2, CheckCircle, AlertCircle, Upload, Gamepad2, Search, X, CheckSquare, Layers, Lock, KeyRound, ShieldCheck } from "lucide-react";
+import { isUploadPasskeyUnlocked, verifyUploadPasskey } from "../utils/passkeyAuth";
 import { DICTIONARY, DictionaryItem, getDictionary } from "../data/dictionary";
 import { getReviewSummary, getDueCardIds } from "../utils/srs";
 import { uiTranslate, LANG_MAPPING } from "../utils/lang";
@@ -46,6 +47,33 @@ export const StartPage: React.FC<StartPageProps> = ({
   narrativeStyle,
 }) => {
   const [customCards, setCustomCards] = useState<DictionaryItem[]>([]);
+
+  // Passkey Gate state (Passkey: QQBCJ)
+  const [isCustomPasskeyUnlocked, setIsCustomPasskeyUnlocked] = useState<boolean>(() => isUploadPasskeyUnlocked());
+  const [customPasskeyInput, setCustomPasskeyInput] = useState<string>("");
+  const [customPasskeyError, setCustomPasskeyError] = useState<string>("");
+
+  useEffect(() => {
+    setIsCustomPasskeyUnlocked(isUploadPasskeyUnlocked());
+    const handleUnlocked = () => setIsCustomPasskeyUnlocked(true);
+    window.addEventListener("katakata_passkey_unlocked", handleUnlocked);
+    return () => window.removeEventListener("katakata_passkey_unlocked", handleUnlocked);
+  }, []);
+
+  const handleCustomPasskeyUnlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customPasskeyInput.trim()) {
+      setCustomPasskeyError("请输入通关卡密");
+      return;
+    }
+    const ok = verifyUploadPasskey(customPasskeyInput);
+    if (ok) {
+      setIsCustomPasskeyUnlocked(true);
+      setCustomPasskeyError("");
+    } else {
+      setCustomPasskeyError("卡密不正确，请重新输入");
+    }
+  };
 
   const activeDict = React.useMemo(() => {
     return getDictionary(isEnglishMode, isKatakanaMode);
@@ -1599,6 +1627,11 @@ export const StartPage: React.FC<StartPageProps> = ({
                   <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
                     <FileText className="w-5 h-5 text-amber-600" />
                     <span>{isEnglishMode ? "My Custom Document Workspace" : "我的自定义学习文稿 & 词库工作台"}</span>
+                    {isCustomPasskeyUnlocked && (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 text-[10px] font-mono text-emerald-800 font-bold">
+                        🔓 已通关解锁
+                      </span>
+                    )}
                   </h3>
                   <p className="text-xs text-stone-500 mt-1">
                     {isEnglishMode 
@@ -1607,6 +1640,56 @@ export const StartPage: React.FC<StartPageProps> = ({
                   </p>
                 </div>
               </div>
+
+              {!isCustomPasskeyUnlocked ? (
+                <div className="py-8 px-4 flex flex-col items-center justify-center text-center space-y-4 bg-white/70 rounded-xl border border-stone-250">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-700 shadow-inner">
+                    <KeyRound className="w-7 h-7 animate-pulse" />
+                  </div>
+                  <div className="space-y-1.5 max-w-md">
+                    <div className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-[10px] font-mono font-bold text-amber-900 uppercase">
+                      <Lock className="w-3.5 h-3.5 text-amber-700" />
+                      <span>卡密安全通道</span>
+                    </div>
+                    <h4 className="text-xl font-black font-serif text-stone-900">
+                      输入通关卡密开启自主上传通道
+                    </h4>
+                    <p className="text-xs text-stone-600 leading-relaxed">
+                      AI 智能文稿分词、长句文本拼写及自定义词条添加功能已开启卡密保护，请输入通关卡密即可解锁。
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleCustomPasskeyUnlock} className="w-full max-w-sm space-y-3 pt-2">
+                    <input
+                      type="text"
+                      maxLength={16}
+                      value={customPasskeyInput}
+                      onChange={(e) => {
+                        setCustomPasskeyInput(e.target.value.toUpperCase());
+                        if (customPasskeyError) setCustomPasskeyError("");
+                      }}
+                      placeholder="请输入通关卡密"
+                      className="w-full px-4 py-3 bg-white border-2 border-stone-300 focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 rounded-xl text-center text-lg font-mono font-black tracking-widest text-stone-950 placeholder:text-stone-400 placeholder:font-normal placeholder:tracking-normal outline-none transition-all shadow-inner"
+                    />
+
+                    {customPasskeyError && (
+                      <div className="flex items-center justify-center gap-1 text-xs font-bold text-rose-600">
+                        <AlertCircle className="w-4 h-4" />
+                        <span>{customPasskeyError}</span>
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      className="w-full py-3 rounded-xl bg-stone-900 hover:bg-[#C4482A] text-stone-50 font-serif font-black text-xs tracking-wider transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-amber-400" />
+                      <span>立即验证通关卡密 ＞</span>
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                <>
 
               {/* Status / Errors Feedback Banner */}
               {parseError && (
@@ -1794,6 +1877,8 @@ export const StartPage: React.FC<StartPageProps> = ({
                   </button>
                 )}
               </div>
+              </>
+              )}
             </motion.div>
           )}
 

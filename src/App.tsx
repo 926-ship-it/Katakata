@@ -11,6 +11,8 @@ import { KanaTrainingPage } from "./components/KanaTrainingPage";
 import { SpanishRecitePage } from "./components/SpanishRecitePage";
 import { AddWordModal } from "./components/AddWordModal";
 import { BatchImportModal } from "./components/BatchImportModal";
+import { PasskeyModal } from "./components/PasskeyModal";
+import { isUploadPasskeyUnlocked } from "./utils/passkeyAuth";
 import { OnlineTimer } from "./components/OnlineTimer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { DictionaryItem } from "./data/dictionary";
@@ -155,6 +157,19 @@ export default function App() {
   const [isBatchModalOpen, setIsBatchModalOpen] = useState<boolean>(false);
   const [batchModalLang, setBatchModalLang] = useState<"es" | "ja" | "en">("es");
   const [spanishRefreshTrigger, setSpanishRefreshTrigger] = useState<number>(0);
+
+  // Passkey Protection for Word Upload Channels (Passkey: QQBCJ)
+  const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState<boolean>(false);
+  const [pendingUploadAction, setPendingUploadAction] = useState<(() => void) | null>(null);
+
+  const requirePasskeyForUpload = (action: () => void) => {
+    if (isUploadPasskeyUnlocked()) {
+      action();
+    } else {
+      setPendingUploadAction(() => action);
+      setIsPasskeyModalOpen(true);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -826,24 +841,28 @@ export default function App() {
                   </button>
                   <button
                     onClick={() => {
-                      setAddWordDefaultLang(isEnglishMode ? "en" : "ja");
-                      setIsAddWordModalOpen(true);
-                      setIsDrawerOpen(false);
+                      requirePasskeyForUpload(() => {
+                        setAddWordDefaultLang(isEnglishMode ? "en" : "ja");
+                        setIsAddWordModalOpen(true);
+                        setIsDrawerOpen(false);
+                      });
                     }}
                     className="cursor-pointer hover:text-stone-950 transition-colors py-0.5 text-stone-600 flex items-center gap-0.5"
-                    title="录入新单词到词库"
+                    title="录入新单词到词库（需通关卡密）"
                   >
                     <span className="text-amber-600 font-bold">➕</span>
                     <span className="hidden xs:inline">录词</span>
                   </button>
                   <button
                     onClick={() => {
-                      setBatchModalLang(currentPage === "spanish_recite" ? "es" : (isEnglishMode ? "en" : "ja"));
-                      setIsBatchModalOpen(true);
-                      setIsDrawerOpen(false);
+                      requirePasskeyForUpload(() => {
+                        setBatchModalLang(currentPage === "spanish_recite" ? "es" : (isEnglishMode ? "en" : "ja"));
+                        setIsBatchModalOpen(true);
+                        setIsDrawerOpen(false);
+                      });
                     }}
                     className="cursor-pointer hover:text-stone-950 transition-colors py-0.5 text-stone-600 flex items-center gap-0.5"
-                    title="批量导入多行短句与生词"
+                    title="批量导入多行短句与生词（需通关卡密）"
                   >
                     <span className="text-amber-600 font-bold">📥</span>
                     <span className="hidden xs:inline">批量</span>
@@ -1241,12 +1260,16 @@ export default function App() {
                 }}
                 onGoToSpanishRecite={() => setCurrentPage("spanish_recite")}
                 onOpenAddWord={(lang) => {
-                  setAddWordDefaultLang(lang || "ja");
-                  setIsAddWordModalOpen(true);
+                  requirePasskeyForUpload(() => {
+                    setAddWordDefaultLang(lang || (isEnglishMode ? "en" : "ja"));
+                    setIsAddWordModalOpen(true);
+                  });
                 }}
                 onOpenBatchImport={(lang) => {
-                  setBatchModalLang(lang || (isEnglishMode ? "en" : "es"));
-                  setIsBatchModalOpen(true);
+                  requirePasskeyForUpload(() => {
+                    setBatchModalLang(lang || (isEnglishMode ? "en" : "es"));
+                    setIsBatchModalOpen(true);
+                  });
                 }}
                 collectedIds={collectedIds}
                 practiceTimes={practiceTimes}
@@ -1406,12 +1429,16 @@ export default function App() {
                     return isEnglishMode ? "en" : "es";
                   })()}
                   onOpenAddModal={(lang) => {
-                    setAddWordDefaultLang(lang || (isEnglishMode ? "en" : "ja"));
-                    setIsAddWordModalOpen(true);
+                    requirePasskeyForUpload(() => {
+                      setAddWordDefaultLang(lang || (isEnglishMode ? "en" : "ja"));
+                      setIsAddWordModalOpen(true);
+                    });
                   }}
                   onOpenBatchModal={(lang) => {
-                    setBatchModalLang(lang || (isEnglishMode ? "en" : "ja"));
-                    setIsBatchModalOpen(true);
+                    requirePasskeyForUpload(() => {
+                      setBatchModalLang(lang || (isEnglishMode ? "en" : "ja"));
+                      setIsBatchModalOpen(true);
+                    });
                   }}
                   onStartTraining={(reciteItems, durationMs) => {
                     const targetLang = reciteItems[0]?.lang;
@@ -1476,6 +1503,22 @@ export default function App() {
         onNavigateToLibrary={() => {
           setIsBatchModalOpen(false);
           setCurrentPage("library");
+        }}
+      />
+
+      {/* Passkey Gate Verification Modal (Passkey: QQBCJ) */}
+      <PasskeyModal
+        isOpen={isPasskeyModalOpen}
+        onClose={() => {
+          setIsPasskeyModalOpen(false);
+          setPendingUploadAction(null);
+        }}
+        onSuccess={() => {
+          showToast("🎉 通关卡密验证成功！已解锁自定义词汇上传通道。");
+          if (pendingUploadAction) {
+            pendingUploadAction();
+            setPendingUploadAction(null);
+          }
         }}
       />
 

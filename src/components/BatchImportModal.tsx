@@ -20,8 +20,12 @@ import {
   CheckSquare,
   Square,
   Filter,
-  GraduationCap
+  GraduationCap,
+  Lock,
+  KeyRound,
+  ShieldCheck
 } from "lucide-react";
+import { isUploadPasskeyUnlocked, verifyUploadPasskey } from "../utils/passkeyAuth";
 import { audioSynth } from "../utils/audio";
 import { SpanishWord, saveBatchCustomSpanishWords, SPANISH_CATEGORIES, BASE_SPANISH_WORDS } from "../data/spanishData";
 import { DICTIONARY, DictionaryItem } from "../data/dictionary";
@@ -280,6 +284,37 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
   const [meaningOverrides, setMeaningOverrides] = useState<Record<string, string>>({});
   const [readingOverrides, setReadingOverrides] = useState<Record<string, string>>({});
   const [deselectedIds, setDeselectedIds] = useState<Set<string>>(new Set());
+
+  // Passkey Gate state (Passkey: QQBCJ)
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => isUploadPasskeyUnlocked());
+  const [passkeyInput, setPasskeyInput] = useState<string>("");
+  const [passkeyError, setPasskeyError] = useState<string>("");
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsUnlocked(isUploadPasskeyUnlocked());
+      setPasskeyInput("");
+      setPasskeyError("");
+    }
+  }, [isOpen]);
+
+  const handlePasskeySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passkeyInput.trim()) {
+      setPasskeyError("请输入通关卡密");
+      audioSynth.playError();
+      return;
+    }
+    const ok = verifyUploadPasskey(passkeyInput);
+    if (ok) {
+      setIsUnlocked(true);
+      setPasskeyError("");
+      audioSynth.playFanfare();
+    } else {
+      setPasskeyError("卡密不正确，请输入正确的通关卡密");
+      audioSynth.playError();
+    }
+  };
 
   // Sync language and sample on initial open
   useEffect(() => {
@@ -828,17 +863,17 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
           <div className="p-4 bg-stone-900 text-stone-100 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                <Sparkles className="w-5 h-5" />
+                {isUnlocked ? <Sparkles className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
               </div>
               <div>
                 <h2 className="text-base sm:text-lg font-bold font-serif flex items-center gap-2">
-                  <span>批量导入生词与短句</span>
+                  <span>{isUnlocked ? "批量导入生词与短句" : "批量导入通道卡密验证"}</span>
                   <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-amber-500 text-stone-950 font-bold">
-                    BATCH WIZARD
+                    {isUnlocked ? "BATCH WIZARD" : "PASSKEY REQUIRED"}
                   </span>
                 </h2>
                 <p className="text-xs text-stone-400 font-sans">
-                  支持 Excel 表格复制、双列/三列制表符、单列纯词及破折号速记
+                  {isUnlocked ? "支持 Excel 表格复制、双列/三列制表符、单列纯词及破折号速记" : "请输入专属通关卡密开启批量导入与表格文本识别"}
                 </p>
               </div>
             </div>
@@ -850,6 +885,57 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
               <X className="w-5 h-5" />
             </button>
           </div>
+
+          {!isUnlocked ? (
+            <div className="p-8 sm:p-12 flex flex-col items-center justify-center text-center space-y-5 my-auto">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-700 shadow-inner">
+                <KeyRound className="w-8 h-8 animate-pulse" />
+              </div>
+
+              <div className="space-y-1.5 max-w-md">
+                <div className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-[10px] font-mono font-bold text-amber-900 uppercase">
+                  <Lock className="w-3.5 h-3.5 text-amber-700" />
+                  <span>通关卡密保护通道</span>
+                </div>
+                <h3 className="text-2xl font-black font-serif text-stone-900">
+                  输入通关卡密解锁批量导入
+                </h3>
+                <p className="text-xs text-stone-600 leading-relaxed">
+                  批量导入生词、Excel表格复制解析与文本批量收录需输入通关卡密方可使用。
+                </p>
+              </div>
+
+              <form onSubmit={handlePasskeySubmit} className="w-full max-w-sm space-y-3 pt-2">
+                <input
+                  type="text"
+                  maxLength={16}
+                  value={passkeyInput}
+                  onChange={(e) => {
+                    setPasskeyInput(e.target.value.toUpperCase());
+                    if (passkeyError) setPasskeyError("");
+                  }}
+                  placeholder="请输入通关卡密"
+                  className="w-full px-4 py-3 bg-white border-2 border-stone-300 focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 rounded-xl text-center text-lg font-mono font-black tracking-widest text-stone-950 placeholder:text-stone-400 placeholder:font-normal placeholder:tracking-normal outline-none transition-all shadow-inner"
+                />
+
+                {passkeyError && (
+                  <div className="flex items-center justify-center gap-1 text-xs font-bold text-rose-600">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{passkeyError}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-xl bg-stone-900 hover:bg-[#C4482A] text-stone-50 font-serif font-black text-xs tracking-wider transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  <span>立即验证通关卡密 ＞</span>
+                </button>
+              </form>
+            </div>
+          ) : (
+            <>
 
           {/* Success State Celebration View */}
           {isSuccessState ? (
@@ -1303,6 +1389,8 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
                 <span>一键导入这 {validCount} 条短句至词库</span>
               </button>
             </div>
+          )}
+          </>
           )}
         </motion.div>
       </div>

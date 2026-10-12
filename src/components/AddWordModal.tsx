@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Plus, Sparkles, Volume2, CheckCircle2, AlertCircle, Loader2, FileText } from "lucide-react";
+import { X, Plus, Sparkles, Volume2, CheckCircle2, AlertCircle, Loader2, FileText, Lock, KeyRound, ShieldCheck } from "lucide-react";
+import { isUploadPasskeyUnlocked, verifyUploadPasskey } from "../utils/passkeyAuth";
 import { DictionaryItem } from "../data/dictionary";
 import { splitKanaIntoSyllables, splitAlphabeticIntoSegments, saveStoredCustomWord } from "../utils/kanaHelper";
 import { saveCustomSpanishWord, SpanishWord, SPANISH_CATEGORIES } from "../data/spanishData";
@@ -48,6 +49,37 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({
   // State
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // Passkey Gate state (Passkey: QQBCJ)
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => isUploadPasskeyUnlocked());
+  const [passkeyInput, setPasskeyInput] = useState<string>("");
+  const [passkeyError, setPasskeyError] = useState<string>("");
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsUnlocked(isUploadPasskeyUnlocked());
+      setPasskeyInput("");
+      setPasskeyError("");
+    }
+  }, [isOpen]);
+
+  const handlePasskeySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passkeyInput.trim()) {
+      setPasskeyError("请输入通关卡密");
+      audioSynth.playError();
+      return;
+    }
+    const ok = verifyUploadPasskey(passkeyInput);
+    if (ok) {
+      setIsUnlocked(true);
+      setPasskeyError("");
+      audioSynth.playFanfare();
+    } else {
+      setPasskeyError("卡密不正确，请输入正确的通关卡密");
+      audioSynth.playError();
+    }
+  };
 
   const SPANISH_ACCENT_KEYS = ["á", "é", "í", "ó", "ú", "ñ", "ü", "¡", "¿"];
 
@@ -265,14 +297,14 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({
           <div className="flex items-center justify-between pb-3 border-b border-stone-250">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-amber-500 text-stone-950 flex items-center justify-center font-black shadow-xs">
-                <Plus className="w-5 h-5" />
+                {isUnlocked ? <Plus className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
               </div>
               <div>
                 <h3 className="text-lg sm:text-xl font-black font-serif text-stone-900 leading-tight">
-                  录入新单词到词库
+                  {isUnlocked ? "录入新单词到词库" : "录入通道卡密验证"}
                 </h3>
                 <p className="text-[11px] text-stone-500 font-mono">
-                  ADD NEW VOCABULARY CARD WITH SPEECH & SPELLING
+                  {isUnlocked ? "ADD NEW VOCABULARY CARD WITH SPEECH & SPELLING" : "PASSKEY REQUIRED TO UNLOCK"}
                 </p>
               </div>
             </div>
@@ -284,7 +316,53 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({
             </button>
           </div>
 
-          {/* Language Selection Tabs and Mode Switcher */}
+          {!isUnlocked ? (
+            <div className="py-6 px-2 flex flex-col items-center text-center space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-700 shadow-inner">
+                <KeyRound className="w-7 h-7 animate-pulse" />
+              </div>
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-[10px] font-mono font-bold text-amber-900 uppercase">
+                  <Lock className="w-3 h-3 text-amber-700" />
+                  <span>卡密安全通道</span>
+                </div>
+                <h4 className="text-xl font-black font-serif text-stone-900">
+                  输入通关卡密开启单词录入
+                </h4>
+                <p className="text-xs text-stone-600 max-w-sm mx-auto leading-relaxed">
+                  自主录入自定义生词与发音标注已受通关卡密保护，请输入通关卡密激活使用。
+                </p>
+              </div>
+
+              <form onSubmit={handlePasskeySubmit} className="w-full max-w-xs space-y-3 pt-2">
+                <input
+                  type="text"
+                  maxLength={16}
+                  value={passkeyInput}
+                  onChange={(e) => {
+                    setPasskeyInput(e.target.value.toUpperCase());
+                    if (passkeyError) setPasskeyError("");
+                  }}
+                  placeholder="请输入通关卡密"
+                  className="w-full px-4 py-2.5 bg-white border-2 border-stone-300 focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 rounded-xl text-center text-base font-mono font-black tracking-widest text-stone-950 placeholder:text-stone-400 placeholder:font-normal placeholder:tracking-normal outline-none transition-all shadow-inner"
+                />
+                {passkeyError && (
+                  <div className="flex items-center justify-center gap-1 text-xs font-bold text-rose-600">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>{passkeyError}</span>
+                  </div>
+                )}
+                <button
+                  type="submit"
+                  className="w-full py-2.5 rounded-xl bg-stone-900 hover:bg-[#C4482A] text-stone-50 font-serif font-black text-xs tracking-wider transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  <span>验证通关卡密 ＞</span>
+                </button>
+              </form>
+            </div>
+          ) : (
+            <>
           <div className="space-y-2">
             <div className="flex rounded-xl bg-stone-200/80 p-1 text-xs font-bold select-none">
               <button
@@ -667,6 +745,8 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({
               </div>
             </div>
           </form>
+          </>
+          )}
         </motion.div>
       </div>
     </AnimatePresence>
