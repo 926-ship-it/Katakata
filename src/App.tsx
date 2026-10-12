@@ -19,6 +19,7 @@ import { recordPracticeBatch } from "./utils/srs";
 import { uiTranslate } from "./utils/lang";
 import { NarrativeStyle, nTrans } from "./utils/narrative";
 import { saveSessionLog } from "./utils/sessionLogs";
+import { addDailyProgress } from "./utils/dailyGoal";
 import { SessionTrendChart } from "./components/SessionTrendChart";
 
 type ScreenState = "start" | "training" | "library" | "unlocked_ceremony" | "spell_rush" | "memory_match" | "kana_training" | "spanish_recite";
@@ -448,6 +449,15 @@ export default function App() {
         accuracy,
         xpGained: xpGained || 0,
       });
+    }
+
+    // Accumulate daily goal practice progress
+    try {
+      const minutesSpent = Math.max(1, Math.round(activeDurationMs / (60 * 1000)));
+      const wordsPracticed = rounds * (activeCards.length || 1);
+      addDailyProgress(minutesSpent, wordsPracticed);
+    } catch (e) {
+      console.warn("Failed to update daily goal progress", e);
     }
 
     // Handle card unlock criteria (needs at least 3 correct spellings)

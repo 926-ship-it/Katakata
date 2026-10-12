@@ -57,6 +57,7 @@ import {
   getReciteHistoryLogs,
   clearReciteHistoryLogs
 } from "../utils/reciteStorage";
+import { addDailyProgress } from "../utils/dailyGoal";
 
 export type ReciteLanguage = "ja" | "en" | "es";
 
@@ -672,6 +673,9 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       setSessionStreak((prev) => prev + 1);
       recordReciteAction(currentLang, currentWord.id, currentWord.displayTitle, "dictation_pass", currentWord.meaning);
       setHistoryLogs(getReciteHistoryLogs(currentLang));
+      try {
+        addDailyProgress(0.15, 1);
+      } catch (_) {}
 
       // Dual-layer advance guarantee:
       // 1. Audio onEnd plays and advances naturally with brief acoustic pause

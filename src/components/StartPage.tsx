@@ -8,6 +8,7 @@ import { NarrativeStyle, nTrans } from "../utils/narrative";
 import { toHanNumerals } from "../App";
 import { SessionTrendChart } from "./SessionTrendChart";
 import { getEnglishPhonetic } from "../utils/englishPhonetics";
+import { DailyGoalPanel } from "./DailyGoalPanel";
 
 interface StartPageProps {
   onStartTraining: (items: DictionaryItem[], durationMs: number) => void;
@@ -756,7 +757,17 @@ export const StartPage: React.FC<StartPageProps> = ({
         </div>
       </div>
 
-      {/* 2. Three Interactive Activity Tracks */}
+      {/* 2. Daily Practice Goal Panel (每日练习目标面板 & 圆环进度条) */}
+      <DailyGoalPanel
+        isEnglishMode={isEnglishMode}
+        onStartPracticeQuick={(mins) => {
+          const shuffled = [...activeDict].sort(() => Math.random() - 0.5);
+          const selected = shuffled.slice(0, Math.min(customCardCount, shuffled.length));
+          onStartTraining(selected, mins * 60 * 1000);
+        }}
+      />
+
+      {/* 3. Three Interactive Activity Tracks */}
       <div className="border-t border-stone-300 pt-6 select-none relative">
         {/* Giant transparent Kanji watermark in left background */}
         <div className="absolute -left-6 -bottom-16 text-[18rem] md:text-[22rem] font-serif text-stone-900/[0.03] leading-none pointer-events-none select-none z-0">
