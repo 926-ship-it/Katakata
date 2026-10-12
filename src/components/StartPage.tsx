@@ -6,6 +6,7 @@ import { getReviewSummary, getDueCardIds } from "../utils/srs";
 import { uiTranslate, LANG_MAPPING } from "../utils/lang";
 import { NarrativeStyle, nTrans } from "../utils/narrative";
 import { toHanNumerals } from "../App";
+import { SessionTrendChart } from "./SessionTrendChart";
 
 interface StartPageProps {
   onStartTraining: (items: DictionaryItem[], durationMs: number) => void;
@@ -1048,136 +1049,8 @@ export const StartPage: React.FC<StartPageProps> = ({
               </div>
             </div>
 
-            {/* Dynamic Typing Speed & Accuracy Line-Chart (Velocity Trends) */}
-            <div className="p-4 rounded-xl border border-stone-250 bg-white shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono text-stone-450 uppercase tracking-widest font-bold block">
-                  {isEnglishMode ? "🔥 Typing Velocity & Accuracy Trends" : "🔥 指尖速度与准确率演变趋势"}
-                </span>
-                {sessionLogs.length > 0 && (
-                  <span className="text-[9px] font-mono font-bold bg-amber-500/10 text-amber-800 border border-amber-500/20 px-2 py-0.5 rounded-full">
-                    KPM Line Chart
-                  </span>
-                )}
-              </div>
-
-              {sessionLogs.length === 0 ? (
-                <div className="h-28 flex flex-col items-center justify-center border border-dashed border-stone-200 rounded-lg bg-stone-50 text-center p-3 text-stone-405 space-y-1">
-                  <Activity className="w-5 h-5 text-stone-300 animate-pulse" />
-                  <span className="text-xs font-serif font-black text-stone-600">指尖蓄势待发...</span>
-                  <span className="text-[10px] font-mono leading-tight max-w-xs text-stone-450">
-                    {isEnglishMode ? "Complete at least one spelling session to unlock high-fidelity performance metrics!" : "开始进行一次拼写练习，即可在此处激活高精度的KPM速率演变曲线图！"}
-                  </span>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {/* Performance Indicators */}
-                  <div className="grid grid-cols-2 gap-2 text-left bg-stone-50 p-2 rounded-lg border border-stone-150">
-                    <div>
-                      <span className="text-[9px] font-mono text-stone-400 block">{isEnglishMode ? "AVERAGE SPEED" : "平均打字速率"}</span>
-                      <span className="text-sm font-black text-stone-800 font-mono">
-                        {Math.round(sessionLogs.reduce((acc: number, curr: any) => acc + curr.kpm, 0) / sessionLogs.length)} <span className="text-[10px] font-normal text-stone-500">KPM</span>
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[9px] font-mono text-stone-400 block">{isEnglishMode ? "AVG ACCURACY" : "平均拼写正确率"}</span>
-                      <span className="text-sm font-black text-stone-800 font-mono">
-                        {Math.round(sessionLogs.reduce((acc: number, curr: any) => acc + curr.accuracy, 0) / sessionLogs.length)}%
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* SVG Chart */}
-                  <div className="relative w-full h-24">
-                    {(() => {
-                      const maxKpm = Math.max(...sessionLogs.map((l: any) => l.kpm), 100);
-                      const width = 400;
-                      const height = 90;
-                      
-                      // Map coordinates
-                      const points = sessionLogs.map((log: any, index: number) => {
-                        const x = sessionLogs.length > 1 ? (index / (sessionLogs.length - 1)) * (width - 40) + 20 : width / 2;
-                        const y = height - ((log.kpm / maxKpm) * (height - 30)) - 10;
-                        return { x, y, kpm: log.kpm, date: log.date };
-                      });
-
-                      const pathD = points.length > 1
-                        ? `M ${points.map(p => `${p.x} ${p.y}`).join(" L ")}`
-                        : "";
-
-                      return (
-                        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
-                          {/* Grid Lines */}
-                          <line x1="10" y1={height - 10} x2={width - 10} y2={height - 10} stroke="#e5e5e5" strokeWidth="1" strokeDasharray="3 3" />
-                          <line x1="10" y1="10" x2={width - 10} y2="10" stroke="#e5e5e5" strokeWidth="1" strokeDasharray="3 3" />
-
-                          {/* Line Path */}
-                          {points.length > 1 && (
-                            <>
-                              {/* Filled Area Gradient */}
-                              <defs>
-                                <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.25" />
-                                  <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.0" />
-                                </linearGradient>
-                              </defs>
-                              <path
-                                d={`${pathD} L ${points[points.length - 1].x} ${height - 10} L ${points[0].x} ${height - 10} Z`}
-                                fill="url(#chartGrad)"
-                              />
-                              {/* Line */}
-                              <path
-                                d={pathD}
-                                fill="none"
-                                stroke="#f59e0b"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </>
-                          )}
-
-                          {/* Data points */}
-                          {points.map((pt, i) => (
-                            <g key={i} className="group">
-                              <circle
-                                cx={pt.x}
-                                cy={pt.y}
-                                r="4"
-                                fill="#ffffff"
-                                stroke="#d97706"
-                                strokeWidth="2"
-                                className="transition-all duration-150 hover:r-6 cursor-pointer"
-                              />
-                              {/* Text tooltip on hover */}
-                              <text
-                                x={pt.x}
-                                y={pt.y - 10}
-                                textAnchor="middle"
-                                className="text-[8px] font-mono font-bold fill-amber-900 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-white px-1"
-                              >
-                                {pt.kpm}
-                              </text>
-                              {/* Date labels */}
-                              {i % Math.max(1, Math.floor(points.length / 4)) === 0 && (
-                                <text
-                                  x={pt.x}
-                                  y={height + 2}
-                                  textAnchor="middle"
-                                  className="text-[7px] font-mono fill-stone-400"
-                                >
-                                  {pt.date}
-                                </text>
-                              )}
-                            </g>
-                          ))}
-                        </svg>
-                      );
-                    })()}
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* D3.js Typing Speed & Accuracy Smooth Line-Chart (15-Session Growth Trajectory) */}
+            <SessionTrendChart compact={true} isEnglishMode={isEnglishMode} />
           </div>
 
           {/* Dashboard Right Column: "每日回顾 (Daily Review)" suggestion module */}

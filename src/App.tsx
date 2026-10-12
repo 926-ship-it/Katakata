@@ -18,6 +18,8 @@ import { audioSynth } from "./utils/audio";
 import { recordPracticeBatch } from "./utils/srs";
 import { uiTranslate } from "./utils/lang";
 import { NarrativeStyle, nTrans } from "./utils/narrative";
+import { saveSessionLog } from "./utils/sessionLogs";
+import { SessionTrendChart } from "./components/SessionTrendChart";
 
 type ScreenState = "start" | "training" | "library" | "unlocked_ceremony" | "spell_rush" | "memory_match" | "kana_training" | "spanish_recite";
 
@@ -118,6 +120,7 @@ export default function App() {
   });
   const [lastAction, setLastAction] = useState<"correct" | "error" | "complete" | "">("");
   const [practiceMode, setPracticeMode] = useState<"typing" | "handwriting">("typing");
+  const [showCeremonyChart, setShowCeremonyChart] = useState<boolean>(false);
   const [isEnglishMode, setIsEnglishMode] = useState<boolean>(() => {
     try {
       return localStorage.getItem("fifty_sound_english_mode") === "true";
@@ -440,22 +443,11 @@ export default function App() {
 
     // Save session logs for dynamic analytics trend visualization
     if (kpm !== undefined && accuracy !== undefined) {
-      try {
-        const storedLogs = localStorage.getItem("fifty_sound_session_log");
-        const logs = storedLogs ? JSON.parse(storedLogs) : [];
-        const newLog = {
-          date: new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-          kpm: kpm,
-          accuracy: accuracy,
-          xpGained: xpGained || 0,
-          timestamp: Date.now()
-        };
-        // Keep last 15 sessions for the chart
-        const updatedLogs = [...logs, newLog].slice(-15);
-        localStorage.setItem("fifty_sound_session_log", JSON.stringify(updatedLogs));
-      } catch (e) {
-        console.warn("localStorage log write failed", e);
-      }
+      saveSessionLog({
+        kpm,
+        accuracy,
+        xpGained: xpGained || 0,
+      });
     }
 
     // Handle card unlock criteria (needs at least 3 correct spellings)
@@ -697,13 +689,32 @@ export default function App() {
             {ceremonyCards.length > 1 ? "这批卡牌" : "该卡牌"}已经永久存放进您的 <b>“个人收藏馆”</b>，您可以随时翻阅并请求博学人工智能 <b>Gemini 解构文化故事</b>。
           </p>
 
-          <div className="pt-2">
+          {showCeremonyChart && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="w-full text-left bg-stone-950/70 p-3 rounded-2xl border border-stone-800"
+            >
+              <SessionTrendChart isEnglishMode={isEnglishMode} />
+            </motion.div>
+          )}
+
+          <div className="pt-2 flex flex-col sm:flex-row gap-2">
+            <button
+              type="button"
+              onClick={() => setShowCeremonyChart((prev) => !prev)}
+              className="flex-1 py-3 px-4 rounded-xl border border-stone-700 bg-stone-800/80 hover:bg-stone-800 text-stone-200 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              {showCeremonyChart ? "收起成长折线图" : "📈 查看过去15次成长轨迹 (D3.js)"}
+            </button>
             <button
               onClick={() => {
                 setCeremonyCards([]);
+                setShowCeremonyChart(false);
                 setCurrentPage("start");
               }}
-              className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-xs uppercase tracking-wider transition-colors cursor-pointer shadow-md"
+              className="flex-1 py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-xs uppercase tracking-wider transition-colors cursor-pointer shadow-md"
             >
               🔒 永久存入个人图鉴藏馆
             </button>

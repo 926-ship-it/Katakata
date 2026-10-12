@@ -7,6 +7,8 @@ import { audioSynth, TypingSoundStyle } from "../utils/audio";
 import { CardIllustration } from "./CardIllustration";
 import { CalligraphyCanvas } from "./CalligraphyCanvas";
 import { uiTranslate, LANG_MAPPING } from "../utils/lang";
+import { SessionTrendChart } from "./SessionTrendChart";
+import { saveSessionLog } from "../utils/sessionLogs";
 
 interface TrainingPageProps {
   items: DictionaryItem[];
@@ -47,6 +49,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [timerFinished, setTimerFinished] = useState<boolean>(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState<boolean>(false);
+  const hasSavedSessionLogRef = useRef<boolean>(false);
 
   // Sound control
   const [muted, setMuted] = useState<boolean>(() => audioSynth.getMuted());
@@ -128,6 +131,23 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
     completedSegmentsCountRef.current = 0;
     lastProcessedKeyRef.current = null;
   }, [currentItemIdx]);
+
+  // Automatically record this session log when practice cycle finishes
+  useEffect(() => {
+    if (timerFinished && !hasSavedSessionLogRef.current && (correctCount > 0 || completedRounds > 0)) {
+      hasSavedSessionLogRef.current = true;
+      const minutes = (effectiveDuration - Math.max(0, timeLeftMs)) / 60000 || 0.1;
+      const finalKpm = correctCount > 0 ? Math.round(correctCount / minutes) : 0;
+      const totalKeys = correctCount + errorCount;
+      const finalAccuracy = totalKeys > 0 ? Math.round((correctCount / totalKeys) * 100) : 100;
+
+      saveSessionLog({
+        kpm: finalKpm,
+        accuracy: finalAccuracy,
+        xpGained: sessionXpEarned,
+      });
+    }
+  }, [timerFinished, effectiveDuration, timeLeftMs, correctCount, errorCount, completedRounds, sessionXpEarned]);
 
   // Monitor physical keystrokes
   const [pressedKey, setPressedKey] = useState<string | null>(null);
@@ -532,14 +552,32 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
       {/* Upper bar: Quit & Controls */}
       <div className="flex items-center justify-between">
-        <button
-          onClick={() => setShowQuitConfirm(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-300 text-stone-700 bg-white hover:bg-red-50 hover:border-red-300 hover:text-red-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
-          title="退出训练"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>退出练习</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowQuitConfirm(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-300 text-stone-700 bg-white hover:bg-red-50 hover:border-red-300 hover:text-red-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+            title="退出训练"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>退出练习</span>
+          </button>
+
+          {/* Quick finish button when at least 1 round completed */}
+          {completedRounds >= 1 && !timerFinished && (
+            <button
+              type="button"
+              onClick={() => {
+                setTimeLeftMs(0);
+                setTimerFinished(true);
+                audioSynth.playTimeCompleted();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              title="提前达成练习目标并结算生成成长轨迹"
+            >
+              <span>🏁 提前结算 ({completedRounds}轮)</span>
+            </button>
+          )}
+        </div>
 
         <div className="flex items-center gap-2">
           {/* Quick Speech Rate Cycler */}
@@ -1037,7 +1075,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
             <motion.div
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              className="max-w-md w-full max-h-[85vh] overflow-y-auto bg-stone-50 rounded-2xl border-2 border-stone-800 p-6 md:p-8 text-center space-y-6 shadow-2xl relative"
+              className="max-w-xl md:max-w-2xl w-full max-h-[90vh] overflow-y-auto bg-stone-50 rounded-3xl border-2 border-stone-800 p-5 sm:p-7 text-center space-y-5 shadow-2xl relative"
             >
               {/* Close Button at top-right */}
               <button
@@ -1113,6 +1151,11 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                 </div>
               )}
 
+              {/* D3.js 15-Session Growth Trajectory Chart */}
+              <div className="text-left w-full pt-1">
+                <SessionTrendChart isEnglishMode={isEnglishMode} />
+              </div>
+
               {completedRounds >= 3 ? (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-left">
                   <div className="flex items-center gap-1.5 text-amber-800 font-bold text-xs font-mono">
@@ -1151,6 +1194,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                         setCompletedRounds(0);
                         setCurrentSegmentIdx(0);
                         setRomajiProgress("");
+                        hasSavedSessionLogRef.current = false;
                         setTimerFinished(false);
                       }}
                       className="flex-1 py-3 px-4 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-100 font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-1"
@@ -1201,23 +1245,40 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => {
-                    // Resume training and append the delta spent in modal
-                    setEndTime(Date.now() + timeLeftMs);
-                    setShowQuitConfirm(false);
-                  }}
-                  className="flex-1 py-3 px-4 rounded-xl border border-stone-300 bg-stone-100 hover:bg-stone-205 text-stone-800 font-bold text-xs font-sans transition-all cursor-pointer select-none"
-                >
-                  🛡️ 留在这里，继续拼写
-                </button>
-                <button
-                  onClick={onQuit}
-                  className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs font-sans transition-all cursor-pointer select-none"
-                >
-                  🚪 意已决，狠心退出
-                </button>
+              <div className="flex flex-col gap-2 pt-2">
+                {correctCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowQuitConfirm(false);
+                      setTimeLeftMs(0);
+                      setTimerFinished(true);
+                      audioSynth.playTimeCompleted();
+                    }}
+                    className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold text-xs font-sans transition-all cursor-pointer select-none flex items-center justify-center gap-1.5 shadow-xs"
+                  >
+                    <span>📊 提前结算本次练习 (记录成长轨迹)</span>
+                  </button>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      // Resume training and append the delta spent in modal
+                      setEndTime(Date.now() + timeLeftMs);
+                      setShowQuitConfirm(false);
+                    }}
+                    className="flex-1 py-3 px-4 rounded-xl border border-stone-300 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-xs font-sans transition-all cursor-pointer select-none"
+                  >
+                    🛡️ 留在这里，继续拼写
+                  </button>
+                  <button
+                    onClick={onQuit}
+                    className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs font-sans transition-all cursor-pointer select-none"
+                  >
+                    🚪 意已决，放弃退出
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
