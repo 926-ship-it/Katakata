@@ -38,6 +38,7 @@ import {
   MasteryStatus
 } from "../data/spanishData";
 import { getDictionary, DictionaryItem } from "../data/dictionary";
+import { getEnglishPhonetic } from "../utils/englishPhonetics";
 import { audioSynth, TypingSoundStyle } from "../utils/audio";
 import {
   MistakeRecord,
@@ -307,12 +308,14 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
           romaji: char === " " ? [" "] : [char.toLowerCase()],
           displayRomaji: char,
         }));
+        const ipa = item.phonetic || getEnglishPhonetic(cleanWord);
         return {
           id: item.id,
           lang: "en",
           word: cleanWord,
           displayTitle: cleanWord,
-          subTitle: item.categoryName,
+          subTitle: ipa ? `${ipa} ・ ${item.categoryName}` : item.categoryName,
+          phonetic: ipa,
           meaning: item.meaning,
           category: item.category,
           categoryName: item.categoryName,
@@ -737,6 +740,12 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
         setRomajiBuffer(proposed);
         audioSynth.playTyping({ volume: 0.7 });
       } else {
+        // Space pressed when kana is expected: soft audio feedback without recording a mistake
+        if (charLower === " ") {
+          audioSynth.playTyping({ volume: 0.5 });
+          return;
+        }
+
         // Check if user is typing for the next character (e.g. punctuation or fresh start)
         audioSynth.playError();
         setShakeIndex(currIdx);
@@ -780,6 +789,12 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       audioSynth.playTyping({ isCompletion: isComp });
       checkCompletion(nextTyped);
     } else {
+      // Space pressed when letter is expected: soft audio feedback without recording a mistake
+      if (inputChar === " ") {
+        audioSynth.playTyping({ volume: 0.5 });
+        return;
+      }
+
       audioSynth.playError();
       setShakeIndex(currIdx);
       setTimeout(() => setShakeIndex(null), 400);

@@ -26,6 +26,7 @@ import { audioSynth } from "../utils/audio";
 import { SpanishWord, saveBatchCustomSpanishWords, SPANISH_CATEGORIES, BASE_SPANISH_WORDS } from "../data/spanishData";
 import { DICTIONARY, DictionaryItem } from "../data/dictionary";
 import { splitKanaIntoSyllables, splitAlphabeticIntoSegments, saveBatchStoredCustomWords } from "../utils/kanaHelper";
+import { getEnglishPhonetic } from "../utils/englishPhonetics";
 
 export interface ParsedItem {
   id: string;
@@ -696,6 +697,7 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
         const cleanTarget = item.target.trim();
         const cleanMeaning = (item.meaning || "（待补充释义）").trim();
         const segments = splitAlphabeticIntoSegments(cleanTarget);
+        const ipa = item.reading?.trim() || getEnglishPhonetic(cleanTarget);
         return {
           id: `custom-en-batch-${Date.now()}-${idx}`,
           kanji: cleanTarget,
@@ -709,6 +711,9 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
           borderColor: "border-blue-400",
           bgGradient: "from-blue-50 to-indigo-100",
           segments: segments,
+          phonetic: ipa,
+          phoneticUs: ipa,
+          phoneticUk: getEnglishPhonetic(cleanTarget, "uk"),
         };
       });
 

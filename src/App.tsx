@@ -686,7 +686,7 @@ export default function App() {
 
           <p className="text-stone-300 text-xs">
             你在本次限时练习里完成了连续 <span className="font-bold font-mono text-amber-400 text-sm">{ceremonyRounds}</span> 轮极致熟化拼写！<br />
-            {ceremonyCards.length > 1 ? "这批卡牌" : "该卡牌"}已经永久存放进您的 <b>“个人收藏馆”</b>，您可以随时翻阅并请求博学人工智能 <b>Gemini 解构文化故事</b>。
+            {ceremonyCards.length > 1 ? "这批卡牌" : "该卡牌"}已经永久存放进您的 <b>“个人收藏馆”</b>，您可以随时翻阅并请求博学人工智能 <b>Gemini {isEnglishMode ? "解读词源与故事" : "解构文化故事"}</b>。
           </p>
 
           {showCeremonyChart && (

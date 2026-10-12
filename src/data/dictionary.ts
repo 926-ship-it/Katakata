@@ -1,5 +1,6 @@
 import { CELEBRITY_DICTIONARY, CELEBRITY_ENGLISH_OVERLAYS } from "./celebrityData";
 import { KPOP_RIVALRY_DICTIONARY, KPOP_RIVALRY_ENGLISH_OVERLAYS } from "./kpopAndRivalryData";
+import { getEnglishPhonetic } from "../utils/englishPhonetics";
 
 export interface KanaSegment {
   kana: string;
@@ -20,6 +21,9 @@ export interface DictionaryItem {
   borderColor: string;
   bgGradient: string;
   segments: KanaSegment[];
+  phonetic?: string;
+  phoneticUk?: string;
+  phoneticUs?: string;
 }
 
 const BASE_DICTIONARY: DictionaryItem[] = [
@@ -1892,6 +1896,9 @@ export interface EnglishOverlay {
   word: string;
   categoryName: string;
   meaning: string;
+  phonetic?: string;
+  phoneticUk?: string;
+  phoneticUs?: string;
 }
 
 const BASE_ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
@@ -2001,9 +2008,9 @@ const BASE_ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
     meaning: "导演。电影背后的创意总监，统筹视觉镜头、角色成长和故事叙事的灵魂人物。"
   },
   sushi: {
-    word: "Sushi Rice",
+    word: "Jasmine Rice",
     categoryName: "西餐美味",
-    meaning: "寿司饭。经过温和调味、酸甜适口的短粒饱满大米，通常搭配海洋鲜美食材作轻盈一口食。"
+    meaning: "香米饭。颗粒饱满、蒸煮后散发天然清雅香气的优质大米，口感软糯香甜，是世界各地佐餐的百搭主食。"
   },
   matcha: {
     word: "Green Tea",
@@ -2013,7 +2020,7 @@ const BASE_ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
   ramen: {
     word: "Spicy Noodles",
     categoryName: "西餐美味",
-    meaning: "香辣拉面。热气腾腾、香气四溢的拉面，浸在精心熬制的浓郁高汤中，辅以香辛红油，暖腹安心。"
+    meaning: "香浓热汤面。热气腾腾、香气四溢的拉面，浸在精心熬制的浓郁高汤中，辅以香辛红油，暖腹安心。"
   },
   wagashi: {
     word: "Cheesecake",
@@ -2028,12 +2035,12 @@ const BASE_ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
   jinja: {
     word: "Cathedral",
     categoryName: "物品与概念",
-    meaning: "大堂（大教堂）。宏伟壮丽、充满信仰气息的神圣建筑杰作，以高耸的尖顶拱门和斑斓彩色玻璃天窗著称。"
+    meaning: "大教堂。宏伟壮丽、充满庄严气息的神圣建筑杰作，以高耸的尖顶拱门和斑斓彩色玻璃天窗著称。"
   },
   ninja: {
     word: "Shadow Agent",
     categoryName: "物品与概念",
-    meaning: "影子情报员。精通隐匿、打探等影子谍战术，行动绝对隐秘快速、忠诚而敏锐的顶尖战术高手。"
+    meaning: "影子情报员。精通隐匿、打探等谍战术，行动绝对隐秘快速、忠诚而敏锐的顶尖侦察高手。"
   },
   bushi: {
     word: "Knight",
@@ -2043,12 +2050,12 @@ const BASE_ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
   bento: {
     word: "Lunch Box",
     categoryName: "物品与概念",
-    meaning: "便当盒（午餐盒）。分隔清晰、设计周到的便携容器，用于盛装丰盛、富有家常关怀的手作膳食。"
+    meaning: "便携午餐盒。分隔清晰、设计周到的便携容器，用于盛装丰盛、富有家常关怀的手作膳食。"
   },
   onsen: {
     word: "Hot Spring",
     categoryName: "自然与动物",
-    meaning: "温泉。地下天然涌出的富含矿物质的地热温水，对舒缓肌肉、静心理疗有极佳的放松和治愈疗效。"
+    meaning: "地热温泉。地下天然涌出的富含矿物质的地热温水，对舒缓肌肉、静心理疗有极佳的放松和治愈疗效。"
   },
   hotaru: {
     word: "Firefly",
@@ -2058,7 +2065,7 @@ const BASE_ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
   semi: {
     word: "Cicada",
     categoryName: "自然与动物",
-    meaning: "蝉。在盛夏至酷热季节的绿树上，不断发出高亢声浪和悠扬鸣叫声、象征生命灿烂宣泄的昆虫。"
+    meaning: "蝉。在盛夏酷热季节的绿树上，不断发出高亢声浪和悠扬鸣叫声、象征生命灿烂宣泄的昆虫。"
   },
   haiku: {
     word: "Poetry",
@@ -2078,22 +2085,22 @@ const BASE_ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
   soba: {
     word: "Buckwheat",
     categoryName: "西餐美味",
-    meaning: "荞麦。一种高度营养的耐旱谷类作物，主要用于碾作面粉，从而烹制成经典的传统麦香荞麦面条。"
+    meaning: "荞麦。一种高度营养的耐旱谷类作物，主要用于碾作面粉，从而烹制成健康的传统麦香面点。"
   },
   tempura: {
     word: "Fried Shrimp",
     categoryName: "西餐美味",
-    meaning: "天妇罗大虾（炸虾）。裹着酥金黄金面衣的肥美大虾，经精微妙火油炸，口感酥脆蓬松、虾肉鲜甜Q弹。"
+    meaning: "黄金脆皮炸虾。裹着轻盈黄金面衣的肥美大虾，经精微妙火油炸，口感酥脆蓬松、虾肉鲜甜Q弹。"
   },
   takoyaki: {
     word: "Octopus Ball",
     categoryName: "西餐美味",
-    meaning: "章鱼小丸子。一种源于街头的美味，在特制烤盘上翻转烤成金黄色外皮，包裹大块Q弹章鱼，香气四溢。"
+    meaning: "香酥海鲜丸。外皮金黄焦香、内里包裹大颗Q弹海鲜的特色风味小吃，淋上特调酱汁，香浓四溢。"
   },
   mochi: {
     word: "Rice Cake",
     categoryName: "西餐美味",
-    meaning: "糯米糕。通过熟糯米碾打塑造而成的美味，质地极其柔韧软糯，可包甜馅或加入汤中慢熬。"
+    meaning: "软糯米糕。通过熟糯米碾打蒸制而成的美味，质地极其柔韧软糯，可包甜馅或加入汤中慢熬。"
   },
   gohan: {
     word: "Steamed Rice",
@@ -2103,7 +2110,7 @@ const BASE_ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
   yukata: {
     word: "Summer Dress",
     categoryName: "物品与概念",
-    meaning: "夏季轻服。质地极其透气、轻薄，在盛夏季节常作为乘凉、泡温泉和参加户外夏日野餐的休闲美装。"
+    meaning: "夏季轻服。质地极其透气、轻薄，在盛夏季节常作为乘凉、度假和参加户外夏日野餐的休闲美装。"
   },
   matsuri: {
     word: "Carnival",
@@ -2113,7 +2120,7 @@ const BASE_ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
   geisha: {
     word: "Dancer",
     categoryName: "物品与概念",
-    meaning: "舞者（传统演艺人）。受过顶尖训练的古典表演家，通过精湛优雅的中世纪舞姿向观众叙述历史传说。"
+    meaning: "古典舞者。受过严格专业训练的古典表演家，通过精湛优雅的舞姿向观众叙述历史传奇。"
   },
   origami: {
     word: "Paper Craft",
@@ -2138,147 +2145,147 @@ const BASE_ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
   kaze: {
     word: "Gentle Breeze",
     categoryName: "自然与动物",
-    meaning: "和风微风。一种轻柔拂面、温暖宜人的空气流动，悄然摇动枝叶和小风铃，令人心旷神怡。"
+    meaning: "和煦微风。轻柔拂面、温暖宜人的流动空气，悄然拂动枝叶与草地，带来舒适惬意的心情。"
   },
   shiba: {
     word: "Puppy Dog",
     categoryName: "自然与动物",
-    meaning: "柴犬。忠诚机警、性格极其逗趣亲人的日本本土名品古犬种，常常展现出阳光治愈系的微风微笑。"
+    meaning: "活泼小狗。忠诚机警、活泼可爱的人类好朋友，带来无限欢乐与陪伴，是家庭的开心果。"
   },
   katana: {
-    word: "Samurai Sword",
+    word: "Broadsword",
     categoryName: "物品与概念",
-    meaning: "日本武士刀。凭借其标志性的单刃弯曲造型与登峰造极的折叠锻打淬火技艺享誉全球，代表不可侵犯的荣誉、正义与坚定灵魂。"
+    meaning: "中世纪阔剑。古典英勇骑士的标志性随身佩剑，代表勇气、正义与捍卫誓言的坚强信念。"
   },
   manga: {
     word: "Comic Book",
     categoryName: "物品与概念",
-    meaning: "日式漫画书。拥有极其丰富的影视分镜画风和深切的情感共鸣，是广受全球读者喜爱、象征无限创意想象的殿堂级画册。"
+    meaning: "漫画书、连环画。由生动插图与精彩对白构成的流行读物，讲述英雄历险与奇幻故事，极富想象力。"
   },
   yakitori: {
     word: "Chicken Skewer",
     categoryName: "西餐美味",
-    meaning: "炭烤鸡串。居酒屋经典风味小吃，在红红炭火上把鲜美多汁的肉块烤制得外酥里香，让人赞不绝口。"
+    meaning: "香烤鸡肉串。在炭火上精心慢烤的金黄鸡肉串，刷上特制酱汁并撒上香料，外焦里嫩、肉香扑鼻。"
   },
   kinkakuji: {
-    word: "Golden Pavilion",
+    word: "Golden Hall",
     categoryName: "物品与概念",
-    meaning: "金阁寺。京都最负盛名的金箔禅宗楼阁建筑，其在明镜般的池塘中映照出流光溢彩的金色倒影，充满震撼的极致之美。"
+    meaning: "金色殿堂。金碧辉煌、宏伟壮丽的古典殿阁建筑，常用于举行盛大庆典与加冕礼仪，象征尊贵与荣耀。"
   },
   wasabi: {
     word: "Spicy Horse Radish",
     categoryName: "西餐美味",
-    meaning: "辛辣山葵。一种带有个性张扬、辛辣呛鼻快感的青绿根茎植物泥，解腻提鲜，是衬托顶奢刺身食材不可或缺的灵魂配料。"
+    meaning: "香辣辣根泥。一种辛辣呛鼻、风味浓郁的绿色根茎蔬菜泥，解腻提鲜，是西餐炙烤牛排与海鲜的经典蘸料。"
   },
   hinata: {
     word: "Sunny Meadow",
-    categoryName: "西式人名",
-    meaning: "桑尼（Sunny/日向）。意为‘阳光普照、明媚温暖的宝地’，寄托着像阳光一样纯真善良、温暖身边所有人的美好品行。"
+    categoryName: "自然与动物",
+    meaning: "阳光草甸。意为‘阳光普照、开满野花的明媚田野’，传递出像沐浴暖阳般温暖治愈、开朗乐观的心境。"
   },
   sakurajima: {
-    word: "Smoking Volcano",
+    word: "Volcano",
     categoryName: "自然与动物",
-    meaning: "冒烟活火山（樱岛）。耸立在清澈深蓝海面之上的地质活化石奇观，终年不息涌出的白雾昭示着大地深处蓬勃跃动的原动力。"
+    meaning: "活火山。终年升腾着地热蒸汽与壮丽烟云的自然地质奇观，展现地球深处雄浑磅礴的原生自然力量。"
   },
   shogun: {
     word: "Supreme General",
     categoryName: "物品与概念",
-    meaning: "幕府大将军。中世纪幕府武家政权事实上的最高独裁掌权者，代表征夷统帅武家至高无上的霸权、威严与历史尊耀。"
+    meaning: "最高统帅、总司令。指挥统筹全局的高阶军事领袖，代表着严密谋略、果敢决断与卓越领导力。"
   },
   tatami: {
     word: "Straw Mat",
     categoryName: "物品与概念",
-    meaning: "榻榻米草垫。用天然蔺草编织的和室传统地板铺垫，散发着草本清香，提供舒适自然、古朴清雅的席地起居体验。"
+    meaning: "编织草垫。采用天然干草或植物纤维精细编织的清爽坐垫与地席，环保透气，适合户外野餐与休憩。"
   },
   tsubaki: {
     word: "Camellia Flower",
     categoryName: "自然与动物",
-    meaning: "山茶花。不惧隆冬雪压、兀自盛开出饱满红艳花冠的常绿名花，在雪野中极其艳丽，代表清雅傲骨与不凡品质。"
+    meaning: "山茶花。不惧严寒、傲然盛开的冬春常绿名花，花瓣饱满艳丽，代表清雅傲骨与不凡品质。"
   },
   teriyaki: {
-    word: "Glazed Sauce Grill",
+    word: "Barbecue Grill",
     categoryName: "西餐美味",
-    meaning: "照烧烤。用甜熟酱油、清酒、糖汁熬煮的琥珀色调料烤肉。表皮色泽金亮如镜，焦香扑鼻，风味咸甜美妙。"
+    meaning: "西式炭烤BBQ。裹上特制香浓烤肉酱在炭火上烤制的美味肉食，表皮焦香扑鼻，肉质鲜嫩多汁。"
   },
   zen: {
-    word: "Zen Meditation",
+    word: "Deep Meditation",
     categoryName: "物品与概念",
-    meaning: "禅。源自深邃东方、讲究静虑和心灵悟道的修行法门。提倡在绝对寂静观照中觉察内在真实的澄明状态。"
+    meaning: "深度冥想。通过专注呼吸与内心觉察来平复思绪、释放压力的思维训练，帮助找回内心的专注与平静。"
   },
   haruto: {
     word: "Harry",
     categoryName: "西式人名",
-    meaning: "哈里（Harry/阳翔）。源自日耳曼语，意为‘家庭的统治者’，象征着温馨守护、忠诚与坚实如初的高尚品质。"
+    meaning: "哈里（Harry）。源自日耳曼语，意为‘家园守护者’或‘领地领袖’，充满亲和力、英勇忠诚且历久弥新。"
   },
   yuto: {
     word: "Ethan",
     categoryName: "西式人名",
-    meaning: "伊桑（Ethan/悠人）。意为‘坚固的’、‘力量无穷的’，给人以沉稳厚重、内心世界极度丰富且长寿平安的美好期望。"
+    meaning: "伊桑（Ethan）。源自希伯来语，意为‘坚固的’、‘恒久坚毅的’，象征着沉稳可靠、刚毅内敛的高尚品质。"
   },
   sota: {
     word: "Leo",
     categoryName: "西式人名",
-    meaning: "里奥（Leo/奏太）。意为‘勇敢的狮子’，象征着生命中无所畏惧的冒险精神、非凡魅力与宽广豁达的王者胸怀。"
+    meaning: "里奥（Leo）。拉丁语意为‘雄狮’，象征着无所畏惧的冒险精神、非凡魅力与宽广豁达的王者胸怀。"
   },
   yua: {
     word: "Grace",
     categoryName: "西式人名",
-    meaning: "格蕾丝（Grace/结爱）。意为‘优雅、神圣的恩泽’。祝愿孩子一生温婉贤淑、仪态大方且处处深受他人善意与关爱。"
+    meaning: "格蕾丝（Grace）。意为‘优雅、神圣的恩泽’，寓意温婉贤淑、仪态大方且处处深受他人善意与关爱。"
   },
   mei: {
     word: "May",
     categoryName: "西式人名",
-    meaning: "梅（May/芽依）。象征着春暖花开、绿意盎然的明媚五月，代表着青春、生机与纯真自然的温润美丽。"
+    meaning: "梅（May）。象征着绿草如茵、繁花盛开的明媚五月，代表着青春、生机与纯真自然的温润美丽。"
   },
   tsumugi: {
     word: "Emma",
     categoryName: "西式人名",
-    meaning: "艾玛（Emma/紬）。意为‘无所不能的’、‘宇宙般宏大的’。历史上极其流行，象征杰出的家庭智慧与高尚的品行。"
+    meaning: "艾玛（Emma）。源自日耳曼语，意为‘包容全面的’、‘宏大的’，象征独立、聪慧与坚韧不拔的品格。"
   },
   akira: {
     word: "Albert",
     categoryName: "西式人名",
-    meaning: "艾伯特（Albert/辉）。意为‘高贵、杰出和聪明的’。代表着学术上的傲人造诣、明察秋毫的智慧与浩瀚的前程。"
+    meaning: "艾伯特（Albert）。意为‘高贵、杰出与明智的’，常令人联想到严谨深刻的学者风范与前沿智慧。"
   },
   kenji: {
     word: "Kevin",
     categoryName: "西式人名",
-    meaning: "凯文（Kevin/健二）。源自凯尔特语，意为‘温和、俊美的出生’。具有开朗幽默、乐于助人且脚踏实地的人格魅力。"
+    meaning: "凯文（Kevin）。源自古爱尔兰语，意为‘温文儒雅、俊朗清秀的’，具有开朗幽默、乐于助人的魅力。"
   },
   ren: {
     word: "Ryan",
     categoryName: "西式人名",
-    meaning: "瑞恩（Ryan/莲）。意为‘英勇的小国王’。代表着独立思考、追求卓越的执着信念以及出类拔萃的杰出领导力。"
+    meaning: "瑞恩（Ryan）。源自盖尔语，意为‘年轻的领航者’或‘小国王’，代表独立思考与追求卓越的信念。"
   },
   aoi: {
     word: "Alice",
     categoryName: "西式人名",
-    meaning: "爱丽丝（Alice/葵）。意为‘高贵而真诚的’。令人联想到童话梦境，代表纯真、善良与不懈探索真相的勇气。"
+    meaning: "爱丽丝（Alice）。意为‘高贵而真诚的’，令人联想到经典童话梦境，代表纯真、善良与探索未知的勇气。"
   },
   rin: {
     word: "Lily",
     categoryName: "西式人名",
-    meaning: "莉莉（Lily/凛）。代表圣洁的百合花，象征纯洁无瑕、高雅不俗以及傲立于霜雪之中的高贵生命姿态。"
+    meaning: "莉莉（Lily）。意为‘纯洁优雅的百合花’，象征纯洁无瑕、高雅不俗以及傲立于风霜之中的高贵姿态。"
   },
   takumi: {
     word: "Tyler",
     categoryName: "西式人名",
-    meaning: "泰勒（Tyler/拓海）。本义指‘勤勉敬业的砖瓦工匠’。引申为凭借勤劳双手、无限创意开拓崭新天地的卓越实干家。"
+    meaning: "泰勒（Tyler）。本义指‘勤勉专注的工匠筑梦者’，引申为脚踏实地、凭借双手开拓崭新天地的卓越实干家。"
   },
   shamisen: {
     word: "Banjo Music",
     categoryName: "物品与概念",
-    meaning: "班卓琴（三味线）。极具乡村风情和清脆金属弹拨质感的传统琴弦乐器，手指弹奏间发出活泼、跳跃的元气声响。"
+    meaning: "班卓琴之音。美洲乡村民谣中标志性的弹拨弦乐器，手指拨动间发出清脆欢快的金属颤音，节奏明快热烈。"
   },
   shodou: {
     word: "Calligraphy",
     categoryName: "物品与概念",
-    meaning: "书法艺术。在纸张上用毛笔挥洒墨汁的书写技艺，通过富有节奏张力的线条线条勾勒，呈现出超脱凡俗的汉字灵魂之美。"
+    meaning: "艺术书法。运用专业蘸水笔和优美笔触勾勒的花体手写字母艺术，线条华丽优雅，富有深厚的人文美感。"
   },
   sensu: {
     word: "Folding Fan",
     categoryName: "物品与概念",
-    meaning: "折扇。采用轻盈竹骨手工编织而成的精致可折叠小扇，既能在热浪中扇拂来徐徐凉风，也是众多古典歌剧中彰显温雅高贵的饰物。"
+    meaning: "折扇。采用轻盈骨架精心制作的便携折叠小扇，既能在热浪中扇拂来徐徐凉风，也是古典舞台上的优雅道具。"
   },
   koto: {
     word: "Harp Melody",
@@ -2288,117 +2295,117 @@ const BASE_ENGLISH_OVERLAYS: Record<string, EnglishOverlay> = {
   wagasa: {
     word: "Paper Umbrella",
     categoryName: "物品与概念",
-    meaning: "油纸竹伞（和伞）。采用毛竹伞架和防水油纸手工扎制而成的古朴雨伞，散发着天然茶油芬芳，在细雨中平添一分古意画卷。"
+    meaning: "古典油纸伞。采用天然轻竹与防水油纸手工制作的典雅雨伞，散发古典文艺气息，常用于复古戏剧与艺术摄影。"
   },
   sudachi: {
     word: "Lime Fruit",
     categoryName: "西餐美味",
-    meaning: "青柠檬果（醋橘）。色泽饱满翠绿、果汁酸冽清新且略带芬芳香气，是调配精致鸡尾酒与衬托各种炙烤海鲜必不可少的点睛佐料。"
+    meaning: "青柠檬果。色泽饱满翠绿、果香酸爽清新，是调制莫吉托鸡尾酒、西餐沙拉与炙烤海鲜必不可少的经典佐料。"
   },
   furoshiki: {
     word: "Wrapping Cloth",
     categoryName: "物品与概念",
-    meaning: "便携包裹布（风吕敷）。一张质地优良、四角整齐的多功能包袱布，通过几下轻松折叠和神奇打结，便能包装好各样随身行囊。"
+    meaning: "多功能包裹布。质地优良、图案精致的多功能布巾，可通过巧妙折叠打结包裹礼盒与随身物品，优雅又环保。"
   },
   daikon: {
     word: "White Radish",
     categoryName: "西餐美味",
-    meaning: "白萝卜（大根）。质地多汁水润、味道清甜略带微辛的健康根茎类蔬菜，最适合慢火煮透食用，给肠胃最温润的抚慰。"
+    meaning: "白萝卜。质地多汁脆嫩、口感甘甜爽口的健康根茎类蔬菜，富含维生素，适合慢火煲汤或炖煮，营养温润。"
   },
   soji: {
     word: "Cleaning Up",
     categoryName: "物品与概念",
-    meaning: "日常大扫除。通过拂尘除垢、扫净地面与整理归纳，让杂乱的环境重归明亮光洁，有助于在井然秩序中重获精神松弛与专注。"
+    meaning: "日常大扫除。通过拂尘除垢、扫净地面与整理归类，让生活环境重归明亮光洁，有助于在秩序中获得专注与放松。"
   },
   sudoku: {
     word: "Number Puzzle",
     categoryName: "物品与概念",
-    meaning: "九宫格数独。由数字组成的、极为考验脑力的严密逻辑推理游戏，玩家在纸笔填数之间锻炼无与伦比的专注度与条理性。"
+    meaning: "九宫格数独。由数字组成的严密逻辑推理益智游戏，玩家在填数之间锻炼无与伦比的专注力与条理性。"
   },
   ikebana: {
     word: "Flower Art",
     categoryName: "物品与概念",
-    meaning: "插花艺术（生花）。利用盛开的鲜花与古雅的绿意枝干在器皿中精巧排布，展现出充满自然生命活力和高低错落层次的美学盛宴。"
+    meaning: "插花艺术。将新鲜花卉、枝叶与器皿巧妙组合的现代花艺设计，为室内空间增添生机盎然的优雅品味。"
   },
   kendama: {
     word: "Cup and Ball",
     categoryName: "物品与概念",
-    meaning: "剑玉玩具。深受各国孩子们喜爱的、富有挑战性的木制抛接球玩具，需要在屏息凝神间调动全身协调感完成花样接球动作。"
+    meaning: "抛接球玩具。经典复古的木制手眼协调益智玩具，通过手腕发力将连接的小球稳稳接在手柄杯槽中，趣味十足。"
   },
   soroban: {
     word: "Abacus Calculator",
     categoryName: "物品与概念",
-    meaning: "复古算盘。拥有精巧滑动算珠的古老木制快速计算框架，算珠拨动间发出清脆碰撞声，体现先辈无穷的数学和理财智慧。"
+    meaning: "复古算盘。拥有精巧滑动算珠的古老木制快速计算框架，算珠拨动间发出清脆碰撞声，体现先辈无穷的数学智慧。"
   },
   manekineko: {
     word: "Lucky Cat",
     categoryName: "物品与概念",
-    meaning: "招财福猫。店铺大堂里总能见到的招手吉祥猫公仔，不断挥舞的小爪子寓意广迎八方宾客、驱散霉运，带来源源不断的好运。"
+    meaning: "招财猫公仔。全球各地店铺与书桌前常见的可爱挥爪猫咪摆件，寓意着广迎八方好运、财富与欣欣向荣的美好祝福。"
   },
   kokeshi: {
     word: "Wooden Doll",
     categoryName: "物品与概念",
-    meaning: "手工木偶娃娃（木芥子）。用整块优质原木经工匠手工旋削、彩绘而成的质朴圆头小娃娃，散发着田园木质芬芳与温馨童趣。"
+    meaning: "手工木偶娃娃。用整块优质原木经工匠手工旋削、彩绘而成的质朴圆头小木偶，散发着田园木质芬芳与温馨童趣。"
   },
   tengu: {
-    word: "Mountain Goblin",
+    word: "Forest Elf",
     categoryName: "物品与概念",
-    meaning: "深山天狗。神话传说中居住在深山老林、生有黑翼、红脸长鼻、行踪诡秘而法力滔天的飞天妖神，手执羽扇，威震四方。"
+    meaning: "森林树精。西方奇幻传说与民间童话中栖居在古老森林的神秘精灵，性格诙谐狡黠，熟悉大自然的一切奥秘。"
   },
   tanzaku: {
     word: "Wish Paper",
     categoryName: "物品与概念",
-    meaning: "彩色许愿长纸笺。用各种亮丽彩色纸裁剪成的小长条，承载着人们亲笔书写的真挚心愿，系挂在翠竹梢头，期盼星光点亮梦想。"
+    meaning: "许愿卡笺。用各种亮丽彩色纸裁剪成的小长条，承载着人们亲笔书写的真挚心愿，系在祈愿树上，期盼梦想成真。"
   },
   obento: {
     word: "Lunch Box meal",
     categoryName: "西餐美味",
-    meaning: "手作盒饭便当。用精美隔板在饭盒中摆盘精美的美味，充满五彩斑斓的营养搭配与制作人的亲切叮咛，是正午充电的绝佳拍档。"
+    meaning: "便携营养便当。摆盘精美、营养均衡的便携膳食，五彩斑斓的食材搭配让人食欲大开，是正午充电的绝佳拍档。"
   },
   kamakura: {
     word: "Snow Igloo",
     categoryName: "物品与概念",
-    meaning: "冬日小雪屋。在白雪皑皑原野中用夯实雪块垒砌而成的圆顶冰雪保暖小房子，炉火摇曳间暖融融，是体验冬日宁静的仙境。"
+    meaning: "圆顶小雪屋。在白雪皑皑的原野中用雪块垒砌而成的圆顶保暖小屋，炉火摇曳间暖融融，是体验冬日安宁的庇护所。"
   },
   teruterubozu: {
     word: "Sunny Doll",
     categoryName: "物品与概念",
-    meaning: "晴天娃娃。悬挂在窗棂边上的白色可爱小晴天玩偶，旨在乞求乌云退散、迎来灿烂明媚的温暖太阳，蕴含纯真期盼。"
+    meaning: "晴天小布偶。悬挂在窗棂边上的白色可爱晴天玩偶，旨在祈盼雨过天晴、迎来灿烂温暖的阳光，蕴含纯真期盼。"
   },
   senkouhanabi: {
     word: "Sparkler Toy",
     categoryName: "物品与概念",
-    meaning: "线香冷烟花。在微风夏夜中点燃的火药纸棒，炸裂出极其细碎、犹如一簇簇金色繁星般温柔闪烁的漫天火花，绝美非凡。"
+    meaning: "手持仙女棒烟花。在微风夏夜中点燃的冷光烟花，金色繁星般的细碎光芒在指尖闪烁绽放，浪漫迷人。"
   },
   origami_tsuru: {
     word: "Paper Crane",
     categoryName: "物品与概念",
-    meaning: "折纸千纸鹤。代表着纯洁祈祷、早日康复以及深切祝福的经典手工折纸仙鹤，象征将心意飞越千山万水传递给心中的那个人。"
+    meaning: "折纸飞鹤。象征着和平、早日康复与真挚祝福的手工折纸仙鹤，相传折满千只飞鹤便能让心愿飞越高山大海成真。"
   },
   fujisan: {
-    word: "Mount Fuji",
+    word: "Alpine Peak",
     categoryName: "自然与动物",
-    meaning: "富士雪山。举世闻名的完美对称休眠火山，其常年不化的皑皑白雪山头与粉嫩樱花交相辉映，是清雅绝俗与永恒大美的神圣化身。"
+    meaning: "阿尔卑斯雪峰。高耸入云的雄伟白雪山巅，终年积雪在阳光照耀下宛如耀眼王冠，是壮阔大自然与探险精神的象征。"
   },
   onsen_tamago: {
     word: "Poached Egg",
     categoryName: "西餐美味",
-    meaning: "温泉流沙蛋。在温暖天然温泉中经过温和火候久煨而出的软嫩半熟蛋，宛如白玉布丁，裹着流沙般的浓郁蛋黄，入口软滑清香。"
+    meaning: "西式水波蛋。在微沸热水中精心煮制的嫩滑溏心蛋，蛋白细嫩凝固，切开时金黄蛋黄如熔岩般缓缓流淌，是早午餐的灵魂。"
   },
   edamame: {
     word: "Green Soybean",
     categoryName: "西餐美味",
-    meaning: "盐水毛豆。在滚热咸水中快火煮熟的翠绿毛豆荚，是和风夏日里最清爽解腻的健康下酒开胃冷盘小食。"
+    meaning: "脆绿鲜毛豆。在滚热咸水中快火煮熟的翠绿毛豆荚，清脆甘甜，富含优质植物蛋白，是健康轻食与蔬果沙拉的理想伴侣。"
   },
   tanuki: {
     word: "Raccoon Dog",
     categoryName: "自然与动物",
-    meaning: "和风福运狸猫。日本古老传说里善于变身的可爱狸猫陶制像，常作为招财化煞、开运亨通的玄关迎客吉祥挂件摆设。"
+    meaning: "野生貉（小浣熊）。毛茸茸、机灵可爱的林栖小动物，拥有标志性的环状尾巴与黑色眼罩面纹，活泼又敏捷。"
   },
   wotome: {
     word: "Young Maiden",
-    categoryName: "文学与民风",
-    meaning: "和歌雅致少女。在日本《万叶集》等古乐民风中，对清丽、纯真而富有生机之大和少女的诗意称誉，代表最古朴天然的青春之美。"
+    categoryName: "物品与概念",
+    meaning: "纯真少女。西方浪漫主义文学与古典诗篇中常被歌颂的清丽少女形象，象征着青春年华的纯洁、生机与美好向往。"
   }
 };
 
@@ -2443,6 +2450,7 @@ export function getDictionary(isEnglishMode: boolean, isKatakanaMode?: boolean):
         };
       });
       
+      const ipa = overlay.phonetic || getEnglishPhonetic(overlay.word);
       return {
         ...item,
         kanji: overlay.word,
@@ -2450,10 +2458,18 @@ export function getDictionary(isEnglishMode: boolean, isKatakanaMode?: boolean):
         categoryName: overlay.categoryName,
         meaning: overlay.meaning,
         segments: segments,
+        phonetic: ipa,
+        phoneticUs: overlay.phoneticUs || getEnglishPhonetic(overlay.word, "us"),
+        phoneticUk: overlay.phoneticUk || getEnglishPhonetic(overlay.word, "uk"),
       };
     });
 
-    const englishCustoms = customItems.filter(c => (c as any).lang === "en" || /^[a-zA-Z0-9\s\.\,\!\?]+$/.test(c.kanji));
+    const englishCustoms = customItems
+      .filter(c => (c as any).lang === "en" || /^[a-zA-Z0-9\s\.\,\!\?]+$/.test(c.kanji))
+      .map(c => ({
+        ...c,
+        phonetic: c.phonetic || getEnglishPhonetic(c.kanji),
+      }));
     return [...englishCustoms, ...mappedBase];
   }
   

@@ -4,6 +4,7 @@ import { X, Plus, Sparkles, Volume2, CheckCircle2, AlertCircle, Loader2, FileTex
 import { DictionaryItem } from "../data/dictionary";
 import { splitKanaIntoSyllables, splitAlphabeticIntoSegments, saveStoredCustomWord } from "../utils/kanaHelper";
 import { saveCustomSpanishWord, SpanishWord, SPANISH_CATEGORIES } from "../data/spanishData";
+import { getEnglishPhonetic } from "../utils/englishPhonetics";
 import { audioSynth } from "../utils/audio";
 
 interface AddWordModalProps {
@@ -40,6 +41,7 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({
 
   // English Form
   const [enWord, setEnWord] = useState("");
+  const [enPhonetic, setEnPhonetic] = useState("");
   const [enMeaning, setEnMeaning] = useState("");
   const [enCategory, setEnCategory] = useState("custom");
 
@@ -216,6 +218,7 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({
       }
 
       const segments = splitAlphabeticIntoSegments(cleanWord);
+      const ipa = enPhonetic.trim() || getEnglishPhonetic(cleanWord);
       const newItem: DictionaryItem = {
         id: "custom-en-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6),
         kanji: cleanWord,
@@ -229,6 +232,9 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({
         borderColor: "border-blue-400",
         bgGradient: "from-blue-50 to-indigo-100",
         segments: segments,
+        phonetic: ipa,
+        phoneticUs: ipa,
+        phoneticUk: getEnglishPhonetic(cleanWord, "uk"),
       };
 
       saveStoredCustomWord(newItem);
@@ -236,6 +242,7 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({
       setNotification({ type: "success", message: `✅ 成功录入英语单词「${cleanWord}」！` });
 
       setEnWord("");
+      setEnPhonetic("");
       setEnMeaning("");
       setTimeout(() => {
         onClose();
@@ -559,11 +566,44 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({
                     type="text"
                     required
                     value={enWord}
-                    onChange={(e) => setEnWord(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEnWord(val);
+                      if (!enPhonetic && val.trim()) {
+                        setEnPhonetic(getEnglishPhonetic(val.trim()));
+                      }
+                    }}
                     placeholder="如：Ephemeral, Serendipity"
                     className="w-full px-3 py-2 text-sm rounded-xl border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-sans"
                   />
                 </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-stone-600">
+                      国际音标 (IPA)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (enWord.trim()) {
+                          setEnPhonetic(getEnglishPhonetic(enWord.trim()));
+                        }
+                      }}
+                      className="text-[10px] text-amber-700 hover:text-amber-900 font-bold underline cursor-pointer"
+                    >
+                      重新自动推导
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={enPhonetic}
+                    onChange={(e) => setEnPhonetic(e.target.value)}
+                    placeholder="如：/ɪˈfem.ər.əl/（留空将自动推导）"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-serif"
+                  />
+                </div>
+
                 <div>
                   <label className="block text-[11px] font-bold text-stone-600 mb-1">
                     中文简明释义 *

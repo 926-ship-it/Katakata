@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { BookOpen, Sparkles, Calendar, RotateCw, ArrowLeft, Lightbulb, Hourglass, HelpCircle, Activity, Volume2, PenTool, Download, Upload, MessageSquare, Send, Bot, User, Trash2 } from "lucide-react";
 import { DICTIONARY, DictionaryItem, getDictionary } from "../data/dictionary";
+import { getEnglishPhonetic } from "../utils/englishPhonetics";
 import { audioSynth } from "../utils/audio";
 import { CalligraphyCanvas } from "./CalligraphyCanvas";
 import { CardIllustration } from "./CardIllustration";
@@ -388,7 +389,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
       if (res.ok && data.story) {
         setAiStory(data.story);
       } else {
-        setAiStory(data.error || (isEnglishMode ? "Failed to get core cultural description. Please try again later." : "获取民俗文化简介失败，外部网络未响应，请稍后再试。"));
+        setAiStory(data.error || (isEnglishMode ? "获取英文词汇词源与用法简介失败，请稍后再试。" : "获取民俗文化简介失败，外部网络未响应，请稍后再试。"));
       }
     } catch (err: any) {
       console.error(err);
@@ -941,7 +942,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                           等阶·{toHanNumeral(upgrade.level)} · {getLevelTitle(upgrade.level)}
                         </div>
                         <p className="text-[10px] font-mono text-stone-500 font-bold italic leading-none">
-                          {isEnglishMode ? "" : `(${item.kanaStr})`}
+                          {isEnglishMode ? (item.phonetic || getEnglishPhonetic(item.kanji)) : `(${item.kanaStr})`}
                         </p>
                       </>
                     ) : (
@@ -1357,10 +1358,16 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                     >
                       {selectedCard.kanji}
                     </h2>
-                    <div className="flex justify-center gap-1 text-[9px] text-stone-650 font-medium">
+                    <div className="flex justify-center items-center flex-wrap gap-1 text-[9px] text-stone-650 font-medium">
                       <span>{isEnglishMode ? "单词:" : "假名:"} <b>{isEnglishMode ? selectedCard.kanji : selectedCard.kanaStr}</b></span>
                       <span className="text-stone-300">|</span>
                       <span>{isEnglishMode ? "拼写:" : "罗马音:"} <b>{selectedCard.segments.map(s => s.displayRomaji).join("")}</b></span>
+                      {isEnglishMode && (selectedCard.phonetic || getEnglishPhonetic(selectedCard.kanji)) && (
+                        <>
+                          <span className="text-stone-300">|</span>
+                          <span className="text-amber-800 font-bold font-serif">音标: <b>{selectedCard.phonetic || getEnglishPhonetic(selectedCard.kanji)}</b></span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1369,7 +1376,13 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                 <div className="space-y-2 z-10 w-full">
                   <div className="flex justify-center">
                     <button
-                      onClick={() => audioSynth.speakJapanese(selectedCard.kanaStr)}
+                      onClick={() => {
+                        if (isEnglishMode) {
+                          audioSynth.speakFullWord(selectedCard.kanji, undefined, selectedCard.kanji, undefined, "en");
+                        } else {
+                          audioSynth.speakJapanese(selectedCard.kanaStr);
+                        }
+                      }}
                       className="px-3 py-1 rounded-full bg-stone-900/10 hover:bg-stone-900/20 text-stone-800 transition-all text-[9px] font-bold flex items-center gap-1 cursor-pointer shadow-xs animate-pulse"
                     >
                       <Volume2 className="w-3 h-3 text-stone-700" />
@@ -1398,7 +1411,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                       : "border-transparent text-stone-400 hover:text-stone-700"
                   }`}
                 >
-                  🔮 文化释义
+                  {isEnglishMode ? "📚 词汇释义" : "🔮 文化释义"}
                 </button>
                 <button
                   onClick={() => {
@@ -1463,14 +1476,16 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <Sparkles className="w-4 h-4 text-rose-500" />
-                        <span className="text-xs font-mono font-bold text-stone-800">GEMINI AI 文化起源大百科</span>
+                        <span className="text-xs font-mono font-bold text-stone-800">
+                          {isEnglishMode ? "GEMINI AI 词源与故事大百科" : "GEMINI AI 文化起源大百科"}
+                        </span>
                       </div>
                       {!aiStory && !loadingAi && (
                         <button
                           onClick={() => handleFetchAiStory(selectedCard)}
                           className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-stone-50 font-bold text-xs flex items-center gap-1 cursor-pointer shadow-sm animate-bounce"
                         >
-                          🔮 探索文化轶事故事
+                          {isEnglishMode ? "📖 解读词源与用法故事" : "🔮 探索文化轶事故事"}
                         </button>
                       )}
                     </div>
@@ -1486,7 +1501,7 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                         </div>
                         <span className="text-xs font-mono text-stone-500 animate-pulse">
                           {isEnglishMode 
-                            ? "Gemini 正在根据本词汇检索历史背景与文化起源，请稍候..." 
+                            ? "Gemini 正在检索该英文词汇的词源故事与精妙用法，请稍候..." 
                             : "Gemini 正在根据本姓氏检索历史编年志与民俗起源，请稍候..."}
                         </span>
                       </div>

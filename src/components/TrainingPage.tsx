@@ -9,6 +9,7 @@ import { CalligraphyCanvas } from "./CalligraphyCanvas";
 import { uiTranslate, LANG_MAPPING } from "../utils/lang";
 import { SessionTrendChart } from "./SessionTrendChart";
 import { saveSessionLog } from "../utils/sessionLogs";
+import { getEnglishPhonetic } from "../utils/englishPhonetics";
 
 interface TrainingPageProps {
   items: DictionaryItem[];
@@ -49,7 +50,9 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [timerFinished, setTimerFinished] = useState<boolean>(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState<boolean>(false);
+  const [showPhonetic, setShowPhonetic] = useState<boolean>(true);
   const hasSavedSessionLogRef = useRef<boolean>(false);
+  const advanceRoundRef = useRef<(() => void) | null>(null);
 
   // Sound control
   const [muted, setMuted] = useState<boolean>(() => audioSynth.getMuted());
@@ -236,7 +239,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   // Prohibits short-circuiting or skipping of repeated letters (e.g. "auu").
   const processInputKey = (key: string, fromHardwareListener: boolean = false) => {
     if (practiceMode === "handwriting") return;
-    if (isPaused || timerFinished || wordCorrect || isPronouncing) return;
 
     // Normalize full-width or alternative dots / hyphens / quotes from various keyboards & IMEs
     let normalizedKey = key;
@@ -261,6 +263,20 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       normalizedKey === "/" || 
       normalizedKey === "&";
     if (!isValidKey) return;
+
+    // Responsive Space key actions: unpause or immediate advance on completed word
+    if (normalizedKey === " ") {
+      if (isPaused) {
+        handleTogglePause();
+        return;
+      }
+      if ((wordCorrect || isPronouncing) && advanceRoundRef.current) {
+        advanceRoundRef.current();
+        return;
+      }
+    }
+
+    if (isPaused || timerFinished || wordCorrect || isPronouncing) return;
 
     // De-duplicate rapid duplicate events to prevent synthetic DOM echoes (e.g. keydown + onChange firing together)
     // 1) Alternating source filter: if identical key arrives from an alternate event source within 150ms, discard echo.
@@ -335,6 +351,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         const doAdvanceRound = () => {
           if (roundAdvanced) return;
           roundAdvanced = true;
+          advanceRoundRef.current = null;
           setIsPronouncing(false);
           setCompletedRounds((prev) => prev + 1);
           setSlideDirection(1);
@@ -348,6 +365,8 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
           setRomajiProgress("");
           setWordCorrect(false);
         };
+
+        advanceRoundRef.current = doAdvanceRound;
 
         const roundFailsafe = setTimeout(doAdvanceRound, 1200);
 
@@ -388,6 +407,16 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
       if (onKeyStrike) onKeyStrike("correct");
     } else {
+      // If the user tapped space, but the current segment does not expect a space:
+      // In typing practice, users frequently tap space reflexively.
+      // Give a gentle notice flash without destructively resetting partially typed word progress!
+      if (normalizedKey === " ") {
+        audioSynth.playTyping({ volume: 0.5 });
+        setErrorFlash(true);
+        setTimeout(() => setErrorFlash(false), 200);
+        return;
+      }
+
       // Typing error/deviation! Trigger a warning shake and reset entire word.
       audioSynth.playError();
       setErrorFlash(true);
@@ -427,6 +456,14 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
       // Prevent default browser scroll when spacebar is pressed during training/typing
       if (e.key === " ") {
         e.preventDefault();
+        if (isPaused) {
+          handleTogglePause();
+          return;
+        }
+        if ((wordCorrect || isPronouncing) && advanceRoundRef.current) {
+          advanceRoundRef.current();
+          return;
+        }
       }
 
       let key = e.key;
@@ -580,6 +617,22 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Phonetic toggle for English mode */}
+          {isEnglishMode && (
+            <button
+              type="button"
+              onClick={() => setShowPhonetic(prev => !prev)}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95 ${
+                showPhonetic
+                  ? "border-amber-400 bg-amber-50 text-amber-900"
+                  : "border-stone-300 bg-white text-stone-500 hover:bg-stone-50"
+              }`}
+              title={showPhonetic ? "点击隐藏音标显示" : "点击开启音标显示"}
+            >
+              <span>{showPhonetic ? "音标: 显" : "音标: 隐"}</span>
+            </button>
+          )}
+
           {/* Quick Speech Rate Cycler */}
           <button
             type="button"
@@ -784,6 +837,28 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                       <span>{speechRate}x</span>
                     </button>
                   </div>
+
+                  {/* English Mode Phonetic Symbol (IPA) Badge */}
+                  {isEnglishMode && showPhonetic && (item.phonetic || getEnglishPhonetic(item.kanji)) && (
+                    <div className="mt-1 flex items-center justify-center gap-2 select-none">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          audioSynth.speakFullWord(item.kanji, undefined, item.kanji, undefined, "en");
+                        }}
+                        className="group flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-900 transition-all cursor-pointer shadow-2xs active:scale-95"
+                        title="点击聆听标准英语读音"
+                      >
+                        <span className="text-[10px] font-mono text-amber-700/80 font-bold uppercase tracking-wider">IPA</span>
+                        <span className="text-sm font-serif font-black tracking-wide text-amber-950">
+                          {item.phonetic || getEnglishPhonetic(item.kanji)}
+                        </span>
+                        <Volume2 className="w-3.5 h-3.5 text-amber-700 group-hover:scale-110 transition-transform" />
+                      </button>
+                    </div>
+                  )}
+
                   <h3 className="text-stone-750 font-medium font-serif text-xs sm:text-sm mt-1 sm:mt-1.5 opacity-90 leading-relaxed max-w-lg mx-auto">
                     {item.meaning}
                   </h3>
@@ -966,8 +1041,23 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                       y: pressedKey === "SPACE" ? 2 : 0,
                     }}
                     onClick={() => {
+                      if (isPaused) {
+                        handleTogglePause();
+                        return;
+                      }
+                      if ((wordCorrect || isPronouncing) && advanceRoundRef.current) {
+                        advanceRoundRef.current();
+                        return;
+                      }
                       processInputKey(" ");
                     }}
+                    title={
+                      isPaused 
+                        ? "恢复训练 (或按空格键)" 
+                        : (wordCorrect || isPronouncing) 
+                        ? "前往下一词 (或按空格键)" 
+                        : "空格键 (Space)"
+                    }
                     className={`w-28 sm:w-40 h-5.5 sm:h-7 flex items-center justify-center rounded text-[9px] sm:text-[10px] font-mono font-bold uppercase transition-all select-none border cursor-pointer ${
                       pressedKey === "SPACE"
                         ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"
@@ -976,7 +1066,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                         : "bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-750"
                     }`}
                   >
-                    Space
+                    {isPaused ? "继续 (Space)" : (wordCorrect || isPronouncing) ? "下一词 (Space)" : "Space"}
                   </motion.button>
                   <motion.button
                     whileTap={{ scale: 0.95 }}
@@ -1163,7 +1253,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     <span>恭喜：卡牌已解锁 CONGRATULATIONS: CARD UNLOCKED!</span>
                   </div>
                   <p className="text-stone-600 text-xs leading-relaxed">
-                    由于你的辛勤练习，你的手指已经记住了这个{isEnglishMode ? "英文单词" : "名字"}。你成功得到了专属卡牌！你可以随时通过收藏馆查看它，并能请求 <b>Gemini AI 分解它的独特文化轶事</b>。
+                    由于你的辛勤练习，你的手指已经记住了这个{isEnglishMode ? "英文单词" : "名字"}。你成功得到了专属卡牌！你可以随时通过收藏馆查看它，并能请求 <b>Gemini AI {isEnglishMode ? "解读它的词源与生动故事" : "分解它的独特文化轶事"}</b>。
                   </p>
                 </div>
               ) : (

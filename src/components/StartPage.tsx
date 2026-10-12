@@ -7,6 +7,7 @@ import { uiTranslate, LANG_MAPPING } from "../utils/lang";
 import { NarrativeStyle, nTrans } from "../utils/narrative";
 import { toHanNumerals } from "../App";
 import { SessionTrendChart } from "./SessionTrendChart";
+import { getEnglishPhonetic } from "../utils/englishPhonetics";
 
 interface StartPageProps {
   onStartTraining: (items: DictionaryItem[], durationMs: number) => void;
@@ -425,7 +426,8 @@ export const StartPage: React.FC<StartPageProps> = ({
       const matchMeaning = item.meaning.toLowerCase().includes(q);
       const matchRomaji = item.segments.some((s) => s.romaji.some((r) => r.toLowerCase().includes(q)));
       const matchCatName = (item.categoryName || "").toLowerCase().includes(q);
-      return matchKanji || matchKana || matchMeaning || matchRomaji || matchCatName;
+      const matchPhonetic = isEnglishMode && ((item.phonetic || "").toLowerCase().includes(q) || getEnglishPhonetic(item.kanji).toLowerCase().includes(q));
+      return matchKanji || matchKana || matchMeaning || matchRomaji || matchCatName || matchPhonetic;
     }
 
     return true;
@@ -1112,8 +1114,8 @@ export const StartPage: React.FC<StartPageProps> = ({
                             <span className="font-serif font-black text-stone-900 text-sm">
                               {item.kanji}
                             </span>
-                            <span className="text-[10px] text-stone-400 font-mono">
-                              {isEnglishMode ? "" : `(${item.kanaStr})`}
+                            <span className="text-[10px] text-stone-500 font-serif font-bold">
+                              {isEnglishMode ? (item.phonetic || getEnglishPhonetic(item.kanji)) : `(${item.kanaStr})`}
                             </span>
                           </div>
                           <span className="text-[9px] font-mono text-amber-800 bg-amber-500/10 px-1.5 rounded font-black border border-amber-500/20">
@@ -1147,8 +1149,8 @@ export const StartPage: React.FC<StartPageProps> = ({
                           <span className="font-serif font-black text-[#C4482A] text-sm">
                             {item.kanji}
                           </span>
-                          <span className="text-[10px] text-stone-500 font-mono">
-                            {isEnglishMode ? "" : `(${item.kanaStr})`}
+                          <span className="text-[10px] text-stone-600 font-serif font-bold">
+                            {isEnglishMode ? (item.phonetic || getEnglishPhonetic(item.kanji)) : `(${item.kanaStr})`}
                           </span>
                         </div>
                         <span className="text-[9px] font-mono text-[#C4482A] bg-red-500/10 px-1.5 rounded font-black border border-red-500/20">
@@ -1979,8 +1981,8 @@ export const StartPage: React.FC<StartPageProps> = ({
                       >
                         {item.kanji}
                       </span>
-                      <span className="text-xs text-stone-400 font-mono font-bold">
-                        {isEnglishMode ? "" : `(${item.kanaStr})`}
+                      <span className="text-xs text-amber-800 font-serif font-bold">
+                        {isEnglishMode ? (item.phonetic || getEnglishPhonetic(item.kanji)) : `(${item.kanaStr})`}
                       </span>
                     </div>
                     <p className="text-stone-500 text-[11px] leading-relaxed line-clamp-3 pt-1 font-sans">
