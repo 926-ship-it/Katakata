@@ -10,6 +10,7 @@ import { toHanNumerals } from "../App";
 import { SessionTrendChart } from "./SessionTrendChart";
 import { getEnglishPhonetic } from "../utils/englishPhonetics";
 import { DailyGoalPanel } from "./DailyGoalPanel";
+import { DailyWordChallengeCard } from "./DailyWordChallengeCard";
 
 interface StartPageProps {
   onStartTraining: (items: DictionaryItem[], durationMs: number) => void;
@@ -21,6 +22,7 @@ interface StartPageProps {
   onOpenAddWord?: (lang?: "ja" | "es" | "en") => void;
   onOpenBatchImport?: (lang?: "es" | "ja" | "en") => void;
   onOpenPhotoUpload?: (lang?: "ja" | "es" | "en" | "auto") => void;
+  onRewardDailyChallenge?: (xp: number, coins: number) => void;
   collectedIds: string[];
   practiceTimes: Record<string, number>;
   practiceMode: "typing" | "handwriting";
@@ -40,6 +42,7 @@ export const StartPage: React.FC<StartPageProps> = ({
   onOpenAddWord,
   onOpenBatchImport,
   onOpenPhotoUpload,
+  onRewardDailyChallenge,
   collectedIds,
   practiceTimes = {},
   practiceMode,
@@ -799,6 +802,23 @@ export const StartPage: React.FC<StartPageProps> = ({
           const shuffled = [...activeDict].sort(() => Math.random() - 0.5);
           const selected = shuffled.slice(0, Math.min(customCardCount, shuffled.length));
           onStartTraining(selected, mins * 60 * 1000);
+        }}
+      />
+
+      {/* 2.5 Daily Word Challenge (每日一词挑战 · Gemini API 词源解读与五十音平假名/片假名练习) */}
+      <DailyWordChallengeCard
+        candidateWords={activeDict}
+        onStartTrainingWord={(item, kanaMode) => {
+          // If Katakana practice mode, start training with this word item directly
+          onStartTraining([item], customTimerMinutes * 60 * 1000);
+        }}
+        onGoToKanaTraining={(type) => {
+          onGoToKanaTraining(type);
+        }}
+        onRewardClaimed={(xp, coins) => {
+          if (onRewardDailyChallenge) {
+            onRewardDailyChallenge(xp, coins);
+          }
         }}
       />
 

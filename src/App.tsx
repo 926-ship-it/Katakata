@@ -1314,6 +1314,9 @@ export default function App() {
                 isEnglishMode={isEnglishMode}
                 isKatakanaMode={isKatakanaMode}
                 narrativeStyle={narrativeStyle}
+                onRewardDailyChallenge={(xp, earnedCoins) => {
+                  setCoins((prev) => prev + earnedCoins);
+                }}
               />
             </motion.div>
           )}

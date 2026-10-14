@@ -250,6 +250,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   const dictationCardRef = useRef<HTMLDivElement>(null);
   const lastAutoPronouncedWordIdRef = useRef<string>("");
   const [typingSoundStyle, setTypingSoundStyle] = useState<TypingSoundStyle>(() => audioSynth.getTypingSoundStyle());
+  const lastProcessedKeyRef = useRef<{ key: string; time: number; source: string } | null>(null);
 
   const [dictationInput, setDictationInput] = useState<string>("");
   const [dictationSuccess, setDictationSuccess] = useState<boolean>(false);
@@ -363,6 +364,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   };
 
   useEffect(() => {
+    if (lastProcessedKeyRef) lastProcessedKeyRef.current = null;
     reloadWords(currentLang);
     setMistakesMap(getMistakes(currentLang));
     setHistoryLogs(getReciteHistoryLogs(currentLang));
@@ -632,6 +634,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
   // Dedicated, safe auto-advance helper that cleanly resets dictation state and moves to next card
   const advanceToNextWord = () => {
+    lastProcessedKeyRef.current = null;
     setIsPronouncing(false);
     setDictationSuccess(false);
     setDictationError(false);
@@ -701,8 +704,27 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   };
 
   // Typewriter input handling for Latin (Spanish/English) and Japanese (Kana/Romaji)
-  const handleTypeCharacter = (inputChar: string) => {
+  const handleTypeCharacter = (
+    inputChar: string,
+    source: "input_keydown" | "window_keydown" | "input_change" | "button" = "window_keydown"
+  ) => {
     if (!currentWord || dictationSuccess) return;
+
+    // De-duplicate rapid duplicate events to prevent synthetic DOM echoes (e.g. keydown + onChange firing together)
+    // 1) Alternating source filter: if identical key arrives from an alternate event source within 180ms, discard echo.
+    // 2) Mechanical bounce filter: humans cannot physically strike, release, and strike the same key in < 55ms.
+    const now = Date.now();
+    const normKey = inputChar.toLowerCase();
+    if (lastProcessedKeyRef.current && lastProcessedKeyRef.current.key === normKey) {
+      const elapsed = now - lastProcessedKeyRef.current.time;
+      if (lastProcessedKeyRef.current.source !== source && elapsed < 180) {
+        return;
+      }
+      if (elapsed < 55) {
+        return;
+      }
+    }
+    lastProcessedKeyRef.current = { key: normKey, time: now, source };
 
     let currIdx = typedChars.length;
     if (currIdx >= targetChars.length) return;
@@ -839,7 +861,9 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.altKey || e.metaKey) return;
-      if (document.activeElement?.tagName === "INPUT" && document.activeElement !== hiddenInputRef.current) {
+      // If the user is currently focused inside ANY input or textarea element (including hiddenInputRef),
+      // the input element itself handles the keystrokes via onKeyDown/onChange. Do NOT execute twice!
+      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") {
         return;
       }
 
@@ -866,7 +890,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
       if (e.key.length === 1) {
         e.preventDefault();
-        handleTypeCharacter(e.key);
+        handleTypeCharacter(e.key, "window_keydown");
       }
     };
 
@@ -1765,22 +1789,33 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                         spellCheck={false}
                         className="opacity-0 absolute inset-0 w-full h-full cursor-text z-10"
                         onKeyDown={(e) => {
+                          if (dictationSuccess) {
+                            if (e.key === "Enter" || e.key === " " || e.key === "ArrowRight" || e.key === "Tab" || e.key.length === 1) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              advanceToNextWord();
+                            }
+                            return;
+                          }
                           if (e.key === "Backspace") {
                             e.preventDefault();
+                            e.stopPropagation();
                             handleBackspace();
                           } else if (e.key === "Enter") {
                             e.preventDefault();
+                            e.stopPropagation();
                             pronounceCurrentWord();
                           } else if (e.key.length === 1) {
                             e.preventDefault();
-                            handleTypeCharacter(e.key);
+                            e.stopPropagation();
+                            handleTypeCharacter(e.key, "input_keydown");
                           }
                         }}
                         onChange={(e) => {
                           const val = e.target.value;
                           if (val) {
                             const lastChar = val[val.length - 1];
-                            handleTypeCharacter(lastChar);
+                            handleTypeCharacter(lastChar, "input_change");
                             e.target.value = "";
                           }
                         }}
@@ -1922,7 +1957,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                           <button
                             key={char}
                             type="button"
-                            onClick={() => handleTypeCharacter(char)}
+                            onClick={() => handleTypeCharacter(char, "button")}
                             className="px-2.5 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-950 font-mono text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs"
                           >
                             {char}
@@ -1950,7 +1985,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                             <button
                               key={idx}
                               type="button"
-                              onClick={() => handleTypeCharacter(s.display)}
+                              onClick={() => handleTypeCharacter(s.display, "button")}
                               className="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-950 font-sans text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs"
                               title={`输入假名 ${s.display} (${s.displayRomaji})`}
                             >

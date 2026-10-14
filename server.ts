@@ -361,6 +361,313 @@ Output format must be valid JSON:
     }
   });
 
+  // API endpoint for Daily Word Challenge with Gemini API
+  app.post("/api/daily-word-challenge", async (req, res) => {
+    try {
+      const {
+        candidates = [],
+        preferredWord = null,
+        date = new Date().toISOString().slice(0, 10),
+        forceRefresh = false,
+      } = req.body;
+
+      const ai = getGeminiClient();
+
+      // Curated rich fallbacks in case AI is offline or API key is not configured
+      const FALLBACK_CHALLENGES = [
+        {
+          word: {
+            id: "komorebi",
+            kanji: "木漏れ日",
+            hiragana: "こもれび",
+            katakana: "コモレビ",
+            romaji: "komorebi",
+            meaning: "树叶间隙穿透洒下的阳光；静谧光影",
+            categoryName: "自然风物 · 和风美学",
+            difficulty: "N2",
+          },
+          etymology:
+            "【词源故事考据】：由“木（こ）”、“漏れ（もれ）”与“日（ひ/び）”融合而成的大和言叶（和语复合词）。古代日本人将从原始茂密森岭间隙落下的日光视为山林神灵（山神）眨眼的温柔神迹，表达对自然生息的细腻敬畏。",
+          culturalStory:
+            "【文化风俗物语】：在日本古典庭园与俳句创作中，“木漏れ日”代表着流转的无常与转瞬即逝的平静之美。当微风吹拂树梢，地面的光斑如同跳跃的碎金，许多动漫大师（如新海诚、宫崎骏）常以此镜头意象描摹少年少女的心动瞬间。",
+          mnemonicTip:
+            "【五十音假名记忆巧思】：拆为「こ・も・れ・び」四音。想象“可口的小蘑菇在森林里，享受漏下来的明媚日照（び）”，平假名圆润柔和，片假名「コ・モ・レ・ビ」棱角分明宛如树枝切面。",
+          exampleSentence: {
+            japanese: "木漏れ日の中で、静かに本を読むのが好きです。",
+            kana: "こもれびのなかで、しずかにほんをよむのがすきです。",
+            translation: "我喜欢在斑驳林隙的阳光下，静静地阅读书卷。",
+          },
+          funFact:
+            "【冷知识】：世界各国的许多语言学家都赞誉“木漏れ日”为世界上最难被单个外语单词直接意译的日语美学词汇之一，它不仅是词，更是一种静心心境。",
+          challengeTask:
+            "今日挑战任务：观察平假名「こもれび」与片假名「コモレビ」的每一处转折，点击下方按钮完成今日击键练习打卡！",
+        },
+        {
+          word: {
+            id: "ichigoichie",
+            kanji: "一期一会",
+            hiragana: "いちごいちえ",
+            katakana: "イチゴイチエ",
+            romaji: "ichigoichie",
+            meaning: "一生仅此一次的珍贵相会；珍惜当下",
+            categoryName: "哲学美学 · 茶道心法",
+            difficulty: "N3",
+          },
+          etymology:
+            "【词源故事考据】：最早出自安土桃山时代茶圣千利休的大弟子山上宗二的茶道秘传书《山上宗二记》，后经井伊直弼在《茶汤一会集》中发扬光大。意指每一次茶席宾主相聚，哪怕天天相见，今日之会席与心情皆是今生唯一。",
+          culturalStory:
+            "【文化风俗物语】：在茶室矮小的躞口门前，不论是征战沙场的战国大名将军，还是平凡旅人，都必须解下佩刀、低头屈膝膝行而入。因为在茶汤之前人人平等，大家以全神贯注的敬畏之心品尝眼前的这一盏抹茶。",
+          mnemonicTip:
+            "【五十音假名记忆巧思】：拆为「い・ち・ご・い・ち・え」。「いちご」恰好谐音“草莓（苺/いちご）”，记忆桩：“一生只能吃一颗的神仙草莓相会”！片假名「イチゴイチエ」常用于现代海报与招牌。",
+          exampleSentence: {
+            japanese: "旅先での出会いは、まさに一期一会ですね。",
+            kana: "たびさきでのであいは、まさにいちごいちえですね。",
+            translation: "旅途中的每一次相逢，都是弥足珍贵的一生一会呢。",
+          },
+          funFact:
+            "【冷知识】：在许多日本传统店铺门口，常挂着写有“一期一会”的木质挂牌，提醒店员每一次为客人递上一杯热茶，都要倾注一生一次的诚意（おもてなし）。",
+          challengeTask:
+            "今日挑战任务：尝试用指尖将假名「いちごいちえ」行云流水地打出，感知专注击键当下的禅定律动。",
+        },
+        {
+          word: {
+            id: "sakura",
+            kanji: "桜",
+            hiragana: "さくら",
+            katakana: "サクラ",
+            romaji: "sakura",
+            meaning: "樱花；绚丽盛放与无常物哀之美",
+            categoryName: "自然风物 · 国花岁时",
+            difficulty: "N5",
+          },
+          etymology:
+            "【词源故事考据】：“さくら”中的“さ（Sa）”在古日语神道中指代掌管稻谷农业丰收的“田之神/谷神”；“くら（Kura）”则指神灵栖息降临的宝座（神座）。因此樱花盛开正是古时向田神祈愿五谷丰登的时节信使。",
+          culturalStory:
+            "【文化风俗物语】：每年春季日本气象厅会发布全国“樱前线（桜前線）”。从冲绳一路向北海道盛开，花期虽仅七日（花咲くや七日の命），日本人却全家围坐樱花树下饮酒赏樱（花見），感悟韶华虽短、尽情绽放的无悔生命哲学。",
+          mnemonicTip:
+            "【五十音假名记忆巧思】：平假名「さ・く・ら」是初学者接触五十音最先学会的美好词汇之一。片假名「サ・ク・ラ」常在植物学教材与花艺设计中出现。",
+          exampleSentence: {
+            japanese: "春になると、川沿いの桜が一斉に咲き誇ります。",
+            kana: "はるになると、かわぞいのさくらがいっせいにさきほこります。",
+            translation: "一到春天，河畔的樱花便争相绚丽盛放。",
+          },
+          funFact:
+            "【冷知识】：日本古代在没有现在的樱花品种时，“花”这个单字专指梅花，到了平安时代《源氏物语》时期，贵族与民间逐渐将“花”默认为樱花。",
+          challengeTask:
+            "今日挑战任务：点击「平假名」或「片假名」练习按钮，体会「さくら」与「サクラ」在指尖绽放的韵律！",
+        },
+        {
+          word: {
+            id: "wabisabi",
+            kanji: "侘寂",
+            hiragana: "わびさび",
+            katakana: "ワビサビ",
+            romaji: "wabisabi",
+            meaning: "侘寂；在粗糙质朴中体会幽微时光沉淀",
+            categoryName: "哲学美学 · 东方禅意",
+            difficulty: "N1",
+          },
+          etymology:
+            "【词源故事考据】：“侘（Wabi）”原意是清贫、简素、幽居自然中的寡欲心境；“寂（Sabi）”原指金属生锈、岁月雕琢留下的斑驳质感。二者结合构成了日本文化中接受事物不完美、不恒久、不完整的最高美学准则。",
+          culturalStory:
+            "【文化风俗物语】：从金缮修复（用金漆修补碎裂的瓷碗）到千利休使用粗糙变形的黑乐茶碗，侘寂教会人们在裂纹、苔藓、枯木与灰瓦之间发现比对称光洁更为动人的时光诗意。",
+          mnemonicTip:
+            "【五十音假名记忆巧思】：「わ・び・さ・び」，注意两个浊音「び（bi）」。片假名「ワ・ビ・サ・ビ」在当代西方建筑与室内极简设计领域极为火爆。",
+          exampleSentence: {
+            japanese: "苔むした古寺の庭には、独特の侘寂の風情が漂っています。",
+            kana: "こけむしたこでらのにわには、どくとくのわびさびのふうぜいがただよっています。",
+            translation: "生满青苔的古寺庭园中，弥漫着独具风味的侘寂韵致。",
+          },
+          funFact:
+            "【冷知识】：苹果公司创始人乔布斯曾深居京都古寺冥想，其产品设计的极致极简理念深受侘寂与禅宗哲学的深刻启迪。",
+          challengeTask:
+            "今日挑战任务：在宁静中完成假名击键练习，感受指尖触键如木鱼轻叩的专注定力。",
+        },
+        {
+          word: {
+            id: "kizuna",
+            kanji: "絆",
+            hiragana: "きずな",
+            katakana: "キズナ",
+            romaji: "kizuna",
+            meaning: "心灵纽带；患难见真情的深厚羁绊",
+            categoryName: "情感共鸣 · 人性之光",
+            difficulty: "N3",
+          },
+          etymology:
+            "【词源故事考据】：古代最初指系住马匹或牲畜的绳索缰绳（繋ぐ綱）。到了中世纪，演化为虽无形却紧紧维系人与人之间血脉、情谊、生死相依的心灵纽带。",
+          culturalStory:
+            "【文化风俗物语】：2011年东日本大地震后，日本民众共同选出的年度汉字便是「絆」。在灾难面前，陌生人互相扶持传递热食、志愿者奔赴灾区，生动诠释了人类在绝境中最温暖的共情力。",
+          mnemonicTip:
+            "【五十音假名记忆巧思】：「き・ず・な」三音。假名「ず」为「す」加浊点，连读起来如琴弦轻抚，牢不可破。片假名「キ・ズ・ナ」常见于经典动漫作品中伙伴的誓言。",
+          exampleSentence: {
+            japanese: "困難を共に乗り越えた仲間との絆は、何よりも固い。",
+            kana: "こんなんをともにのりこえたなかまとのきずなは、なによりもかたい。",
+            translation: "与共同克服艰难困苦的伙伴结下的羁绊，比世上任何事物都坚固。",
+          },
+          funFact:
+            "【冷知识】：日本赛马界著名的传奇赛马“无敌之绊（キズナ Kizuna）”曾斩获日本德比大赛冠军，寄托了万千民众昂扬奋发的祈愿。",
+          challengeTask:
+            "今日挑战任务：完成平假名「きずな」与片假名「キズナ」的打卡拼写，唤醒今日学习羁绊！",
+        },
+      ];
+
+      // Pick fallback based on date hash if AI unavailable
+      const dateHash = date.split("").reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+      const defaultIndex = Math.abs(dateHash) % FALLBACK_CHALLENGES.length;
+      let fallbackChoice = FALLBACK_CHALLENGES[defaultIndex];
+
+      if (forceRefresh) {
+        const randomIndex = Math.floor(Math.random() * FALLBACK_CHALLENGES.length);
+        fallbackChoice = FALLBACK_CHALLENGES[randomIndex];
+      }
+
+      // If user specified preferredWord or candidates, adjust fallback word if needed
+      if (preferredWord && preferredWord.kanji) {
+        fallbackChoice = {
+          ...fallbackChoice,
+          word: {
+            id: preferredWord.id || "custom-word",
+            kanji: preferredWord.kanji,
+            hiragana: preferredWord.kanaStr || fallbackChoice.word.hiragana,
+            katakana: preferredWord.katakanaStr || fallbackChoice.word.katakana,
+            romaji: preferredWord.romaji || fallbackChoice.word.romaji,
+            meaning: preferredWord.meaning || fallbackChoice.word.meaning,
+            categoryName: preferredWord.categoryName || "词库精选",
+            difficulty: "N3",
+          },
+        };
+      }
+
+      if (!ai) {
+        // Return rich curated response gracefully
+        return res.json({
+          success: true,
+          source: "curated",
+          date,
+          word: fallbackChoice.word,
+          analysis: {
+            etymology: fallbackChoice.etymology,
+            culturalStory: fallbackChoice.culturalStory,
+            mnemonicTip: fallbackChoice.mnemonicTip,
+            exampleSentence: fallbackChoice.exampleSentence,
+            funFact: fallbackChoice.funFact,
+            challengeTask: fallbackChoice.challengeTask,
+          },
+        });
+      }
+
+      // We have Gemini API available! Ask Gemini to pick or deeply analyze
+      let promptTargetInfo = "";
+      if (preferredWord && preferredWord.kanji) {
+        promptTargetInfo = `用户指定需要深度解析并作为今日挑战的词汇是：“${preferredWord.kanji}”（假名：${preferredWord.kanaStr}，释义：${preferredWord.meaning}）。请针对此词进行高品质全景深度解析。`;
+      } else if (Array.isArray(candidates) && candidates.length > 0) {
+        // Shuffle or pick from top 30 candidates
+        const shuffledCandidates = [...candidates].sort(() => Math.random() - 0.5).slice(0, 15);
+        const candidatesSummary = shuffledCandidates
+          .map((c) => `${c.kanji}(${c.kanaStr}: ${c.meaning})`)
+          .join("；");
+        promptTargetInfo = `请从以下用户当前词库候选列表中，挑选一个文化底蕴最丰富、或最生动实用、最适合作为【今日一词挑战】的词汇（或如果你认为有更契合今日灵感的词汇也可挑选经典日文词）：
+候选候选池：${candidatesSummary}`;
+      } else {
+        promptTargetInfo = `请随机精选一个极具东方美学意境、深厚文化故事或生活实用性的经典日语词汇（例如：木漏れ日、一期一会、花鳥風月、侘寂、幽玄、絆、風鈴、狐火、侍、初雪、森林浴、夕暮れ等）作为今日挑战。`;
+      }
+
+      const prompt = `你是一位精通日本语言学（语源学）、日本古典文学（《万叶集》《枕草子》）、江户风俗史与五十音教学的博学学者与语言艺术家。
+现在请为背单词与打字软件生成今日份的【每日一词挑战 / Daily Word Quest】。
+${promptTargetInfo}
+日期标记：${date}
+
+请按照以下严格的 JSON 结构输出（不要输出任何多余的前缀或代码块外的闲聊）：
+{
+  "word": {
+    "id": "英文字符串slug（如komorebi, sakura等）",
+    "kanji": "词汇汉字或日文写法（如木漏れ日）",
+    "hiragana": "纯平假名写法（如こもれび）",
+    "katakana": "纯片假名写法（如コモレビ）",
+    "romaji": "标准平文式罗马音（如komorebi）",
+    "meaning": "凝练精准优美的中文释义（20字以内）",
+    "categoryName": "文化分类（如自然风物、哲学美学、岁时节令、民俗神道、日常物语）",
+    "difficulty": "N5" | "N4" | "N3" | "N2" | "N1"
+  },
+  "etymology": "【词源故事考据】：该词造字源流、在大和言叶（和语）或汉字传入时期的演变历史、古文典籍或民间传说源头（120-180字，博学文雅、生动通俗）",
+  "culturalStory": "【文化风俗物语】：在日本社会民俗、四季节气、动漫文学或市井生活中的鲜活真实故事，画面感十足（140-200字）",
+  "mnemonicTip": "【五十音假名记忆巧思】：针对该词的平假名与片假名发音音节，设计一个令人记忆深刻的记忆桩/谐音画面/联想法（60-100字）",
+  "exampleSentence": {
+    "japanese": "地道的日文现代实用例句（含汉字）",
+    "kana": "例句纯假名注音",
+    "translation": "优美流畅的中文例句翻译"
+  },
+  "funFact": "【冷知识】：一个鲜为人知的小趣闻或发音秘密（60-90字）",
+  "challengeTask": "今日挑战任务寄语（鼓励用户闭眼回想假名字形，并点击下方平假名/片假名按钮开启今日击键打卡）"
+}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.85,
+        },
+      });
+
+      const parsed = JSON.parse(response.text || "{}");
+      if (!parsed.word || !parsed.word.kanji || !parsed.etymology) {
+        throw new Error("AI returned malformed daily word json structure");
+      }
+
+      res.json({
+        success: true,
+        source: "gemini",
+        date,
+        word: parsed.word,
+        analysis: {
+          etymology: parsed.etymology,
+          culturalStory: parsed.culturalStory || fallbackChoice.culturalStory,
+          mnemonicTip: parsed.mnemonicTip || fallbackChoice.mnemonicTip,
+          exampleSentence: parsed.exampleSentence || fallbackChoice.exampleSentence,
+          funFact: parsed.funFact || fallbackChoice.funFact,
+          challengeTask: parsed.challengeTask || fallbackChoice.challengeTask,
+        },
+      });
+    } catch (error: any) {
+      console.error("Daily word challenge generation error:", error);
+      // Seamless graceful fallback
+      res.json({
+        success: true,
+        source: "fallback",
+        date: req.body?.date || new Date().toISOString().slice(0, 10),
+        word: {
+          id: "komorebi",
+          kanji: "木漏れ日",
+          hiragana: "こもれび",
+          katakana: "コモレビ",
+          romaji: "komorebi",
+          meaning: "树叶间隙穿透洒下的阳光；静谧光影",
+          categoryName: "自然风物 · 和风美学",
+          difficulty: "N2",
+        },
+        analysis: {
+          etymology:
+            "【词源故事考据】：由“木（こ）”、“漏れ（もれ）”与“日（ひ/び）”结合而成的大和言叶。古代日本人视林木树影中透下的束束金光为大自然的恩赐灵气。",
+          culturalStory:
+            "【文化风俗物语】：新海诚、宫崎骏动画中标志性的夏日青翠树影与跃动光斑，便是木漏れ日的完美写照。驻足仰望片刻，浮躁的心情便能瞬间归于安宁。",
+          mnemonicTip:
+            "【五十音假名记忆巧思】：拆为「こ・も・れ・び」，平假名柔美如微风拂树，片假名「コ・モ・レ・ビ」清晰似枝丫投影。",
+          exampleSentence: {
+            japanese: "木漏れ日の中で、静かに本を読むのが好きです。",
+            kana: "こもれびのなかで、しずかにほんをよむのがすきです。",
+            translation: "我喜欢在斑驳林隙的阳光下，静静地阅读书卷。",
+          },
+          funFact:
+            "【冷知识】：它是世界公认最难用单个外语单词翻译的独创日语词汇之一，传达着东方特有的光阴静美。",
+          challengeTask:
+            "今日挑战任务：点击「平假名」或「片假名」练习按钮，完成今日份的专注击键打卡！",
+        },
+      });
+    }
+  });
+
   // API endpoint for OCR image analysis and vocabulary extraction from camera/photos
   // API endpoint for OCR image analysis and vocabulary extraction from camera/photos (supporting circled/highlighted words)
   app.post("/api/ocr-extract-words", async (req, res) => {
