@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Plus, Sparkles, Volume2, CheckCircle2, AlertCircle, Loader2, FileText, Lock, KeyRound, ShieldCheck } from "lucide-react";
+import { X, Plus, Sparkles, Volume2, CheckCircle2, AlertCircle, Loader2, FileText, Lock, KeyRound, ShieldCheck, Camera } from "lucide-react";
 import { isUploadPasskeyUnlocked, verifyUploadPasskey, lockUploadPasskey } from "../utils/passkeyAuth";
 import { DictionaryItem } from "../data/dictionary";
 import { splitKanaIntoSyllables, splitAlphabeticIntoSegments, saveStoredCustomWord } from "../utils/kanaHelper";
@@ -14,6 +14,7 @@ interface AddWordModalProps {
   defaultLanguage?: "ja" | "es" | "en";
   onWordAdded?: (item: DictionaryItem | SpanishWord, lang: "ja" | "es" | "en") => void;
   onSwitchToBatchImport?: (lang: "ja" | "es" | "en") => void;
+  onSwitchToPhotoUpload?: (lang: "ja" | "es" | "en") => void;
 }
 
 export const AddWordModal: React.FC<AddWordModalProps> = ({
@@ -22,6 +23,7 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({
   defaultLanguage = "ja",
   onWordAdded,
   onSwitchToBatchImport,
+  onSwitchToPhotoUpload,
 }) => {
   const [langTab, setLangTab] = useState<"ja" | "es" | "en">(defaultLanguage);
 
@@ -317,6 +319,20 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {onSwitchToPhotoUpload && isUnlocked && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onSwitchToPhotoUpload(langTab);
+                  }}
+                  className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold text-amber-800 hover:text-amber-950 bg-amber-100 hover:bg-amber-200 border border-amber-300 transition-colors cursor-pointer flex items-center gap-1 active:scale-95"
+                  title="切换至拍照识词录入"
+                >
+                  <Camera className="w-3.5 h-3.5 text-amber-700" />
+                  <span className="hidden xs:inline">拍照圈词</span>
+                </button>
+              )}
               {isUnlocked && (
                 <button
                   type="button"

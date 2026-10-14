@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { BookOpen, Sparkles, Trophy, Settings, HelpCircle, Flame, Keyboard, BarChart2, Calendar, Award, Clock, ArrowRight, RotateCw, Play, BookOpenCheck, Activity, Plus, FileText, Trash2, CheckCircle, AlertCircle, Upload, Gamepad2, Search, X, CheckSquare, Layers, Lock, KeyRound, ShieldCheck } from "lucide-react";
+import { BookOpen, Sparkles, Trophy, Settings, HelpCircle, Flame, Keyboard, BarChart2, Calendar, Award, Clock, ArrowRight, RotateCw, Play, BookOpenCheck, Activity, Plus, FileText, Trash2, CheckCircle, AlertCircle, Upload, Gamepad2, Search, X, CheckSquare, Layers, Lock, KeyRound, ShieldCheck, Camera } from "lucide-react";
 import { isUploadPasskeyUnlocked, verifyUploadPasskey, lockUploadPasskey } from "../utils/passkeyAuth";
 import { DICTIONARY, DictionaryItem, getDictionary } from "../data/dictionary";
 import { getReviewSummary, getDueCardIds } from "../utils/srs";
@@ -20,6 +20,7 @@ interface StartPageProps {
   onGoToSpanishRecite?: () => void;
   onOpenAddWord?: (lang?: "ja" | "es" | "en") => void;
   onOpenBatchImport?: (lang?: "es" | "ja" | "en") => void;
+  onOpenPhotoUpload?: (lang?: "ja" | "es" | "en" | "auto") => void;
   collectedIds: string[];
   practiceTimes: Record<string, number>;
   practiceMode: "typing" | "handwriting";
@@ -38,6 +39,7 @@ export const StartPage: React.FC<StartPageProps> = ({
   onGoToSpanishRecite,
   onOpenAddWord,
   onOpenBatchImport,
+  onOpenPhotoUpload,
   collectedIds,
   practiceTimes = {},
   practiceMode,
@@ -1727,6 +1729,43 @@ export const StartPage: React.FC<StartPageProps> = ({
                   <span>{parseSuccess}</span>
                 </div>
               )}
+
+              {/* Quick Entry: AI Photo OCR Vocabulary Extraction */}
+              <div className="p-4 rounded-xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border-2 border-amber-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-amber-500 text-stone-950 flex items-center justify-center font-bold shadow-md shrink-0">
+                    <Camera className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-black font-serif text-stone-900">
+                        {isEnglishMode ? "Photo Vocab & Circled Words Error Notebook" : "拍照圈词 · 荧光笔高光 & 错题本识别"}
+                      </h4>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[#C4482A] text-white">
+                        错题本神器
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-600 mt-0.5 leading-relaxed">
+                      {isEnglishMode
+                        ? "Snap handwritten notes, books, or exams. AI spots your circled words ⭕ & highlighters 🖍️ to create your custom mistake notebook!"
+                        : "对纸质书、真题或手写本拍照，AI 自动定位荧光笔高光 🖍️、用笔画圈 ⭕ 与下划线生词，过滤冗余长句，一秒生成错题本！"}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onOpenPhotoUpload) {
+                      onOpenPhotoUpload(isEnglishMode ? "en" : "auto");
+                    }
+                  }}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-stone-900 hover:bg-[#C4482A] text-stone-50 font-serif font-black text-xs tracking-wider transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 shrink-0 active:scale-95"
+                >
+                  <Camera className="w-4 h-4 text-amber-400" />
+                  <span>{isEnglishMode ? "Snap & Extract Circled Words ＞" : "📸 拍照圈词录入 ＞"}</span>
+                </button>
+              </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Left side: AI smart parse */}

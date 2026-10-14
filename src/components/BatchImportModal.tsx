@@ -23,7 +23,8 @@ import {
   GraduationCap,
   Lock,
   KeyRound,
-  ShieldCheck
+  ShieldCheck,
+  Camera
 } from "lucide-react";
 import { isUploadPasskeyUnlocked, verifyUploadPasskey, lockUploadPasskey } from "../utils/passkeyAuth";
 import { audioSynth } from "../utils/audio";
@@ -52,6 +53,7 @@ interface BatchImportModalProps {
   onImportComplete?: (count: number, lang: "es" | "ja" | "en") => void;
   onNavigateToRecite?: (lang: "es" | "ja" | "en") => void;
   onNavigateToLibrary?: () => void;
+  onSwitchToPhotoUpload?: (lang: "es" | "ja" | "en") => void;
 }
 
 // Common Japanese dictionary with both reading (kana) and meaning (Chinese)
@@ -271,6 +273,7 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
   onImportComplete,
   onNavigateToRecite,
   onNavigateToLibrary,
+  onSwitchToPhotoUpload,
 }) => {
   const [lang, setLang] = useState<"es" | "ja" | "en">(defaultLanguage);
   const [inputText, setInputText] = useState<string>(SAMPLE_TEXT_ES);
@@ -887,6 +890,20 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
+              {onSwitchToPhotoUpload && isUnlocked && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onSwitchToPhotoUpload(lang);
+                  }}
+                  className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold text-amber-300 hover:text-amber-200 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 transition-colors cursor-pointer flex items-center gap-1 active:scale-95"
+                  title="切换至拍照/截图多模态识词"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span className="hidden xs:inline">拍照圈词</span>
+                </button>
+              )}
               {isUnlocked && (
                 <button
                   type="button"

@@ -11,6 +11,7 @@ import { KanaTrainingPage } from "./components/KanaTrainingPage";
 import { SpanishRecitePage } from "./components/SpanishRecitePage";
 import { AddWordModal } from "./components/AddWordModal";
 import { BatchImportModal } from "./components/BatchImportModal";
+import { PhotoWordUploadModal } from "./components/PhotoWordUploadModal";
 import { PasskeyModal } from "./components/PasskeyModal";
 import { isUploadPasskeyUnlocked } from "./utils/passkeyAuth";
 import { OnlineTimer } from "./components/OnlineTimer";
@@ -23,6 +24,7 @@ import { NarrativeStyle, nTrans } from "./utils/narrative";
 import { saveSessionLog } from "./utils/sessionLogs";
 import { addDailyProgress } from "./utils/dailyGoal";
 import { SessionTrendChart } from "./components/SessionTrendChart";
+import { DataExportSection } from "./components/DataExportSection";
 
 type ScreenState = "start" | "training" | "library" | "unlocked_ceremony" | "spell_rush" | "memory_match" | "kana_training" | "spanish_recite";
 
@@ -158,7 +160,11 @@ export default function App() {
   const [batchModalLang, setBatchModalLang] = useState<"es" | "ja" | "en">("es");
   const [spanishRefreshTrigger, setSpanishRefreshTrigger] = useState<number>(0);
 
-  // Passkey Protection for Word Upload Channels (Passkey: QQBCJ)
+  // Global Photo Word Upload Modal state
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState<boolean>(false);
+  const [photoModalLang, setPhotoModalLang] = useState<"ja" | "es" | "en" | "auto">("auto");
+
+  // Passkey Protection for Word Upload Channels
   const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState<boolean>(false);
   const [pendingUploadAction, setPendingUploadAction] = useState<(() => void) | null>(null);
 
@@ -867,6 +873,20 @@ export default function App() {
                     <span className="text-amber-600 font-bold">📥</span>
                     <span className="hidden xs:inline">批量</span>
                   </button>
+                  <button
+                    onClick={() => {
+                      requirePasskeyForUpload(() => {
+                        setPhotoModalLang(currentPage === "spanish_recite" ? "es" : (isEnglishMode ? "en" : "auto"));
+                        setIsPhotoModalOpen(true);
+                        setIsDrawerOpen(false);
+                      });
+                    }}
+                    className="cursor-pointer hover:text-stone-950 transition-colors py-0.5 text-stone-600 flex items-center gap-0.5"
+                    title="拍照圈词/荧光笔识别错题本（需通关卡密）"
+                  >
+                    <span className="text-amber-600 font-bold">📸</span>
+                    <span className="hidden xs:inline">圈词</span>
+                  </button>
                   <div className="flex items-center gap-0.5 sm:gap-1 text-stone-700 select-none">
                     <span className="hidden xs:inline">岁币</span>
                     <span className="xs:hidden">🪙</span>
@@ -1227,11 +1247,21 @@ export default function App() {
                     <OnlineTimer isEnglishMode={isEnglishMode} narrativeStyle={narrativeStyle} />
                   </div>
                 </div>
+
+                {/* Cross-Device Backup & Data Export (JSON / CSV) */}
+                <DataExportSection
+                  collectedIds={collectedIds}
+                  practiceTimes={practiceTimes}
+                  coins={coins}
+                  cardUpgrades={cardUpgrades}
+                  isEnglishMode={isEnglishMode}
+                  onImportData={handleImportData}
+                />
               </div>
 
               {/* Decorative Drawer stamp or footer */}
               <div className="border-t border-stone-300 pt-4 mt-6 text-center text-[10px] text-stone-400 font-mono">
-                KATAKATA SYSTEM CONFIG PANEL V1.2
+                KATAKATA SYSTEM CONFIG PANEL V1.3 · BACKUP ENABLED
               </div>
             </motion.div>
           </>
@@ -1269,6 +1299,12 @@ export default function App() {
                   requirePasskeyForUpload(() => {
                     setBatchModalLang(lang || (isEnglishMode ? "en" : "es"));
                     setIsBatchModalOpen(true);
+                  });
+                }}
+                onOpenPhotoUpload={(lang) => {
+                  requirePasskeyForUpload(() => {
+                    setPhotoModalLang(lang || (isEnglishMode ? "en" : "auto"));
+                    setIsPhotoModalOpen(true);
                   });
                 }}
                 collectedIds={collectedIds}
@@ -1440,6 +1476,12 @@ export default function App() {
                       setIsBatchModalOpen(true);
                     });
                   }}
+                  onOpenPhotoModal={(lang) => {
+                    requirePasskeyForUpload(() => {
+                      setPhotoModalLang(lang || (isEnglishMode ? "en" : "es"));
+                      setIsPhotoModalOpen(true);
+                    });
+                  }}
                   onStartTraining={(reciteItems, durationMs) => {
                     const targetLang = reciteItems[0]?.lang;
                     if (targetLang === "en") {
@@ -1479,6 +1521,10 @@ export default function App() {
           setBatchModalLang(lang);
           setIsBatchModalOpen(true);
         }}
+        onSwitchToPhotoUpload={(lang) => {
+          setPhotoModalLang(lang);
+          setIsPhotoModalOpen(true);
+        }}
       />
 
       {/* Global Batch Import Modal */}
@@ -1502,6 +1548,35 @@ export default function App() {
         }}
         onNavigateToLibrary={() => {
           setIsBatchModalOpen(false);
+          setCurrentPage("library");
+        }}
+        onSwitchToPhotoUpload={(lang) => {
+          setPhotoModalLang(lang);
+          setIsPhotoModalOpen(true);
+        }}
+      />
+
+      {/* Global Photo Word Upload Modal */}
+      <PhotoWordUploadModal
+        isOpen={isPhotoModalOpen}
+        onClose={() => setIsPhotoModalOpen(false)}
+        defaultLanguage={photoModalLang}
+        onImportComplete={(count, lang) => {
+          setSpanishRefreshTrigger((prev) => prev + 1);
+          showToast(`📸 成功从照片收录 ${count} 个生词至${lang === "es" ? "西语" : lang === "ja" ? "日语" : "英语"}词库！`);
+        }}
+        onNavigateToRecite={(lang) => {
+          setIsPhotoModalOpen(false);
+          if (lang === "en") {
+            setIsEnglishMode(true);
+            setIsKatakanaMode(false);
+          } else {
+            setIsEnglishMode(false);
+          }
+          setCurrentPage("spanish_recite");
+        }}
+        onNavigateToLibrary={() => {
+          setIsPhotoModalOpen(false);
           setCurrentPage("library");
         }}
       />

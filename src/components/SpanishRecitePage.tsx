@@ -26,7 +26,8 @@ import {
   Clock,
   X,
   AlertCircle,
-  BookMarked
+  BookMarked,
+  Camera
 } from "lucide-react";
 import {
   SpanishWord,
@@ -89,6 +90,7 @@ interface SpanishRecitePageProps {
   onBack: () => void;
   onOpenAddModal?: (lang?: ReciteLanguage) => void;
   onOpenBatchModal?: (lang?: ReciteLanguage) => void;
+  onOpenPhotoModal?: (lang?: ReciteLanguage) => void;
   onStartTraining?: (items: any[], durationMs: number) => void;
   refreshTrigger?: number;
   initialLanguage?: ReciteLanguage;
@@ -165,6 +167,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   onBack,
   onOpenAddModal,
   onOpenBatchModal,
+  onOpenPhotoModal,
   onStartTraining,
   refreshTrigger = 0,
   initialLanguage = "es",
@@ -1158,6 +1161,18 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
               >
                 <span>📥</span>
                 <span className="hidden sm:inline">批量导入</span>
+              </button>
+            )}
+
+            {onOpenPhotoModal && (
+              <button
+                type="button"
+                onClick={() => onOpenPhotoModal(currentLang)}
+                className="px-3 py-2 rounded-xl bg-white hover:bg-stone-100 border border-stone-300 text-stone-800 text-xs font-serif font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-95"
+                title="拍照圈词/荧光笔识别错题本"
+              >
+                <Camera className="w-4 h-4 text-amber-600" />
+                <span className="hidden sm:inline">拍照圈词</span>
               </button>
             )}
 

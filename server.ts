@@ -10,7 +10,9 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  // Allow larger payload for camera photos and high-resolution base64 images
+  app.use(express.json({ limit: "30mb" }));
+  app.use(express.urlencoded({ limit: "30mb", extended: true }));
 
   // Lazy initialization of Gemini client with proper User-Agent header
   let geminiClient: GoogleGenAI | null = null;
@@ -355,6 +357,132 @@ Output format must be valid JSON:
       res.status(500).json({
         success: false,
         error: "AI smart fill failed: " + (error.message || error),
+      });
+    }
+  });
+
+  // API endpoint for OCR image analysis and vocabulary extraction from camera/photos
+  // API endpoint for OCR image analysis and vocabulary extraction from camera/photos (supporting circled/highlighted words)
+  app.post("/api/ocr-extract-words", async (req, res) => {
+    const { image, mimeType = "image/jpeg", language = "auto", scanMode = "marked_only" } = req.body;
+
+    if (!image || typeof image !== "string") {
+      return res.status(400).json({ error: "No image data provided. Please capture or upload a photo." });
+    }
+
+    const ai = getGeminiClient();
+    if (!ai) {
+      return res.status(500).json({ 
+        error: "未配置系统的 GEMINI_API_KEY。请在 Settings > Secrets 面板中添加您的 API Key。" 
+      });
+    }
+
+    try {
+      // Strip potential data URL prefix if present (e.g. data:image/png;base64,...)
+      let base64Data = image;
+      let detectedMime = mimeType;
+      const dataUriMatch = image.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+      if (dataUriMatch) {
+        detectedMime = dataUriMatch[1];
+        base64Data = dataUriMatch[2];
+      }
+
+      let langInstruction = "";
+      if (language === "ja") {
+        langInstruction = "Target language is Japanese. Extract Japanese words/vocabulary from this photo (kanji and kana). For each word, provide 'target' (word in kanji/kana), 'reading' (pure hiragana only, e.g. せんせい, さくら), 'meaning' (in accurate concise Chinese), 'partOfSpeech' (e.g. 名词, 动词, 形容词).";
+      } else if (language === "es") {
+        langInstruction = "Target language is Spanish. Extract Spanish vocabulary/words from this photo. For each word, provide 'target' (Spanish word with correct accents, e.g. biblioteca, corazón), 'reading' (IPA phonetic / pronunciation e.g. [bje.mbeˈni.ðo]), 'partOfSpeech' (e.g. s.m., s.f., adj., v.), 'meaning' (clear concise Chinese translation), 'example' (a short practical Spanish sentence using this word), 'exampleZh' (Chinese translation of the example sentence).";
+      } else if (language === "en") {
+        langInstruction = "Target language is English. Extract English vocabulary words or short phrases from this photo. For each word, provide 'target' (the English word), 'reading' (IPA phonetic transcription e.g. /ˈbeɪ.sɪk/), 'partOfSpeech' (e.g. n., v., adj., adv.), 'meaning' (accurate concise Chinese translation), 'example' (a short example sentence), 'exampleZh' (Chinese translation of example sentence).";
+      } else {
+        langInstruction = "Auto-detect the language from this photo (principally Japanese, Spanish, or English). Extract the most important learning vocabulary words visible in the photo. For each word, include 'target' (original word), 'reading' (hiragana for Japanese, IPA phonetic for Spanish/English), 'partOfSpeech', 'meaning' (concise Chinese translation), and 'language' ('ja' | 'es' | 'en').";
+      }
+
+      let modeSpecificDirective = "";
+      if (scanMode === "marked_only") {
+        modeSpecificDirective = `
+*** SPECIAL MISSION: EXTRACTION OF HANDWRITTEN CIRCLES & HIGHLIGHTED WORDS (错题本/圈画生词模式) ***
+The student took a photo of their physical book, notebook, printed article, or exam paper.
+The student SPECIFICALLY circles or highlights unfamiliar words (生词/错题) using:
+1. Highlighter pens: Fluorescent yellow, green, pink, orange, light blue, etc.
+2. Pen/Pencil/Marker hand-drawn circles, ellipses, ovals, or rounded rectangles enclosing specific words.
+3. Underlines, wavy underlines, or arrows pointing to words.
+4. Marginal lists or column notes written by hand.
+
+CRITICAL INSTRUCTIONS:
+- PRIORITY #1: Locate and extract ONLY the words or short phrases that have been visibly MARKED, CIRCLED, HIGHLIGHTED, or UNDERLINED by the learner!
+- IGNORE regular un-annotated background text, whole paragraphs, questions, or surrounding reading comprehension passages that do NOT have markings.
+- For each marked word:
+  * 'markType': classify how it was marked ('circle' if circled/boxed, 'highlight' if fluorescent highlighter, 'underline' if underlined, 'handwritten' if written in notes/margins).
+  * 'contextSentence': extract the brief original sentence or phrase on the paper where this word was marked (so the student remembers the context in their error notebook).
+- Set 'isMarkedModeDetected' to true if you detected actual hand-drawn circles, highlighters, or underlines on the paper.
+- GRACEFUL FALLBACK: If and ONLY IF you carefully inspect the entire image and there are completely NO circles, underlines, or highlighters anywhere on the page (e.g. a plain clean textbook page with zero marks), extract between 5 and 15 key vocabulary items from the page, set their 'markType' to 'general', and set 'isMarkedModeDetected' to false.`;
+      } else {
+        modeSpecificDirective = `
+*** FULL PAGE VOCABULARY SCAN MODE ***
+Carefully read the text in the image. Identify all key vocabulary items, important terms, or glossary items (extract between 5 and 25 words depending on text density). Set 'markType' to 'general' and 'isMarkedModeDetected' to false.`;
+      }
+
+      const promptText = `You are a world-class visual OCR and multilingual lexicography AI assistant specialized in language learning and mistake-notebook extraction.
+Analyze the provided image (which could be a photo of a textbook, paper exam, student notebook, blackboard, sign, flashcard, or screen).
+${langInstruction}
+${modeSpecificDirective}
+Ensure all Chinese meanings ('meaning') are accurate, natural, and helpful for a student.
+Ignore page numbers, barcodes, timestamps, or irrelevant noisy background text.
+
+Return your response strictly as JSON with this structure:
+{
+  "detectedLanguage": "ja" | "es" | "en",
+  "isMarkedModeDetected": true | false,
+  "imageDescription": "Brief Chinese description of the image content and marked words found (e.g. 识别到 5 处荧光笔高光与 3 处圆圈标注生词 / 纸质手写错题本笔记)",
+  "words": [
+    {
+      "target": "word in original language (in clean dictionary/lemma form)",
+      "reading": "hiragana for Japanese, or standard IPA phonetic for Spanish/English",
+      "partOfSpeech": "part of speech abbreviation (e.g. n., v., adj., adv., 名, 动)",
+      "meaning": "accurate concise Chinese translation",
+      "markType": "circle" | "highlight" | "underline" | "handwritten" | "general",
+      "contextSentence": "sentence or context snippet on the paper where this word was marked",
+      "example": "optional short example sentence in target language",
+      "exampleZh": "optional Chinese translation of example sentence"
+    }
+  ]
+}`;
+
+      const imagePart = {
+        inlineData: {
+          mimeType: detectedMime,
+          data: base64Data,
+        },
+      };
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: {
+          parts: [imagePart, { text: promptText }],
+        },
+        config: {
+          responseMimeType: "application/json",
+        },
+      });
+
+      const parsed = JSON.parse(response.text || "{}");
+      if (!parsed.words || !Array.isArray(parsed.words)) {
+        parsed.words = [];
+      }
+
+      res.json({
+        success: true,
+        detectedLanguage: parsed.detectedLanguage || (language === "auto" ? "en" : language),
+        isMarkedModeDetected: Boolean(parsed.isMarkedModeDetected),
+        imageDescription: parsed.imageDescription || "已识别图片中的词汇",
+        words: parsed.words,
+      });
+    } catch (error: any) {
+      console.error("OCR extract words error:", error);
+      res.status(500).json({
+        success: false,
+        error: "拍照识词处理失败: " + (error.message || error),
       });
     }
   });

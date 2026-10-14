@@ -21,8 +21,10 @@ export interface SpanishWord {
   categoryName: string;
   exampleEs?: string;
   exampleZh?: string;
-  level: "A1" | "A2" | "B1" | "B2";
+  level: "A1" | "A2" | "B1" | "B2" | string;
   isCustom?: boolean;
+  markType?: string;
+  contextSentence?: string;
 }
 
 export const SPANISH_CATEGORIES: { id: SpanishCategory | string; label: string; icon: string }[] = [
