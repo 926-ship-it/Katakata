@@ -55,6 +55,7 @@ interface PhotoWordUploadModalProps {
   onImportComplete?: (count: number, lang: "ja" | "es" | "en") => void;
   onNavigateToRecite?: (lang: "ja" | "es" | "en") => void;
   onNavigateToLibrary?: () => void;
+  onStartPracticeWithWords?: (categoryName: string, lang: "ja" | "es" | "en") => void;
 }
 
 export const PhotoWordUploadModal: React.FC<PhotoWordUploadModalProps> = ({
@@ -64,6 +65,7 @@ export const PhotoWordUploadModal: React.FC<PhotoWordUploadModalProps> = ({
   onImportComplete,
   onNavigateToRecite,
   onNavigateToLibrary,
+  onStartPracticeWithWords,
 }) => {
   // Passkey Gate state
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => isUploadPasskeyUnlocked());
@@ -529,18 +531,21 @@ export const PhotoWordUploadModal: React.FC<PhotoWordUploadModalProps> = ({
               </div>
 
               <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
-                {onNavigateToRecite && (
-                  <button
-                    onClick={() => {
-                      onClose();
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    if (onStartPracticeWithWords) {
+                      onStartPracticeWithWords(customCategoryName, detectedLang);
+                    } else if (onNavigateToRecite) {
                       onNavigateToRecite(detectedLang);
-                    }}
-                    className="px-6 py-2.5 rounded-xl bg-stone-900 hover:bg-[#C4482A] text-stone-50 font-serif font-black text-xs tracking-wider transition-all shadow-md cursor-pointer flex items-center gap-1.5 active:scale-95"
-                  >
-                    <ChevronRight className="w-4 h-4 text-amber-400" />
-                    <span>🎯 立即开始拼写背诵</span>
-                  </button>
-                )}
+                    }
+                  }}
+                  className="px-6 py-3 rounded-xl bg-[#C4482A] hover:bg-[#A33B22] text-white font-serif font-black text-xs sm:text-sm tracking-wider transition-all shadow-md cursor-pointer flex items-center gap-2 active:scale-95"
+                >
+                  <ChevronRight className="w-4 h-4 text-amber-300" />
+                  <span>🚀 立即开始这组圈词速刷 (3分钟快过)</span>
+                </button>
 
                 <button
                   onClick={() => {

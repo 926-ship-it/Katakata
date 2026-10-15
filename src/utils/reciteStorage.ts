@@ -7,6 +7,7 @@ export interface MistakeRecord {
   meaning?: string;
   errorCount: number;
   mistakeCount?: number;
+  consecutiveCorrectStreak?: number; // How many consecutive times user spelled it correctly without hint
   lastErrorTime: number;
   lastErrorInput?: string;
 }
@@ -77,6 +78,7 @@ export function addMistake(
       meaning: meaning || existing?.meaning || "",
       errorCount: (existing?.errorCount || 0) + 1,
       mistakeCount: (existing?.errorCount || 0) + 1,
+      consecutiveCorrectStreak: 0, // Reset streak on mistake
       lastErrorTime: Date.now(),
       lastErrorInput: wrongInput || existing?.lastErrorInput,
     };
@@ -97,6 +99,66 @@ export function addMistake(
     return next;
   } catch (_) {
     return getMistakes(lang);
+  }
+}
+
+/**
+ * Records a successful, hint-free attempt for a word in the mistake notebook.
+ * If user achieves a 2-streak (or 3-streak), graduates the word by removing it from the mistake list!
+ */
+export function recordMistakeCorrectStreak(
+  lang: ReciteLanguage,
+  wordId: string,
+  targetStreak: number = 2
+): { graduated: boolean; currentStreak: number; remainingCount: number; wordText?: string } {
+  if (typeof window === "undefined") return { graduated: false, currentStreak: 0, remainingCount: 0 };
+  try {
+    const current = getMistakes(lang);
+    const existing = current[wordId];
+    if (!existing) {
+      return { graduated: false, currentStreak: 0, remainingCount: Object.keys(current).length };
+    }
+
+    const nextStreak = (existing.consecutiveCorrectStreak || 0) + 1;
+    if (nextStreak >= targetStreak) {
+      // Graduated! Word is conquered and removed from active mistake notebook!
+      const next = { ...current };
+      delete next[wordId];
+      localStorage.setItem(getMistakesKey(lang), JSON.stringify(next));
+
+      appendHistoryLog({
+        id: `${wordId}_graduated_${Date.now()}`,
+        wordId,
+        lang,
+        wordText: existing.wordText,
+        meaning: existing.meaning,
+        action: "mistake_resolve",
+        timestamp: Date.now(),
+      });
+
+      return {
+        graduated: true,
+        currentStreak: nextStreak,
+        remainingCount: Object.keys(next).length,
+        wordText: existing.wordText,
+      };
+    } else {
+      // Increment streak
+      const updated: MistakeRecord = {
+        ...existing,
+        consecutiveCorrectStreak: nextStreak,
+      };
+      const next = { ...current, [wordId]: updated };
+      localStorage.setItem(getMistakesKey(lang), JSON.stringify(next));
+      return {
+        graduated: false,
+        currentStreak: nextStreak,
+        remainingCount: Object.keys(next).length,
+        wordText: existing.wordText,
+      };
+    }
+  } catch (_) {
+    return { graduated: false, currentStreak: 0, remainingCount: 0 };
   }
 }
 

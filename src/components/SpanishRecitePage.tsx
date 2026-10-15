@@ -56,9 +56,17 @@ import {
   clearReciteProgress,
   recordReciteAction,
   getReciteHistoryLogs,
-  clearReciteHistoryLogs
+  clearReciteHistoryLogs,
+  recordMistakeCorrectStreak
 } from "../utils/reciteStorage";
 import { addDailyProgress } from "../utils/dailyGoal";
+import { getPitfallHint, PitfallHintResult } from "../utils/pitfallHints";
+import { WeeklyReportModal } from "./WeeklyReportModal";
+
+import { getSpanishGrammarDetails, WordGrammarDetails } from "../utils/spanishGrammarHelper";
+import { loadSrsData, isDue, recordPracticeBatch, getDueDate } from "../utils/srs";
+import { calculateBadges, LearnerBadge } from "../utils/badgesHelper";
+import { LearnerBadgesModal } from "./LearnerBadgesModal";
 
 export type ReciteLanguage = "ja" | "en" | "es";
 
@@ -84,6 +92,8 @@ export interface UnifiedReciteWord {
   kanjiHint?: string;
   romajiHint?: string;
   isCustom?: boolean;
+  exampleEs?: string;
+  exampleZh?: string;
 }
 
 interface SpanishRecitePageProps {
@@ -116,6 +126,7 @@ const CATEGORIES_MAP: Record<ReciteLanguage, { id: string; label: string; icon: 
   ],
   es: [
     { id: "all", label: "全部", icon: "🇪🇸" },
+    { id: "srs_due", label: "⏰ 艾宾浩斯复习", icon: "⏰" },
     { id: "daily", label: "日常交流", icon: "💬" },
     { id: "travel", label: "旅行交通", icon: "✈️" },
     { id: "business", label: "职场商务", icon: "💼" },
@@ -241,11 +252,14 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   const [speechRate, setSpeechRate] = useState<number>(() => audioSynth.getSpeechRate());
 
   // Dictation & Guided Letter-by-Letter Prompt State
-  const [promptMode, setPromptMode] = useState<"guided" | "hint" | "blind">("guided");
+  const [promptMode, setPromptMode] = useState<"guided" | "hint" | "blind" | "audio_blind">("guided");
   const [useTypewriterGrid, setUseTypewriterGrid] = useState<boolean>(true);
   const [typedChars, setTypedChars] = useState<string[]>([]);
   const [romajiBuffer, setRomajiBuffer] = useState<string>("");
   const [shakeIndex, setShakeIndex] = useState<number | null>(null);
+  const [pitfallHint, setPitfallHint] = useState<PitfallHintResult | null>(null);
+  const [graduatedNotice, setGraduatedNotice] = useState<string>("");
+  const [showReportModal, setShowReportModal] = useState<boolean>(false);
   const hiddenInputRef = useRef<HTMLInputElement>(null);
   const dictationCardRef = useRef<HTMLDivElement>(null);
   const lastAutoPronouncedWordIdRef = useRef<string>("");
@@ -256,6 +270,12 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   const [dictationSuccess, setDictationSuccess] = useState<boolean>(false);
   const [dictationError, setDictationError] = useState<boolean>(false);
   const dictationInputRef = useRef<HTMLInputElement>(null);
+  const typedCharsRef = useRef<string[]>([]);
+  const isKeyHandledByKeyDownRef = useRef<boolean>(false);
+  const [isGrammarExpanded, setIsGrammarExpanded] = useState<boolean>(false);
+  const [showBadgesModal, setShowBadgesModal] = useState<boolean>(false);
+  const [badgeNotice, setBadgeNotice] = useState<string>("");
+  const [allBadges, setAllBadges] = useState<LearnerBadge[]>([]);
 
   // Load words whenever language or refreshTrigger changes
   const reloadWords = (langToLoad: ReciteLanguage = currentLang) => {
@@ -302,6 +322,8 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
           segments: letterSegments,
           pronounceText: cleanWord,
           isCustom: w.isCustom,
+          exampleEs: w.exampleEs,
+          exampleZh: w.exampleZh,
         };
       });
     } else if (langToLoad === "en") {
@@ -380,7 +402,15 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       if (isMistakesOnly) {
         if (!mistakesMap[w.id]) return false;
       }
-      const matchCat = isMistakesOnly ? true : selectedCategory === "all" || w.category === selectedCategory;
+      if (selectedCategory === "srs_due") {
+        const srsData = loadSrsData();
+        const cardState = srsData.cards[w.id];
+        if (cardState && !isDue(cardState)) return false;
+      }
+      const matchCat =
+        isMistakesOnly || selectedCategory === "srs_due"
+          ? true
+          : selectedCategory === "all" || w.category === selectedCategory;
       const matchLevel = isMistakesOnly ? true : selectedLevel === "all" || w.level === selectedLevel;
       const matchSearch =
         !searchQuery.trim() ||
@@ -429,15 +459,22 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   }, [currentWord]);
 
   // Play pronunciation of current word safely
-  const pronounceCurrentWord = (onEnd?: () => void) => {
+  const pronounceCurrentWord = (onEnd?: () => void, customRate?: number) => {
     if (!currentWord) {
       if (onEnd) onEnd();
       return;
+    }
+    const prevRate = audioSynth.getSpeechRate();
+    if (typeof customRate === "number") {
+      audioSynth.setSpeechRate(customRate);
     }
     setIsPronouncing(true);
     audioSynth.speakFullWord(
       currentWord.pronounceText,
       () => {
+        if (typeof customRate === "number") {
+          audioSynth.setSpeechRate(prevRate);
+        }
         setIsPronouncing(false);
         if (onEnd) onEnd();
       },
@@ -447,11 +484,27 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
     );
   };
 
+  // Dedicated 0.6x super-slow pronunciation for phonetic clarity & trill listening
+  const playSlowPronunciation = () => {
+    if (!currentWord) return;
+    pronounceCurrentWord(undefined, 0.6);
+  };
+
+  // Dual playback mode: first 1.0x native flow, then 400ms pause, then 0.6x deep slow breakdown
+  const playDualPronunciation = () => {
+    if (!currentWord) return;
+    pronounceCurrentWord(() => {
+      setTimeout(() => {
+        playSlowPronunciation();
+      }, 400);
+    }, 1.0);
+  };
+
   const cycleSpeechRate = (speakSample: boolean = true) => {
-    const rates = [1.0, 1.25, 1.5, 1.75, 0.8];
+    const rates = [1.0, 0.8, 0.6, 1.25, 1.5];
     const current = audioSynth.getSpeechRate();
     const nextIdx = (rates.findIndex((r) => Math.abs(r - current) < 0.05) + 1) % rates.length;
-    const newRate = rates[nextIdx >= 0 ? nextIdx : 1];
+    const newRate = rates[nextIdx >= 0 ? nextIdx : 0];
     audioSynth.setSpeechRate(newRate);
     setSpeechRate(newRate);
     audioSynth.playCardSlide();
@@ -481,8 +534,10 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       // Auto-advance inverted punctuation (¡, ¿) if word starts with it in Spanish
       const first = currentWord?.segments?.[0]?.display;
       if (first === "¡" || first === "¿") {
+        typedCharsRef.current = [first];
         setTypedChars([first]);
       } else {
+        typedCharsRef.current = [];
         setTypedChars([]);
       }
 
@@ -635,11 +690,13 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
   // Dedicated, safe auto-advance helper that cleanly resets dictation state and moves to next card
   const advanceToNextWord = () => {
     lastProcessedKeyRef.current = null;
+    isKeyHandledByKeyDownRef.current = false;
     setIsPronouncing(false);
     setDictationSuccess(false);
     setDictationError(false);
     setShakeIndex(null);
     setRomajiBuffer("");
+    typedCharsRef.current = [];
     setTypedChars([]);
     setDictationInput("");
     if (activeDeck.length > 1) {
@@ -648,8 +705,10 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
     } else {
       const first = currentWord?.segments?.[0]?.display;
       if (first === "¡" || first === "¿") {
+        typedCharsRef.current = [first];
         setTypedChars([first]);
       } else {
+        typedCharsRef.current = [];
         setTypedChars([]);
       }
     }
@@ -683,6 +742,41 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
         addDailyProgress(0.15, 1);
       } catch (_) {}
 
+      // Advance Ebbinghaus Spaced Repetition (SRS)
+      try {
+        recordPracticeBatch([currentWord.id]);
+      } catch (_) {}
+
+      // Dynamic check for newly unlocked learner achievement badges
+      try {
+        const { newlyUnlocked } = calculateBadges({
+          spanishMasteredCount: Object.values(nextMap).filter((m) => m.status === "mastered").length,
+          japaneseCollectedCount: getDictionary(false).length,
+          streakDays: 1,
+          maxSessionStreak: sessionStreak + 1,
+          graduatedMistakesCount: 0,
+          srsReviewCount: 1,
+        });
+        if (newlyUnlocked.length > 0) {
+          audioSynth.playFanfare();
+          setBadgeNotice(`🏅 荣获成就勋章：「${newlyUnlocked[0].title}」${newlyUnlocked[0].icon}！`);
+          setTimeout(() => setBadgeNotice(""), 4500);
+        }
+      } catch (_) {}
+
+      // Check if this word was in active mistake notebook for graduation (3-strike mastery)
+      if (mistakesMap[currentWord.id]) {
+        const res = recordMistakeCorrectStreak(currentLang, currentWord.id, 2);
+        if (res.graduated) {
+          audioSynth.playFanfare();
+          setGraduatedNotice(`💮 破茧攻克！「${currentWord.displayTitle}」已连续无提示拼对，彻底毕业移出易错词表！`);
+          setTimeout(() => setGraduatedNotice(""), 4500);
+          setMistakesMap(getMistakes(currentLang));
+        } else {
+          setMistakesMap(getMistakes(currentLang));
+        }
+      }
+
       // Dual-layer advance guarantee:
       // 1. Audio onEnd plays and advances naturally with brief acoustic pause
       // 2. Ironclad safety watchdog (1200ms) guarantees advancing so user is NEVER stalled
@@ -711,22 +805,24 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
     if (!currentWord || dictationSuccess) return;
 
     // De-duplicate rapid duplicate events to prevent synthetic DOM echoes (e.g. keydown + onChange firing together)
-    // 1) Alternating source filter: if identical key arrives from an alternate event source within 180ms, discard echo.
-    // 2) Mechanical bounce filter: humans cannot physically strike, release, and strike the same key in < 55ms.
+    // 1) Cross-source echo filter: if identical key arrives from an alternate event source within 350ms, discard echo.
+    // 2) Mechanical bounce filter: humans cannot physically strike, release, and strike the same key in < 65ms.
     const now = Date.now();
     const normKey = inputChar.toLowerCase();
     if (lastProcessedKeyRef.current && lastProcessedKeyRef.current.key === normKey) {
       const elapsed = now - lastProcessedKeyRef.current.time;
-      if (lastProcessedKeyRef.current.source !== source && elapsed < 180) {
+      if (lastProcessedKeyRef.current.source !== source && elapsed < 350) {
         return;
       }
-      if (elapsed < 55) {
+      if (elapsed < 65) {
         return;
       }
     }
     lastProcessedKeyRef.current = { key: normKey, time: now, source };
 
-    let currIdx = typedChars.length;
+    // Synchronous progress tracking: guarantees no stale closure or React batch delay can double-fill letters
+    const currentProgress = typedCharsRef.current;
+    let currIdx = currentProgress.length;
     if (currIdx >= targetChars.length) return;
 
     const currentSegment = currentWord.segments[currIdx];
@@ -739,7 +835,8 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       // Check if user directly tapped/input the Kana character
       if (inputChar === currentSegment.display) {
         setRomajiBuffer("");
-        const nextTyped = [...typedChars, currentSegment.display];
+        const nextTyped = [...currentProgress, currentSegment.display];
+        typedCharsRef.current = nextTyped;
         setTypedChars(nextTyped);
         const isComp = nextTyped.length >= targetChars.length;
         audioSynth.playTyping({ isCompletion: isComp });
@@ -757,7 +854,8 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
       if (isMatch) {
         setRomajiBuffer("");
-        const nextTyped = [...typedChars, currentSegment.display];
+        const nextTyped = [...currentProgress, currentSegment.display];
+        typedCharsRef.current = nextTyped;
         setTypedChars(nextTyped);
         const isComp = nextTyped.length >= targetChars.length;
         audioSynth.playTyping({ isCompletion: isComp });
@@ -801,7 +899,8 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       if (nextSegment) {
         const nextExp = nextSegment.display;
         if (inputChar.toLowerCase() === nextExp.toLowerCase() || inputChar.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === nextExp.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")) {
-          const nextTyped = [...typedChars, expected, nextExp];
+          const nextTyped = [...currentProgress, expected, nextExp];
+          typedCharsRef.current = nextTyped;
           setTypedChars(nextTyped);
           const isComp = nextTyped.length >= targetChars.length;
           audioSynth.playTyping({ isCompletion: isComp });
@@ -812,7 +911,8 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
     }
 
     if (isExact || isNormMatch || (expected === " " && inputChar === " ")) {
-      const nextTyped = [...typedChars, expected];
+      const nextTyped = [...currentProgress, expected];
+      typedCharsRef.current = nextTyped;
       setTypedChars(nextTyped);
       const isComp = nextTyped.length >= targetChars.length;
       audioSynth.playTyping({ isCompletion: isComp });
@@ -844,13 +944,15 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
       return;
     }
 
-    if (typedChars.length > 0) {
+    if (typedCharsRef.current.length > 0) {
       const first = targetChars[0];
-      if ((first === "¡" || first === "¿") && typedChars.length === 1) {
+      if ((first === "¡" || first === "¿") && typedCharsRef.current.length === 1) {
         return;
       }
       audioSynth.playTyping({ volume: 0.6 });
-      setTypedChars((prev) => prev.slice(0, -1));
+      const nextTyped = typedCharsRef.current.slice(0, -1);
+      typedCharsRef.current = nextTyped;
+      setTypedChars(nextTyped);
       setRomajiBuffer("");
     }
   };
@@ -861,9 +963,16 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.altKey || e.metaKey) return;
-      // If the user is currently focused inside ANY input or textarea element (including hiddenInputRef),
+      // If the user is currently focused inside hiddenInputRef or ANY input or textarea element,
       // the input element itself handles the keystrokes via onKeyDown/onChange. Do NOT execute twice!
-      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") {
+      if (
+        document.activeElement === hiddenInputRef.current ||
+        (e.target && e.target === hiddenInputRef.current) ||
+        (e.target && (e.target as HTMLElement).tagName === "INPUT") ||
+        (e.target && (e.target as HTMLElement).tagName === "TEXTAREA") ||
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
         return;
       }
 
@@ -896,7 +1005,7 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeTab, useTypewriterGrid, currentWord, typedChars, romajiBuffer, dictationSuccess, targetChars, currentLang, activeDeck.length]);
+  }, [activeTab, useTypewriterGrid, currentWord, dictationSuccess, targetChars, currentLang, activeDeck.length]);
 
   // Classic fallback input check
   const handleCheckClassicDictation = (inputVal: string) => {
@@ -957,6 +1066,103 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
 
   const categories = CATEGORIES_MAP[currentLang];
 
+  const renderSpanishGrammarDrawer = () => {
+    if (!currentWord || currentLang !== "es") return null;
+    const grammar = getSpanishGrammarDetails(
+      currentWord.displayTitle,
+      currentWord.partOfSpeech,
+      currentWord.meaning,
+      currentWord.exampleEs,
+      currentWord.exampleZh
+    );
+
+    return (
+      <div className="bg-white rounded-3xl border border-stone-200 shadow-xs overflow-hidden transition-all text-left">
+        <button
+          type="button"
+          onClick={() => setIsGrammarExpanded((prev) => !prev)}
+          className="w-full px-5 py-3.5 bg-stone-50 hover:bg-stone-100 flex items-center justify-between text-stone-800 text-xs font-bold font-serif transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base">📚</span>
+            <span className="text-stone-900 font-black">
+              {grammar.conjugation ? "西语动词变位与原声实战例句" : "西语语法辨析与地道例句"}
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-mono">
+              {grammar.partOfSpeech || "词汇解析"}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 text-stone-500 font-mono text-[11px]">
+            <span>{isGrammarExpanded ? "收起解析" : "展开变位与例句"}</span>
+            <span>{isGrammarExpanded ? "▲" : "▼"}</span>
+          </div>
+        </button>
+
+        {isGrammarExpanded && (
+          <div className="p-5 space-y-4 border-t border-stone-200">
+            {grammar.conjugation && (
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-stone-700 flex items-center justify-between">
+                  <span>⏰ 直陈式现在时核心变位 (Presente de Indicativo):</span>
+                  <span className="text-[10px] text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded font-mono font-bold">
+                    {grammar.conjugation.regular ? "规则变位" : "重点不规则"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {grammar.conjugation.present.map((item, idx) => (
+                    <div key={idx} className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200 text-center space-y-0.5 shadow-2xs">
+                      <div className="text-[10px] font-mono text-stone-400">{item.pronoun}</div>
+                      <div className="text-xs font-mono font-black text-amber-950">{item.form}</div>
+                    </div>
+                  ))}
+                </div>
+                {(grammar.conjugation.gerund || grammar.conjugation.participle) && (
+                  <div className="text-[11px] font-mono text-stone-500 flex flex-wrap gap-4 pt-1">
+                    {grammar.conjugation.gerund && (
+                      <span>副动词(进行时): <strong className="text-stone-800">{grammar.conjugation.gerund}</strong></span>
+                    )}
+                    {grammar.conjugation.participle && (
+                      <span>过去分词(完成时): <strong className="text-stone-800">{grammar.conjugation.participle}</strong></span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {grammar.genderRule && (
+              <div className="p-3 rounded-xl bg-stone-100 border border-stone-200 text-xs text-stone-700 flex items-center gap-2">
+                <span className="text-amber-700 font-bold">💡 阴阳性辨析:</span>
+                <span>{grammar.genderRule}</span>
+              </div>
+            )}
+
+            <div className="p-4 rounded-2xl bg-stone-900 text-stone-50 space-y-2 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-amber-400 font-bold flex items-center gap-1">
+                  <span>🇪🇸</span> 原汁原味西语原声例句
+                </span>
+                <button
+                  type="button"
+                  onClick={() => audioSynth.speakFullWord(grammar.exampleEs, undefined, undefined, undefined, "es")}
+                  className="px-2.5 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-stone-950 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                >
+                  <Volume2 className="w-3 h-3" />
+                  <span>朗读例句</span>
+                </button>
+              </div>
+              <p className="text-sm font-serif font-medium leading-relaxed text-amber-100">
+                {grammar.exampleEs}
+              </p>
+              <p className="text-xs font-serif text-stone-400">
+                {grammar.exampleZh}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen pb-16 text-stone-900 select-none">
       <div className="max-w-4xl mx-auto px-3 sm:px-6 space-y-6">
@@ -986,8 +1192,41 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
             </div>
           </div>
 
-          {/* Language Switcher Tabs */}
-          <div className="flex items-center bg-stone-200/80 p-1 rounded-2xl border border-stone-300/80 shadow-inner">
+          {/* Right Action Bar: Badges & Language Switcher */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const res = calculateBadges({
+                  spanishMasteredCount: Object.values(masteryMap).filter((m) => m.status === "mastered").length,
+                  japaneseCollectedCount: getDictionary(false).length,
+                  streakDays: 1,
+                  maxSessionStreak: sessionStreak,
+                  graduatedMistakesCount: 0,
+                  srsReviewCount: 1,
+                });
+                setAllBadges(res.badges);
+                setShowBadgesModal(true);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-serif font-black text-xs transition-all cursor-pointer shadow-xs flex items-center gap-1.5 active:scale-95"
+              title="查看学习者成就勋章"
+            >
+              <span>🏅</span>
+              <span className="hidden sm:inline">成就勋章</span>
+              <span className="text-[10px] bg-stone-950 text-amber-300 px-1.5 py-0.2 rounded-full font-mono">
+                {calculateBadges({
+                  spanishMasteredCount: Object.values(masteryMap).filter((m) => m.status === "mastered").length,
+                  japaneseCollectedCount: getDictionary(false).length,
+                  streakDays: 1,
+                  maxSessionStreak: sessionStreak,
+                  graduatedMistakesCount: 0,
+                  srsReviewCount: 1,
+                }).badges.filter((b) => b.unlocked).length}
+              </span>
+            </button>
+
+            {/* Language Switcher Tabs */}
+            <div className="flex items-center bg-stone-200/80 p-1 rounded-2xl border border-stone-300/80 shadow-inner">
             <button
               type="button"
               onClick={() => handleSwitchLanguage("ja")}
@@ -1028,6 +1267,49 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
             </button>
           </div>
         </div>
+      </div>
+
+        {/* Learner Achievement Unlocked Banner */}
+        {badgeNotice && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-amber-400 border-2 border-amber-600 text-stone-950 rounded-2xl p-3.5 px-4 flex flex-wrap items-center justify-between gap-3 text-xs font-serif font-bold shadow-md"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl">🎉</span>
+              <span className="text-sm">{badgeNotice}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const res = calculateBadges({
+                    spanishMasteredCount: Object.values(masteryMap).filter((m) => m.status === "mastered").length,
+                    japaneseCollectedCount: getDictionary(false).length,
+                    streakDays: 1,
+                    maxSessionStreak: sessionStreak,
+                    graduatedMistakesCount: 0,
+                    srsReviewCount: 1,
+                  });
+                  setAllBadges(res.badges);
+                  setShowBadgesModal(true);
+                }}
+                className="px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-stone-50 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+              >
+                查看勋章
+              </button>
+              <button
+                type="button"
+                onClick={() => setBadgeNotice("")}
+                className="p-1 text-stone-700 hover:text-stone-950 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
 
         {/* Restored Learning Progress Notification Banner */}
         {restoredBanner && (
@@ -1577,6 +1859,9 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
+
+                {/* Spanish Grammar, Verb Conjugations & Example Sentences Drawer */}
+                {renderSpanishGrammarDrawer()}
               </>
             ) : (
               <div className="p-12 text-center bg-white rounded-3xl border-2 border-stone-800 space-y-4">
@@ -1598,7 +1883,8 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
         {activeTab === "dictation" && (
           <div className="max-w-3xl mx-auto space-y-6">
             {currentWord ? (
-              <div ref={dictationCardRef} className="bg-white rounded-3xl border-2 border-stone-800 p-5 sm:p-8 shadow-lg space-y-6 text-center scroll-mt-6">
+              <>
+                <div ref={dictationCardRef} className="bg-white rounded-3xl border-2 border-stone-800 p-5 sm:p-8 shadow-lg space-y-6 text-center scroll-mt-6">
                 {/* Header & Prompt Level Selector */}
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 pb-4">
                   <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl border border-stone-200 text-[11px] font-bold">
@@ -1713,16 +1999,35 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                   <div className="text-xl sm:text-2xl font-bold font-serif text-stone-900">
                     {currentWord.meaning}
                   </div>
-                  <div className="text-xs font-mono text-stone-500 flex items-center justify-center gap-2">
+                  <div className="text-xs font-mono text-stone-500 flex flex-wrap items-center justify-center gap-2">
                     <span className="px-2 py-0.5 rounded-full bg-stone-100 border border-stone-200">
                       {currentWord.categoryName}
                     </span>
                     {currentWord.phonetic && <span>{currentWord.phonetic}</span>}
+                    {(() => {
+                      const srsData = loadSrsData();
+                      const card = srsData.cards[currentWord.id];
+                      if (!card) return null;
+                      const interval = [1, 2, 4, 7, 15, 30][Math.min(card.intervalIndex, 5)];
+                      const due = isDue(card);
+                      return (
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-bold flex items-center gap-1 ${
+                            due
+                              ? "bg-amber-100 text-amber-900 border border-amber-300"
+                              : "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                          }`}
+                        >
+                          <span>⏰ 记忆阶段 {card.intervalIndex + 1} ({interval}天)</span>
+                          {due && <span className="text-[10px] bg-amber-400 text-stone-950 px-1 rounded">今日待复习</span>}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
 
                 {/* Audio Listen Buttons */}
-                <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center justify-center flex-wrap gap-2.5">
                   <button
                     type="button"
                     onClick={() => pronounceCurrentWord()}
@@ -1734,6 +2039,24 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                   >
                     <Volume2 className={`w-4 h-4 ${isPronouncing ? "text-stone-950 animate-bounce" : "text-amber-800"}`} />
                     <span>{isPronouncing ? "正在朗读..." : "重听发音 (Enter)"}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={playSlowPronunciation}
+                    className="px-3 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-950 text-xs font-serif font-bold transition-all cursor-pointer active:scale-95 flex items-center gap-1 shadow-2xs"
+                    title="0.6x 考据超慢速播放，清晰辨析辅音与颤音"
+                  >
+                    <span>🐢 0.6x 慢放</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={playDualPronunciation}
+                    className="px-3 py-1.5 rounded-full bg-purple-50 hover:bg-purple-100 border border-purple-300 text-purple-950 text-xs font-serif font-bold transition-all cursor-pointer active:scale-95 flex items-center gap-1 shadow-2xs"
+                    title="先播放原速语调，随后慢放逐音拆解"
+                  >
+                    <span>🔁 双速磨耳朵</span>
                   </button>
 
                   <button
@@ -1806,12 +2129,21 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                             e.stopPropagation();
                             pronounceCurrentWord();
                           } else if (e.key.length === 1) {
+                            isKeyHandledByKeyDownRef.current = true;
                             e.preventDefault();
                             e.stopPropagation();
                             handleTypeCharacter(e.key, "input_keydown");
                           }
                         }}
+                        onKeyUp={() => {
+                          isKeyHandledByKeyDownRef.current = false;
+                        }}
                         onChange={(e) => {
+                          if (isKeyHandledByKeyDownRef.current) {
+                            isKeyHandledByKeyDownRef.current = false;
+                            e.target.value = "";
+                            return;
+                          }
                           const val = e.target.value;
                           if (val) {
                             const lastChar = val[val.length - 1];
@@ -2137,6 +2469,10 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* Spanish Grammar, Verb Conjugations & Example Sentences Drawer */}
+              {renderSpanishGrammarDrawer()}
+            </>
             ) : (
               <div className="p-12 text-center bg-white rounded-3xl border-2 border-stone-800 space-y-4">
                 <p className="text-stone-500 font-serif">当前分类下暂无词汇</p>
@@ -2553,6 +2889,24 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
             </div>
           </div>
         )}
+
+        {/* Learner Achievement Badges Showcase Modal */}
+        <LearnerBadgesModal
+          isOpen={showBadgesModal}
+          onClose={() => setShowBadgesModal(false)}
+          badges={
+            allBadges.length > 0
+              ? allBadges
+              : calculateBadges({
+                  spanishMasteredCount: Object.values(masteryMap).filter((m) => m.status === "mastered").length,
+                  japaneseCollectedCount: getDictionary(false).length,
+                  streakDays: 1,
+                  maxSessionStreak: sessionStreak,
+                  graduatedMistakesCount: 0,
+                  srsReviewCount: 1,
+                }).badges
+          }
+        />
       </div>
     </div>
   );
