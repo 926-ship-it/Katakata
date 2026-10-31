@@ -12,7 +12,7 @@ export interface DictionaryItem {
   id: string;
   kanji: string;
   kanaStr: string;
-  category: "name" | "nature" | "culture" | "food" | "custom";
+  category: "name" | "nature" | "culture" | "food" | "custom" | "fairy" | "poetry" | "music";
   categoryName: string;
   meaning: string;
   rarity: "N" | "R" | "SR" | "SSR";
@@ -1882,6 +1882,163 @@ const BASE_DICTIONARY: DictionaryItem[] = [
       { kana: "を", romaji: ["wo", "o"], displayRomaji: "wo" },
       { kana: "と", romaji: ["to"], displayRomaji: "to" },
       { kana: "め", romaji: ["me"], displayRomaji: "me" }
+    ]
+  },
+  {
+    id: "cinderella",
+    kanji: "灰姑娘",
+    kanaStr: "しんでれら",
+    category: "fairy",
+    categoryName: "童话仙境",
+    meaning: "世界经典童话中的灰姑娘（Cinderella）。拥有水晶鞋、南瓜马车与午夜钟声的奇幻浪漫故事，代表善良与美好梦想终将破晓实现。",
+    rarity: "SSR",
+    rarityName: "传世 (SSR)",
+    glowColor: "rgba(236, 72, 153, 0.5)",
+    borderColor: "border-pink-400",
+    bgGradient: "from-pink-100 via-purple-100 to-sky-100",
+    segments: [
+      { kana: "し", romaji: ["shi", "si"], displayRomaji: "shi" },
+      { kana: "ん", romaji: ["n", "nn"], displayRomaji: "n" },
+      { kana: "で", romaji: ["de"], displayRomaji: "de" },
+      { kana: "れ", romaji: ["re"], displayRomaji: "re" },
+      { kana: "ら", romaji: ["ra"], displayRomaji: "ra" }
+    ]
+  },
+  {
+    id: "peterpan",
+    kanji: "彼得潘",
+    kanaStr: "ぴーたーぱん",
+    category: "fairy",
+    categoryName: "童话仙境",
+    meaning: "永不长大的永无乡少年彼得潘（Peter Pan）。乘着金色精灵粉末在夜空飞翔，守护童真与无忧无虑的奇妙冒险。",
+    rarity: "SR",
+    rarityName: "卓越 (SR)",
+    glowColor: "rgba(34, 197, 94, 0.4)",
+    borderColor: "border-emerald-300",
+    bgGradient: "from-emerald-50 to-teal-100",
+    segments: [
+      { kana: "ぴ", romaji: ["pi"], displayRomaji: "pi" },
+      { kana: "ー", romaji: ["-"], displayRomaji: "-" },
+      { kana: "た", romaji: ["ta"], displayRomaji: "ta" },
+      { kana: "ー", romaji: ["-"], displayRomaji: "-" },
+      { kana: "ぱ", romaji: ["pa"], displayRomaji: "pa" },
+      { kana: "ん", romaji: ["n", "nn"], displayRomaji: "n" }
+    ]
+  },
+  {
+    id: "kaguyahime",
+    kanji: "辉夜姬",
+    kanaStr: "かぐやひめ",
+    category: "fairy",
+    categoryName: "童话仙境",
+    meaning: "《竹取物语》中诞生于发光竹节中的月亮公主，日本最早的虚构物语名作，身披羽衣重返银月天宫。",
+    rarity: "SSR",
+    rarityName: "传世 (SSR)",
+    glowColor: "rgba(245, 158, 11, 0.5)",
+    borderColor: "border-amber-400",
+    bgGradient: "from-amber-50 via-rose-50 to-purple-100",
+    segments: [
+      { kana: "か", romaji: ["ka"], displayRomaji: "ka" },
+      { kana: "ぐ", romaji: ["gu"], displayRomaji: "gu" },
+      { kana: "や", romaji: ["ya"], displayRomaji: "ya" },
+      { kana: "ひ", romaji: ["hi"], displayRomaji: "hi" },
+      { kana: "め", romaji: ["me"], displayRomaji: "me" }
+    ]
+  },
+  {
+    id: "serenade",
+    kanji: "小夜曲",
+    kanaStr: "せれなーで",
+    category: "music",
+    categoryName: "流行与乐章",
+    meaning: "小夜曲（Serenade）。黄昏或月夜在窗前弹唱的抒情恋歌，旋律柔美缠绵，如舒伯特与莫扎特的传世乐章。",
+    rarity: "SR",
+    rarityName: "卓越 (SR)",
+    glowColor: "rgba(168, 85, 247, 0.4)",
+    borderColor: "border-purple-300",
+    bgGradient: "from-purple-50 via-pink-50 to-indigo-50",
+    segments: [
+      { kana: "せ", romaji: ["se"], displayRomaji: "se" },
+      { kana: "れ", romaji: ["re"], displayRomaji: "re" },
+      { kana: "な", romaji: ["na"], displayRomaji: "na" },
+      { kana: "ー", romaji: ["-"], displayRomaji: "-" },
+      { kana: "で", romaji: ["de"], displayRomaji: "de" }
+    ]
+  },
+  {
+    id: "melody",
+    kanji: "旋律",
+    kanaStr: "めろでぃー",
+    category: "music",
+    categoryName: "流行与乐章",
+    meaning: "音符起伏交织的流淌旋律（Melody），赋予流行歌曲与古典交响诗最扣人心弦的灵魂与情感记忆。",
+    rarity: "R",
+    rarityName: "稀有 (R)",
+    glowColor: "rgba(59, 130, 246, 0.3)",
+    borderColor: "border-sky-300",
+    bgGradient: "from-sky-50 to-indigo-50",
+    segments: [
+      { kana: "め", romaji: ["me"], displayRomaji: "me" },
+      { kana: "ろ", romaji: ["ro"], displayRomaji: "ro" },
+      { kana: "で", romaji: ["de"], displayRomaji: "de" },
+      { kana: "ぃ", romaji: ["li", "xi", "i"], displayRomaji: "i" },
+      { kana: "ー", romaji: ["-"], displayRomaji: "-" }
+    ]
+  },
+  {
+    id: "ballad",
+    kanji: "叙事谣",
+    kanaStr: "ばらーど",
+    category: "music",
+    categoryName: "流行与乐章",
+    meaning: "叙事民谣与抒情慢歌（Ballad），以深情缓慢的节奏倾诉心声，如肖邦叙事曲或流行流行抒情金曲。",
+    rarity: "R",
+    rarityName: "稀有 (R)",
+    glowColor: "rgba(236, 72, 153, 0.35)",
+    borderColor: "border-pink-300",
+    bgGradient: "from-pink-50 to-rose-100",
+    segments: [
+      { kana: "ば", romaji: ["ba"], displayRomaji: "ba" },
+      { kana: "ら", romaji: ["ra"], displayRomaji: "ra" },
+      { kana: "ー", romaji: ["-"], displayRomaji: "-" },
+      { kana: "ど", romaji: ["do"], displayRomaji: "do" }
+    ]
+  },
+  {
+    id: "tanka",
+    kanji: "短歌",
+    kanaStr: "たんか",
+    category: "poetry",
+    categoryName: "抒情诗歌",
+    meaning: "日本古典三十一音定型抒情诗（五七五七七），如《小仓百人一首》吟诵四时落叶、微风与绵延思念。",
+    rarity: "SR",
+    rarityName: "卓越 (SR)",
+    glowColor: "rgba(244, 114, 182, 0.4)",
+    borderColor: "border-rose-300",
+    bgGradient: "from-rose-50 via-amber-50 to-stone-50",
+    segments: [
+      { kana: "た", romaji: ["ta"], displayRomaji: "ta" },
+      { kana: "ん", romaji: ["n", "nn"], displayRomaji: "n" },
+      { kana: "か", romaji: ["ka"], displayRomaji: "ka" }
+    ]
+  },
+  {
+    id: "sonnet",
+    kanji: "十四行",
+    kanaStr: "そねっと",
+    category: "poetry",
+    categoryName: "抒情诗歌",
+    meaning: "十四行十四押韵的西方严谨抒情诗体（Sonnet），如莎士比亚“我能否将你比作明媚夏日”，咏赞永恒之美。",
+    rarity: "SR",
+    rarityName: "卓越 (SR)",
+    glowColor: "rgba(139, 92, 246, 0.4)",
+    borderColor: "border-purple-300",
+    bgGradient: "from-purple-50 via-stone-50 to-pink-50",
+    segments: [
+      { kana: "そ", romaji: ["so"], displayRomaji: "so" },
+      { kana: "ね", romaji: ["ne"], displayRomaji: "ne" },
+      { kana: "っ", romaji: ["t", "xtsu", "ltu"], displayRomaji: "t" },
+      { kana: "と", romaji: ["to"], displayRomaji: "to" }
     ]
   }
 ];

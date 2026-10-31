@@ -13,11 +13,16 @@ import { audioSynth } from "../utils/audio";
 interface DailyGoalPanelProps {
   isEnglishMode?: boolean;
   onStartPracticeQuick?: (minutes: number) => void;
+  onOpenCelebration?: () => void;
+  onOpenZine?: () => void;
 }
+
 
 export const DailyGoalPanel: React.FC<DailyGoalPanelProps> = ({
   isEnglishMode = false,
   onStartPracticeQuick,
+  onOpenCelebration,
+  onOpenZine,
 }) => {
   const [goal, setGoal] = useState<DailyGoalConfig>(getDailyGoal);
   const [showCustomModal, setShowCustomModal] = useState<boolean>(false);
@@ -106,24 +111,21 @@ export const DailyGoalPanel: React.FC<DailyGoalPanelProps> = ({
   const wordsPresets = [10, 20, 30, 50, 100];
 
   return (
-    <div className="p-5 md:p-6 rounded-2xl border-2 border-stone-850 bg-[#FAF7F2] shadow-sm relative overflow-hidden select-none">
-      {/* Subtle traditional watermark in background */}
-      <div className="absolute -right-8 -bottom-8 w-36 h-36 opacity-[0.03] pointer-events-none">
-        <svg viewBox="0 0 100 100" className="w-full h-full fill-stone-900">
-          <circle cx="50" cy="50" r="45" stroke="currentColor" strokeWidth="6" fill="none" />
-          <path d="M50 20 L50 80 M20 50 L80 50" stroke="currentColor" strokeWidth="4" />
-        </svg>
+    <div className="p-5 md:p-6 rounded-3xl border-2 border-stone-850 bg-white shadow-[5px_5px_0px_#2E2530] relative overflow-hidden select-none">
+      {/* Subtle star in background */}
+      <div className="absolute -right-4 -bottom-4 text-pink-200/40 text-7xl font-serif pointer-events-none">
+        ✦
       </div>
 
       {/* Top Banner: Title, Streak Badge & Mode Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-300/70 pb-3.5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-pink-100 pb-3.5">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-700">
-            <Target className="w-4 h-4 text-[#C4482A]" />
+          <div className="w-8 h-8 rounded-xl bg-pink-100/80 border border-pink-200 flex items-center justify-center text-pink-600">
+            <Target className="w-4 h-4 text-rose-500" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-serif font-black text-stone-900 text-base md:text-lg tracking-wide">
+              <h3 className="font-serif-vintage font-bold text-stone-900 text-base md:text-lg tracking-wide">
                 {isEnglishMode ? "Daily Practice Goal" : "每日练习目标"}
               </h3>
               {goal.streakDays > 0 && (
@@ -253,10 +255,35 @@ export const DailyGoalPanel: React.FC<DailyGoalPanelProps> = ({
 
             <div className="text-xs font-sans text-stone-600 leading-snug">
               {isCompleted ? (
-                <span className="text-emerald-700 font-bold flex items-center gap-1">
-                  <Award className="w-3.5 h-3.5 text-emerald-600" />
-                  {isEnglishMode ? "Goal accomplished! Outstanding work!" : "太棒了！今日目标已圆满达成！🎉"}
-                </span>
+                <div className="space-y-1.5">
+                  <span className="text-emerald-700 font-bold flex items-center gap-1">
+                    <Award className="w-3.5 h-3.5 text-emerald-600" />
+                    {isEnglishMode ? "Goal accomplished! Outstanding work!" : "太棒了！今日目标已圆满达成！🎉"}
+                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {onOpenCelebration && (
+                      <button
+                        type="button"
+                        onClick={onOpenCelebration}
+                        className="px-2.5 py-1 rounded-full bg-gradient-to-r from-pink-400 to-purple-400 text-white font-bold text-[11px] shadow-sm hover:from-pink-500 hover:to-purple-500 flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+                      >
+                        <span>✨</span>
+                        <span>{isEnglishMode ? "View Celebration Screen" : "查看今日达成庆祝画面 ＞"}</span>
+                      </button>
+                    )}
+                    {onOpenZine && (
+                      <button
+                        type="button"
+                        onClick={onOpenZine}
+                        className="px-2.5 py-1 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 font-bold text-[11px] shadow-2xs flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+                      >
+                        <span>💌</span>
+                        <span>{isEnglishMode ? "Daily Aesthetic Zine" : "生成今日手作日签"}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
               ) : (
                 <span>
                   {isEnglishMode 

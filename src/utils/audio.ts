@@ -165,10 +165,32 @@ export function resolveJapaneseSpeechPayload(
   text: string,
   kanjiHint?: string,
   romajiHint?: string,
-  langHint?: "ja" | "es" | "en"
+  langHint?: "ja" | "es" | "en" | "fr" | "it"
 ): { speechText: string; isEnglish: boolean; isSpanish: boolean; lang: string; romajiFallback: string } {
   const cleanText = (text || "").trim();
   const cleanKanji = (kanjiHint || "").trim();
+
+  // Explicit French mode
+  if (langHint === "fr" || /[œæçéèêëàâîïôùû]/.test(cleanText)) {
+    return {
+      speechText: cleanText,
+      isEnglish: false,
+      isSpanish: false,
+      lang: "fr-FR",
+      romajiFallback: cleanText,
+    };
+  }
+
+  // Explicit Italian mode
+  if (langHint === "it") {
+    return {
+      speechText: cleanText,
+      isEnglish: false,
+      isSpanish: false,
+      lang: "it-IT",
+      romajiFallback: cleanText,
+    };
+  }
 
   // Explicit Spanish mode or Spanish accented characters
   if (langHint === "es" || /[áéíóúÁÉÍÓÚñÑüÜ¡¿]/.test(cleanText)) {
@@ -647,7 +669,7 @@ class RetroAudioSynth {
     onEnd?: () => void,
     kanjiHint?: string,
     romajiHint?: string,
-    langHint?: "ja" | "es" | "en"
+    langHint?: "ja" | "es" | "en" | "fr" | "it"
   ) {
     if (!text || text.trim() === "") {
       if (onEnd) onEnd();
@@ -693,7 +715,11 @@ class RetroAudioSynth {
       let spokenText = payload.speechText;
       let spokenLang = payload.lang;
 
-      if (payload.isSpanish) {
+      if (payload.lang.startsWith("fr")) {
+        targetVoice = voices.find((v) => (v.lang || "").toLowerCase().startsWith("fr")) || null;
+      } else if (payload.lang.startsWith("it")) {
+        targetVoice = voices.find((v) => (v.lang || "").toLowerCase().startsWith("it")) || null;
+      } else if (payload.isSpanish) {
         // Robust Spanish voice lookup: check language tag variants and voice names
         targetVoice =
           voices.find((v) => {
@@ -1531,6 +1557,176 @@ class RetroAudioSynth {
     this.droneGain = null;
   }
 
+  // Grand celebration chime with sparkling celestial arpeggio for daily milestone completion
+  playCelebrationTriumph() {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // Dreamy romantic arpeggio: C5, E5, G5, B5, D6, E6, G6
+      const freqs = [523.25, 659.25, 783.99, 987.77, 1174.66, 1318.51, 1567.98];
+      freqs.forEach((freq, idx) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.08, now + idx * 0.08 + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.08 + 0.65);
+
+        osc.connect(gain);
+        gain.connect(this.ctx!.destination);
+
+        osc.start(now + idx * 0.08);
+        osc.stop(now + idx * 0.08 + 0.7);
+      });
+
+      // Secondary shimmer chime
+      setTimeout(() => {
+        if (!this.ctx) return;
+        const subNow = this.ctx.currentTime;
+        [1046.50, 1318.51, 1567.98, 2093.00].forEach((freq, idx) => {
+          const osc = this.ctx!.createOscillator();
+          const gain = this.ctx!.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(freq, subNow + idx * 0.06);
+
+          gain.gain.setValueAtTime(0, subNow);
+          gain.gain.linearRampToValueAtTime(0.06, subNow + idx * 0.06 + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.0001, subNow + idx * 0.06 + 0.45);
+
+          osc.connect(gain);
+          gain.connect(this.ctx!.destination);
+
+          osc.start(subNow + idx * 0.06);
+          osc.stop(subNow + idx * 0.06 + 0.5);
+        });
+      }, 550);
+    } catch (e) {
+      this.playFanfare();
+    }
+  }
+
+  // Realistic mechanical Gacha rotary crank ratchet clicks (ka-chack! ka-chack!)
+  playGachaCrank() {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // 3 progressive ratchet tooth clicks
+      [0, 0.12, 0.24].forEach((offset, idx) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(320 + idx * 80, now + offset);
+        osc.frequency.exponentialRampToValueAtTime(140, now + offset + 0.04);
+
+        gain.gain.setValueAtTime(0, now + offset);
+        gain.gain.linearRampToValueAtTime(0.22, now + offset + 0.003);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.045);
+
+        osc.connect(gain);
+        gain.connect(this.ctx!.destination);
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.05);
+
+        // Metallic spring ping
+        const spring = this.ctx!.createOscillator();
+        const sGain = this.ctx!.createGain();
+        spring.type = "sine";
+        spring.frequency.setValueAtTime(1200 + idx * 240, now + offset);
+        sGain.gain.setValueAtTime(0.08, now + offset);
+        sGain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.06);
+        spring.connect(sGain);
+        sGain.connect(this.ctx!.destination);
+        spring.start(now + offset);
+        spring.stop(now + offset + 0.07);
+      });
+    } catch (e) {
+      this.playCardSlide();
+    }
+  }
+
+  // Capsule rolling down and bouncing down the chute (tok-tok-plop!)
+  playGachaRoll() {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // Capsule tumbling bounces
+      [0, 0.14, 0.26, 0.38].forEach((offset, idx) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+        osc.type = "sine";
+        const baseFreq = 540 - idx * 60;
+        osc.frequency.setValueAtTime(baseFreq, now + offset);
+        osc.frequency.exponentialRampToValueAtTime(220, now + offset + 0.05);
+
+        gain.gain.setValueAtTime(0, now + offset);
+        gain.gain.linearRampToValueAtTime(0.18 - idx * 0.03, now + offset + 0.004);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.06);
+
+        osc.connect(gain);
+        gain.connect(this.ctx!.destination);
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.07);
+      });
+    } catch (e) {
+      this.playCardSlide();
+    }
+  }
+
+  // Capsule popping open with sparkle chime (pop! + celestial bell)
+  playGachaPop() {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // 1. Crisp Plastic Snap / Pop
+      const popOsc = this.ctx.createOscillator();
+      const popGain = this.ctx.createGain();
+      popOsc.type = "triangle";
+      popOsc.frequency.setValueAtTime(860, now);
+      popOsc.frequency.exponentialRampToValueAtTime(140, now + 0.06);
+
+      popGain.gain.setValueAtTime(0.3, now);
+      popGain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+
+      popOsc.connect(popGain);
+      popGain.connect(this.ctx.destination);
+      popOsc.start(now);
+      popOsc.stop(now + 0.08);
+
+      // 2. Sparkling High Chimes (E6, G6, C7, E7)
+      [1318.51, 1567.98, 2093.00, 2637.02].forEach((freq, idx) => {
+        const chime = this.ctx!.createOscillator();
+        const cGain = this.ctx!.createGain();
+        chime.type = "sine";
+        chime.frequency.setValueAtTime(freq, now + 0.04 + idx * 0.05);
+
+        cGain.gain.setValueAtTime(0, now + 0.04 + idx * 0.05);
+        cGain.gain.linearRampToValueAtTime(0.12, now + 0.04 + idx * 0.05 + 0.01);
+        cGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04 + idx * 0.05 + 0.4);
+
+        chime.connect(cGain);
+        cGain.connect(this.ctx!.destination);
+        chime.start(now + 0.04 + idx * 0.05);
+        chime.stop(now + 0.04 + idx * 0.05 + 0.45);
+      });
+    } catch (e) {
+      this.playCelebrationTriumph();
+    }
+  }
+
   updateBgmVolume() {
     if (!this.droneGain || !this.ctx) return;
     try {
@@ -1541,5 +1737,6 @@ class RetroAudioSynth {
     } catch (e) {}
   }
 }
+
 
 export const audioSynth = new RetroAudioSynth();

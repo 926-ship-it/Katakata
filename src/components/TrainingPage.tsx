@@ -10,6 +10,8 @@ import { uiTranslate, LANG_MAPPING } from "../utils/lang";
 import { SessionTrendChart } from "./SessionTrendChart";
 import { saveSessionLog } from "../utils/sessionLogs";
 import { getEnglishPhonetic } from "../utils/englishPhonetics";
+import { DailyZineModal } from "./DailyZineModal";
+
 
 interface TrainingPageProps {
   items: DictionaryItem[];
@@ -97,6 +99,8 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   const [isPronouncing, setIsPronouncing] = useState<boolean>(false); // Tracks whether full word audio is currently playing
   const [errorFlash, setErrorFlash] = useState<boolean>(false);
   const [handwritingPassed, setHandwritingPassed] = useState<boolean>(false);
+  const [isZineOpen, setIsZineOpen] = useState<boolean>(false);
+
 
   // Game/RPG Arcade States
   const [combo, setCombo] = useState<number>(0);
@@ -134,8 +138,11 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
     setXpPopups(prev => [...prev, newPopup]);
   };
 
+  const [isMeaningExpanded, setIsMeaningExpanded] = useState<boolean>(false);
+
   useEffect(() => {
     setHandwritingPassed(false);
+    setIsMeaningExpanded(false);
     currentSegmentIdxRef.current = 0;
     romajiProgressRef.current = "";
     completedSegmentsCountRef.current = 0;
@@ -902,16 +909,52 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     </div>
                   )}
 
-                  {/* Lexicon Meaning Banner - Clear, prominent, with toggle support */}
+                  {/* Lexicon Meaning Banner - Click to Expand to save vertical space on mobile */}
                   {showMeaning && item.meaning && (
-                    <div className="mt-2 px-3.5 sm:px-4 py-1.5 sm:py-2 bg-amber-50/95 border border-amber-200/90 rounded-xl shadow-2xs max-w-xl mx-auto flex items-center justify-center gap-2 select-text">
-                      <span className="px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900 font-bold text-[10px] sm:text-xs shrink-0 font-mono flex items-center gap-1">
-                        <BookOpen className="w-3 h-3 text-amber-800" />
-                        <span>词意</span>
-                      </span>
-                      <p className="text-stone-850 font-medium font-serif text-xs sm:text-sm leading-relaxed text-center">
-                        {item.meaning}
-                      </p>
+                    <div className="mt-1.5 max-w-xl mx-auto flex flex-col items-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMeaningExpanded(!isMeaningExpanded);
+                          try {
+                            audioSynth.playCardSlide();
+                          } catch (_) {}
+                        }}
+                        className={`px-3 py-1 rounded-full border text-xs font-serif transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95 ${
+                          isMeaningExpanded
+                            ? "bg-amber-100 border-amber-300 text-amber-950 font-bold"
+                            : "bg-amber-50/90 hover:bg-amber-100/80 border-amber-200/90 text-stone-700"
+                        }`}
+                        title={isMeaningExpanded ? "收起词意" : "展开完整词意解释"}
+                      >
+                        <span className="px-1.5 py-0.2 rounded bg-amber-200/90 text-amber-900 font-bold text-[10px] font-mono flex items-center gap-1">
+                          <BookOpen className="w-2.5 h-2.5 text-amber-800" />
+                          <span>词意</span>
+                        </span>
+                        <span className="max-w-[150px] sm:max-w-[280px] truncate text-[11px] sm:text-xs text-stone-600">
+                          {item.meaning}
+                        </span>
+                        <span className="text-[10px] font-mono font-bold text-amber-800 shrink-0">
+                          {isMeaningExpanded ? "▴ 收起" : "▾ 点击展开"}
+                        </span>
+                      </button>
+
+                      {/* Expanded full meaning card */}
+                      <AnimatePresence>
+                        {isMeaningExpanded && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0, y: -4 }}
+                            animate={{ opacity: 1, height: "auto", y: 0 }}
+                            exit={{ opacity: 0, height: 0, y: -4 }}
+                            transition={{ duration: 0.18 }}
+                            className="w-full mt-1.5 px-3 py-2 bg-amber-50/95 border border-amber-300/80 rounded-xl shadow-xs text-center select-text"
+                          >
+                            <p className="text-stone-850 font-medium font-serif text-xs sm:text-sm leading-relaxed">
+                              {item.meaning}
+                            </p>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   )}
                 </div>
@@ -989,26 +1032,20 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                       {getExpectedPrefixHelp()}
                     </div>
 
-                    {/* Live Game Combo and XP Info Overlay */}
-                    <div className="flex items-center justify-between gap-2 sm:gap-4 mt-1 sm:mt-2 px-2 sm:px-3 py-0.5 sm:py-1 bg-stone-900/5 rounded-lg border border-stone-200/50 text-[10px] sm:text-xs font-mono select-none">
-                      <div className="flex items-center gap-1.5 text-stone-500">
-                        <span>LEVEL</span>
-                        <span className="font-black text-stone-800">{Math.floor(xp / 250) + 1}</span>
-                        <span className="text-[10px] text-stone-400">({xp % 250}/250 XP)</span>
-                      </div>
-                      
-                      {combo > 0 && (
+                    {/* Live Game Combo Only - Level & XP removed per user request */}
+                    {combo > 0 && (
+                      <div className="flex items-center justify-center mt-1 sm:mt-1.5 select-none">
                         <motion.div
                           key={combo}
-                          initial={{ scale: 0.8, rotate: -5 }}
-                          animate={{ scale: [1, 1.25, 1], rotate: [0, 5, 0] }}
-                          className="flex items-center gap-1 font-black text-amber-600 tracking-wider"
+                          initial={{ scale: 0.8, rotate: -4 }}
+                          animate={{ scale: [1, 1.2, 1], rotate: [0, 4, 0] }}
+                          className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-amber-100/90 border border-amber-300 text-amber-900 font-mono font-black text-xs tracking-wider shadow-2xs"
                         >
                           <span>{combo} COMBO</span>
                           <span className="animate-pulse">🔥</span>
                         </motion.div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </>
                 )}
               </motion.div>
@@ -1346,14 +1383,24 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     </button>
                   </>
                 ) : (
-                  <button
-                    onClick={handleClaimCard}
-                    className="w-full py-3.5 px-4 rounded-xl bg-stone-900 hover:bg-amber-600 hover:text-stone-950 text-stone-50 font-black text-sm transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer cursor-custom select-none"
-                  >
-                    <span>🎁 翻开并永久收录此闪卡</span>
-                  </button>
+                  <div className="space-y-2 w-full">
+                    <button
+                      onClick={handleClaimCard}
+                      className="w-full py-3.5 px-4 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-50 font-black text-sm transition-all flex items-center justify-center gap-2 border-2 border-stone-850 shadow-[3px_3px_0px_#2E2530] cursor-pointer cursor-custom select-none"
+                    >
+                      <span>🎁 翻开并永久收录此闪卡</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsZineOpen(true)}
+                      className="w-full py-2.5 px-4 rounded-xl bg-pink-100 hover:bg-pink-200 text-pink-900 font-mono font-bold text-xs transition-all flex items-center justify-center gap-1.5 border-2 border-pink-400 shadow-[2px_2px_0px_#F472B6] cursor-pointer"
+                    >
+                      <span>💌 生成今日手作日签</span>
+                    </button>
+                  </div>
                 )}
               </div>
+
             </motion.div>
           </motion.div>
         )}
@@ -1426,6 +1473,14 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Daily Aesthetic Zine Postcard Modal */}
+      <DailyZineModal
+        isOpen={isZineOpen}
+        onClose={() => setIsZineOpen(false)}
+        isEnglishMode={isEnglishMode}
+      />
     </div>
   );
 };
+

@@ -1,9 +1,14 @@
 @import "tailwindcss";
 
 @theme {
-  --color-paper: #F3EFE3;
-  --color-ink: #221E18;
-  --color-vermilion: #C4482A;
+  --color-paper: #FAF8F5;
+  --color-ink: #2E2530;
+  --color-accent: #E11D48;
+  --color-babyblue: #E0F2FE;
+  --color-softpink: #FCE7F3;
+  --color-lavender: #F3E8FF;
+  --color-butter: #FEF9C3;
+  --color-mint: #DCFCE7;
 }
 
 @layer utilities {
@@ -15,15 +20,227 @@
       transform: translateY(-4px);
     }
   }
+
+  @keyframes sparkle-twinkle {
+    0%, 100% {
+      opacity: 0.35;
+      transform: scale(0.85) rotate(0deg);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.18) rotate(18deg);
+    }
+  }
+
+  @keyframes float-subtle {
+    0%, 100% {
+      transform: translateY(0px) rotate(0deg);
+    }
+    50% {
+      transform: translateY(-5px) rotate(1.2deg);
+    }
+  }
+
+  @keyframes confetti-fall {
+    0% {
+      transform: translateY(-10%) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(110vh) rotate(720deg);
+      opacity: 0;
+    }
+  }
   
   .animate-bounce-slow {
     animation: bounce-slow 4s ease-in-out infinite;
   }
-  
-  .bg-japanese-pattern {
-    background-color: #f2ede0;
+
+  .animate-sparkle {
+    animation: sparkle-twinkle 2.4s ease-in-out infinite;
+  }
+
+  .animate-float {
+    animation: float-subtle 5s ease-in-out infinite;
+  }
+
+  /* Font utility classes */
+  .font-script {
+    font-family: 'Great Vibes', 'Pinyon Script', cursive;
+  }
+
+  .font-pinyon {
+    font-family: 'Pinyon Script', cursive;
+  }
+
+  .font-serif-vintage {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+
+  .font-sans-modern {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+
+  .font-mono-retro {
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* Soft Macaron Halftone Dots (Riso print subtle screen, clean & fresh) */
+  .bg-halftone-dots {
+    background-color: #FAF8F6;
     background-image: 
-      radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15) 0%, rgba(34, 30, 24, 0.03) 100%),
-      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.055'/%3E%3C/svg%3E");
+      radial-gradient(circle at 50% 50%, rgba(244, 114, 182, 0.16) 1.5px, transparent 1.6px),
+      radial-gradient(circle at 0 0, rgba(96, 165, 250, 0.14) 1.5px, transparent 1.6px);
+    background-size: 16px 16px;
+  }
+
+  .bg-macaron-canvas {
+    background-color: #FAF8F6;
+    background-image: 
+      radial-gradient(circle at 10% 20%, rgba(253, 230, 138, 0.18) 0%, transparent 35%),
+      radial-gradient(circle at 90% 15%, rgba(244, 114, 182, 0.16) 0%, transparent 40%),
+      radial-gradient(circle at 50% 80%, rgba(192, 132, 252, 0.14) 0%, transparent 45%),
+      radial-gradient(circle at 50% 50%, rgba(244, 114, 182, 0.10) 1.4px, transparent 1.5px);
+    background-size: 100% 100%, 100% 100%, 100% 100%, 18px 18px;
+  }
+
+  /* Pastel Gingham / Plaid Grid for Collage Aesthetic */
+  .bg-gingham-pastel {
+    background-color: #FFFFFF;
+    background-image: 
+      linear-gradient(90deg, rgba(249, 168, 212, 0.12) 50%, transparent 50%),
+      linear-gradient(rgba(186, 230, 253, 0.12) 50%, transparent 50%);
+    background-size: 20px 20px;
+  }
+
+  /* Subtle clean Riso noise */
+  .bg-riso-noise {
+    background-image: 
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.035'/%3E%3C/svg%3E");
+  }
+
+  /* Polaroid Photo Style Card */
+  .polaroid-card {
+    background: #FFFFFF;
+    padding: 12px 12px 24px 12px;
+    box-shadow: 0 12px 28px -6px rgba(216, 180, 224, 0.28), 0 4px 8px -2px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(240, 215, 235, 0.7);
+    position: relative;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+
+  .polaroid-card:hover {
+    transform: translateY(-3px) rotate(-0.5deg);
+    box-shadow: 0 18px 36px -6px rgba(216, 180, 224, 0.38);
+  }
+
+  /* Washi tape accent */
+  .washi-tape {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%) rotate(-1deg);
+    width: 72px;
+    height: 18px;
+    background: rgba(254, 240, 138, 0.82);
+    backdrop-filter: blur(2px);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    opacity: 0.9;
+    z-index: 10;
+  }
+
+  /* Art Nouveau Botanical Curve Border */
+  .art-nouveau-frame {
+    border: 2px solid #E2CCE4;
+    border-radius: 20px;
+    box-shadow: 
+      inset 0 0 0 2px rgba(255, 255, 255, 0.9),
+      inset 0 0 0 4px rgba(235, 205, 230, 0.35),
+      0 8px 24px rgba(216, 180, 224, 0.15);
+  }
+
+  .art-nouveau-oval {
+    border-radius: 9999px;
+    border: 3px double #F3C2DC;
+    box-shadow: 0 6px 16px rgba(244, 185, 217, 0.22);
+  }
+
+  /* Solid Girlhood Scrapbook Card with bold ink outlines */
+  .zine-card-solid {
+    border: 2px solid #2E2530;
+    box-shadow: 4px 4px 0px #2E2530;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .zine-card-solid:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 5px 5px 0px #2E2530;
+  }
+
+  .zine-card-pink-solid {
+    border: 2px solid #F43F5E;
+    box-shadow: 4px 4px 0px #FDA4AF;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  /* Diagonal wrinkled washi tapes for corners (matching reference screenshot) */
+  .tape-corner-tr {
+    position: absolute;
+    top: -10px;
+    right: -24px;
+    width: 86px;
+    height: 26px;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(2px);
+    transform: rotate(38deg);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), inset 0 0 4px rgba(245, 230, 210, 0.6);
+    border-left: 2px dashed rgba(220, 210, 200, 0.7);
+    border-right: 2px dashed rgba(220, 210, 200, 0.7);
+    z-index: 20;
+    pointer-events: none;
+  }
+
+  .tape-corner-bl {
+    position: absolute;
+    bottom: -10px;
+    left: -24px;
+    width: 86px;
+    height: 26px;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(2px);
+    transform: rotate(38deg);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), inset 0 0 4px rgba(245, 230, 210, 0.6);
+    border-left: 2px dashed rgba(220, 210, 200, 0.7);
+    border-right: 2px dashed rgba(220, 210, 200, 0.7);
+    z-index: 20;
+    pointer-events: none;
+  }
+
+  /* Scalloped lace border trim */
+  .lace-scallop-top {
+    background-image: radial-gradient(circle at 10px 0, transparent 8px, #FFFFFF 9px);
+    background-size: 20px 12px;
+    background-repeat: repeat-x;
+    height: 12px;
+  }
+
+  .lace-scallop-bottom {
+    background-image: radial-gradient(circle at 10px 12px, transparent 8px, #FFFFFF 9px);
+    background-size: 20px 12px;
+    background-repeat: repeat-x;
+    height: 12px;
+  }
+
+  /* Realistic pearl string pattern */
+  .pearl-chain {
+    background-image: radial-gradient(circle, #FFFFFF 0%, #FFF5F7 50%, #FBCFE8 85%, #E2E8F0 100%);
+    box-shadow: 0 1px 3px rgba(225, 29, 72, 0.18), inset 0 1px 2px rgba(255, 255, 255, 0.9);
+  }
+
+  /* Flyer tear-off tabs (perforated bottom strips) */
+  .tear-off-strip {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
   }
 }
+

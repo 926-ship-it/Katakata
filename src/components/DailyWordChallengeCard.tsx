@@ -251,31 +251,25 @@ export const DailyWordChallengeCard: React.FC<DailyWordChallengeCardProps> = ({
   };
 
   return (
-    <div className="relative border border-stone-300/80 bg-[#FAF7F0] rounded-sm p-5 md:p-7 shadow-xs overflow-hidden transition-all duration-300 hover:border-stone-400 select-none">
-      {/* Decorative Traditional Japanese Wabi-Sabi Woodblock Accents */}
-      <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#C4482A]/70 pointer-events-none" />
-      <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#C4482A]/70 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#C4482A]/70 pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[#C4482A]/70 pointer-events-none" />
-
-      {/* Background Soft Seal Watermark */}
-      <div className="absolute -right-6 -bottom-8 text-8xl font-serif text-stone-900/[0.03] select-none pointer-events-none leading-none">
-        言霊
+    <div className="relative border-2 border-stone-850 bg-white rounded-3xl p-5 md:p-7 shadow-[5px_5px_0px_#2E2530] overflow-hidden transition-all duration-300 select-none">
+      {/* Background Soft Celestial Star */}
+      <div className="absolute -right-4 -bottom-6 text-purple-100 text-8xl font-serif select-none pointer-events-none leading-none">
+        ✧
       </div>
 
       {/* 1. Header with Badge & Today's Date */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-stone-200/90 relative z-10">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-purple-100 relative z-10">
         <div className="flex items-center gap-2.5 flex-wrap">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#C4482A] text-[#F3EFE3] rounded-xs shadow-xs text-xs font-serif font-black tracking-wider">
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-purple-400 to-pink-400 text-white rounded-xl shadow-2xs text-xs font-mono font-bold tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
             <span>每日一词挑战</span>
           </div>
 
-          <div className="flex items-center gap-1 text-xs font-serif text-stone-600 bg-white/80 border border-stone-200 px-2 py-0.5 rounded-xs">
+          <div className="flex items-center gap-1 text-xs font-sans text-stone-600 bg-pink-50/80 border border-pink-200 px-2.5 py-0.5 rounded-lg">
             <Calendar className="w-3 h-3 text-stone-400" />
             <span>{todayStr}</span>
             <span className="text-stone-300 mx-0.5">·</span>
-            <span className="text-[#C4482A] font-bold">日替言灵</span>
+            <span className="text-purple-600 font-bold">每日探索</span>
           </div>
 
           {source === "gemini" && (

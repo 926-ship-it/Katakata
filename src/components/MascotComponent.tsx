@@ -255,26 +255,25 @@ export const MascotComponent: React.FC<MascotComponentProps> = ({
         onClick={() => {
           setIsMinimized(false);
           setShowBubble(true);
-          audioSynth.playCardSlide();
+          try {
+            audioSynth.playCardSlide();
+          } catch (_) {}
         }}
-        className="fixed bottom-4 right-4 z-[70] flex flex-col items-center gap-1 cursor-pointer select-none pointer-events-auto"
+        className="fixed top-14 sm:top-16 right-3 sm:right-5 z-[70] flex flex-col items-center gap-1 cursor-pointer select-none pointer-events-auto"
       >
-        {/* Cute small pulsing floating ball */}
-        <div className="relative w-12 h-12 rounded-full bg-amber-500 border-2 border-stone-800 flex items-center justify-center shadow-lg group hover:scale-105 transition-all">
-          <div className="absolute inset-0 rounded-full bg-amber-400 animate-ping opacity-25" />
-          {/* A tiny mini SVG of Fuli-chan's ears and nose or just a cute fox face */}
-          <svg viewBox="0 0 100 100" className="w-8 h-8 pointer-events-none">
-            <polygon points="20,40 10,15 35,28" fill="#d97706" stroke="#7c2d12" strokeWidth="4" />
-            <polygon points="80,40 90,15 65,28" fill="#d97706" stroke="#7c2d12" strokeWidth="4" />
-            <circle cx="50" cy="60" r="30" fill="#f59e0b" stroke="#7c2d12" strokeWidth="5" />
-            <path d="M 30 60 C 30 70, 40 72, 50 72 C 60 72, 70 70, 70 60" fill="#ffffff" stroke="#7c2d12" strokeWidth="3" />
-            <circle cx="40" cy="55" r="5" fill="#292524" />
-            <circle cx="60" cy="55" r="5" fill="#292524" />
-            <polygon points="48,62 52,62 50,65" fill="#7c2d12" />
+        {/* Cute small floating orb when minimized */}
+        <div className="relative w-9 h-9 rounded-full bg-amber-400 border-2 border-stone-850 flex items-center justify-center shadow-[2px_2px_0px_#2E2530] group hover:scale-110 transition-all">
+          <div className="absolute inset-0 rounded-full bg-amber-300 animate-ping opacity-25" />
+          <svg viewBox="0 0 100 100" className="w-6 h-6 pointer-events-none">
+            <polygon points="25,35 15,12 40,24" fill="#ea580c" stroke="#7c2d12" strokeWidth="4" />
+            <polygon points="75,35 85,12 60,24" fill="#ea580c" stroke="#7c2d12" strokeWidth="4" />
+            <circle cx="50" cy="55" r="32" fill="#f59e0b" stroke="#7c2d12" strokeWidth="4" />
+            <path d="M 36 54 Q 42 58 48 54" fill="none" stroke="#292524" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 52 54 Q 58 58 64 54" fill="none" stroke="#292524" strokeWidth="3" strokeLinecap="round" />
           </svg>
         </div>
-        <span className="bg-stone-900 text-amber-400 text-[9px] font-black font-mono border border-amber-600 px-1.5 py-0.5 rounded shadow-sm scale-90">
-          {isEnglishMode ? "WAKE UP" : "唤醒福狸"}
+        <span className="bg-stone-900 text-amber-300 text-[8px] font-black font-mono border border-amber-500 px-1 py-0.2 rounded shadow-xs scale-90">
+          {isEnglishMode ? "WAKE" : "唤醒"}
         </span>
       </motion.div>
     );
@@ -285,221 +284,177 @@ export const MascotComponent: React.FC<MascotComponentProps> = ({
       drag
       dragMomentum={false}
       dragElastic={0.1}
-      dragConstraints={{ left: -450, right: 30, top: -750, bottom: 30 }}
-      className="fixed bottom-4 right-4 z-[70] flex flex-col items-end select-none cursor-grab active:cursor-grabbing pointer-events-auto"
-      style={{ touchAction: "none" }} // Prevents browser scroll interference while dragging on mobile!
+      dragConstraints={{ left: -360, right: 10, top: -10, bottom: 600 }}
+      className="fixed top-14 sm:top-16 right-3 sm:right-5 z-[70] flex flex-col items-end select-none cursor-grab active:cursor-grabbing pointer-events-auto"
+      style={{ touchAction: "none" }}
     >
-      {/* Speech bubble */}
-      <AnimatePresence>
-        {showBubble && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8, y: 15 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="mb-2 max-w-[200px] bg-white text-stone-905 border-2 border-amber-500 rounded-2xl p-3 shadow-xl relative cursor-pointer"
-            onClick={() => setShowBubble(false)}
-          >
-            {/* Tiny arrow down */}
-            <div className="absolute right-6 -bottom-2 w-3.5 h-3.5 bg-white border-r-2 border-b-2 border-amber-500 transform rotate-45" />
-            <div className="text-[11px] font-sans leading-relaxed text-stone-800 flex flex-col gap-1">
-              <span className="font-bold text-amber-700 flex items-center justify-between text-[10px] font-mono tracking-wider border-b border-stone-100 pb-0.5">
-                <span>{isEnglishMode ? "FUKU-CHAN" : "福狸酱"}</span>
-                <span className="flex items-center gap-0.5 text-rose-500">
-                  <Heart className="w-2.5 h-2.5 fill-current" /> {isEnglishMode ? "GUARDIAN" : "守护灵"}
-                </span>
-              </span>
-              <span>{speech}</span>
-              <span className="text-[8px] text-stone-400 text-right mt-1 font-mono">
-                {isEnglishMode ? "Click bubble to close" : "点击对话框可关闭"}
-              </span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Mascot character avatar with float physics */}
+      {/* Round Ball Mascot Avatar (Floating at Top) */}
       <motion.div
         animate={{
-          y: [0, -6, 0],
+          y: [0, -4, 0],
         }}
         transition={{
           repeat: Infinity,
-          duration: 3 + (clickCount % 2),
+          duration: 2.8 + (clickCount % 2),
           ease: "easeInOut",
         }}
-        className="relative group flex flex-col items-center justify-end"
+        className="relative group flex flex-col items-center justify-center"
         onClick={handleMascotClick}
       >
-        {/* Glow behind mascot */}
-        <div className="absolute inset-0 bg-amber-400/20 rounded-full filter blur-[15px] scale-75 group-hover:scale-95 transition-transform duration-500" />
+        {/* Soft background aura */}
+        <div className="absolute inset-0 bg-amber-400/20 rounded-full filter blur-[10px] scale-90 group-hover:scale-110 transition-transform duration-300" />
 
-        {/* Dynamic hand-designed vector raccoon/fox companion */}
-        <svg
-          width="88"
-          height="88"
-          viewBox="0 0 100 100"
-          className="drop-shadow-lg transform active:scale-95 transition-transform pointer-events-none"
-        >
-          {/* Big fluffy fox tail with orange gradient */}
-          <motion.path
-            d="M 65 65 C 85 45, 95 65, 85 85 C 75 95, 55 85, 65 65 Z"
-            fill="#ea580c"
-            stroke="#7c2d12"
-            strokeWidth="2.5"
-            strokeLinejoin="round"
-            animate={{
-              rotate: [0, 10, -5, 0],
-            }}
-            transition={{
-              repeat: Infinity,
-              duration: 2.2,
-              ease: "easeInOut",
-            }}
-            style={{ transformOrigin: "65px 75px" }}
-          />
-          {/* Fox tail tip (white) */}
-          <path
-            d="M 85 85 C 80 88, 77 86, 75 80 C 80 78, 88 72, 85 85 Z"
-            fill="#ffffff"
-            stroke="#7c2d12"
-            strokeWidth="1.5"
-          />
+        {/* Adorable Round Sphere / Ball (圆球福狸) */}
+        <div className="relative w-12 h-12 sm:w-13 sm:h-13 rounded-full bg-gradient-to-br from-amber-300 via-amber-400 to-orange-500 border-2 border-stone-850 shadow-[3px_3px_0px_#2E2530] flex items-center justify-center transform active:scale-95 transition-transform overflow-visible">
+          
+          {/* Top Fox Ears perched on the sphere */}
+          <div className="absolute -top-3.5 inset-x-0 flex justify-between px-1 pointer-events-none">
+            {/* Left Ear */}
+            <motion.div
+              animate={{ rotate: expression === "shocked" ? [-6, 6, -6] : [0, 4, -4, 0] }}
+              transition={{ repeat: Infinity, duration: 3 }}
+              className="w-4 h-4"
+            >
+              <svg viewBox="0 0 40 40" className="w-full h-full drop-shadow-xs">
+                <polygon points="20,5 35,35 5,35" fill="#ea580c" stroke="#2E2530" strokeWidth="4" strokeLinejoin="round" />
+                <polygon points="20,12 30,32 10,32" fill="#fed7aa" />
+              </svg>
+            </motion.div>
 
-          {/* Fox Back ears */}
-          {/* Left ear */}
-          <motion.polygon
-            points="22,35 12,10 38,22"
-            fill="#d97706"
-            stroke="#7c2d12"
-            strokeWidth="2.5"
-            animate={{
-              rotate: expression === "shocked" ? [0, -5, 5, 0] : [0, 8, -8, 0],
-            }}
-            transition={{ repeat: Infinity, duration: 4 }}
-            style={{ transformOrigin: "22px 35px" }}
-          />
-          {/* Right ear */}
-          <motion.polygon
-            points="78,35 88,10 62,22"
-            fill="#d97706"
-            stroke="#7c2d12"
-            strokeWidth="2.5"
-            animate={{
-              rotate: expression === "shocked" ? [0, 5, -5, 0] : [0, -6, 6, 0],
-            }}
-            transition={{ repeat: Infinity, duration: 3.5 }}
-            style={{ transformOrigin: "78px 35px" }}
-          />
+            {/* Right Ear */}
+            <motion.div
+              animate={{ rotate: expression === "shocked" ? [6, -6, 6] : [0, -4, 4, 0] }}
+              transition={{ repeat: Infinity, duration: 3.2 }}
+              className="w-4 h-4"
+            >
+              <svg viewBox="0 0 40 40" className="w-full h-full drop-shadow-xs">
+                <polygon points="20,5 35,35 5,35" fill="#ea580c" stroke="#2E2530" strokeWidth="4" strokeLinejoin="round" />
+                <polygon points="20,12 30,32 10,32" fill="#fed7aa" />
+              </svg>
+            </motion.div>
+          </div>
 
-          {/* Ear inners */}
-          <polygon points="24,30 16,14 34,22" fill="#fed7aa" />
-          <polygon points="76,30 84,14 66,22" fill="#fed7aa" />
+          {/* Sphere Ball Vector Details */}
+          <svg viewBox="0 0 100 100" className="w-full h-full rounded-full pointer-events-none">
+            {/* 3D Gloss highlight curve */}
+            <ellipse cx="38" cy="24" rx="18" ry="8" fill="#ffffff" opacity="0.45" transform="rotate(-20 38 24)" />
 
-          {/* Golden round body */}
-          <circle cx="50" cy="65" r="24" fill="#f59e0b" stroke="#7c2d12" strokeWidth="2.5" />
-          {/* Fluffy white chest patch */}
-          <ellipse cx="50" cy="68" rx="14" ry="12" fill="#fafaf9" stroke="#7c2d12" strokeWidth="1.5" />
+            {/* White Fox Cheek patches */}
+            <path d="M 12 55 C 12 75, 30 82, 50 82 C 70 82, 88 75, 88 55 C 88 70, 70 88, 50 88 C 30 88, 12 70, 12 55 Z" fill="#ffffff" opacity="0.9" />
 
-          {/* Main adorable round head */}
-          <circle cx="50" cy="42" r="26" fill="#f59e0b" stroke="#7c2d12" strokeWidth="2.5" />
+            {/* Pink Blush Circles */}
+            <circle cx="24" cy="58" r="6" fill="#f43f5e" opacity="0.65" />
+            <circle cx="76" cy="58" r="6" fill="#f43f5e" opacity="0.65" />
 
-          {/* White cheeks circles */}
-          <path d="M 24 42 C 24 55, 34 58, 50 58" fill="#ffffff" />
-          <path d="M 76 42 C 76 55, 66 58, 50 58" fill="#ffffff" />
-          <path d="M 24 42 C 24 55, 34 58, 50 58 C 50 58, 76 58, 76 42 C 76 56, 50 63, 24 42 Z" fill="#ffffff" stroke="#7c2d12" strokeWidth="2" strokeLinejoin="round" />
+            {/* Expression-specific eyes */}
+            {expression === "happy" && (
+              <>
+                <path d="M 28 48 Q 36 40 42 48" fill="none" stroke="#2E2530" strokeWidth="4.5" strokeLinecap="round" />
+                <path d="M 58 48 Q 64 40 72 48" fill="none" stroke="#2E2530" strokeWidth="4.5" strokeLinecap="round" />
+              </>
+            )}
 
-          {/* Cheek pink blush circles */}
-          <circle cx="34" cy="48" r="4" fill="#f43f5e" opacity="0.6" />
-          <circle cx="66" cy="48" r="4" fill="#f43f5e" opacity="0.6" />
+            {expression === "cheering" && (
+              <>
+                <circle cx="35" cy="46" r="4.5" fill="#2E2530" />
+                <circle cx="36" cy="44" r="1.5" fill="#ffffff" />
+                <path d="M 58 48 Q 64 40 72 48" fill="none" stroke="#2E2530" strokeWidth="4.5" strokeLinecap="round" />
+              </>
+            )}
 
-          {/* Dynamic expression-specific eyes */}
-          {expression === "happy" && (
-            <>
-              {/* Happy arches eyes */}
-              <path d="M 32 40 Q 38 34 40 40" fill="none" stroke="#292524" strokeWidth="3" strokeLinecap="round" />
-              <path d="M 68 40 Q 62 34 60 40" fill="none" stroke="#292524" strokeWidth="3" strokeLinecap="round" />
-            </>
-          )}
+            {expression === "determined" && (
+              <>
+                <path d="M 26 42 L 42 46" stroke="#2E2530" strokeWidth="3.5" strokeLinecap="round" />
+                <circle cx="35" cy="48" r="4" fill="#2E2530" />
+                <path d="M 74 42 L 58 46" stroke="#2E2530" strokeWidth="3.5" strokeLinecap="round" />
+                <circle cx="65" cy="48" r="4" fill="#2E2530" />
+              </>
+            )}
 
-          {expression === "cheering" && (
-            <>
-              {/* Winking happy eyes */}
-              <circle cx="36" cy="38" r="3" fill="#292524" />
-              <path d="M 60 38 Q 64 34 68 38" fill="none" stroke="#292524" strokeWidth="3" strokeLinecap="round" />
-            </>
-          )}
+            {expression === "shocked" && (
+              <>
+                <circle cx="35" cy="46" r="6.5" fill="#ffffff" stroke="#2E2530" strokeWidth="3" />
+                <circle cx="35" cy="46" r="2.5" fill="#2E2530" />
+                <circle cx="65" cy="46" r="6.5" fill="#ffffff" stroke="#2E2530" strokeWidth="3" />
+                <circle cx="65" cy="46" r="2.5" fill="#2E2530" />
+              </>
+            )}
 
-          {expression === "determined" && (
-            <>
-              {/* Cool focused eyes */}
-              <path d="M 30 35 L 42 38" stroke="#292524" strokeWidth="2.5" strokeLinecap="round" />
-              <circle cx="36" cy="40" r="3.5" fill="#292524" />
-              <path d="M 70 35 L 58 38" stroke="#292524" strokeWidth="2.5" strokeLinecap="round" />
-              <circle cx="64" cy="40" r="3.5" fill="#292524" />
-            </>
-          )}
+            {expression === "celebrate" && (
+              <>
+                {/* Twinkling star eyes */}
+                <path d="M 30 46 L 40 46 M 35 41 L 35 51" stroke="#eab308" strokeWidth="4" strokeLinecap="round" />
+                <path d="M 60 46 L 70 46 M 65 41 L 65 51" stroke="#eab308" strokeWidth="4" strokeLinecap="round" />
+              </>
+            )}
 
-          {expression === "shocked" && (
-            <>
-              {/* Wide circular eyes with tiny pupils */}
-              <circle cx="36" cy="40" r="5" fill="#ffffff" stroke="#292524" strokeWidth="2" />
-              <circle cx="36" cy="40" r="2" fill="#292524" />
-              <circle cx="64" cy="40" r="5" fill="#ffffff" stroke="#292524" strokeWidth="2" />
-              <circle cx="64" cy="40" r="2" fill="#292524" />
-            </>
-          )}
+            {/* Cute nose */}
+            <polygon points="47,56 53,56 50,60" fill="#7c2d12" />
 
-          {expression === "celebrate" && (
-            <>
-              {/* Stars / Sparkles eyes representation */}
-              <path d="M 32 36 L 40 44 M 40 36 L 32 44" stroke="#eab308" strokeWidth="3" strokeLinecap="round" />
-              <path d="M 60 36 L 68 44 M 68 36 L 60 44" stroke="#eab308" strokeWidth="3" strokeLinecap="round" />
-            </>
-          )}
+            {/* Mouth */}
+            {expression === "shocked" ? (
+              <circle cx="50" cy="67" r="4" fill="#7c2d12" />
+            ) : (
+              <path d="M 43 64 Q 50 69 57 64" fill="none" stroke="#7c2d12" strokeWidth="3" strokeLinecap="round" />
+            )}
 
-          {/* Small adorable triangular nose */}
-          <polygon points="48,46 52,46 50,49" fill="#7c2d12" />
+            {/* Whiskers */}
+            <line x1="16" y1="56" x2="6" y2="55" stroke="#7c2d12" strokeWidth="2" strokeLinecap="round" />
+            <line x1="16" y1="62" x2="6" y2="64" stroke="#7c2d12" strokeWidth="2" strokeLinecap="round" />
+            <line x1="84" y1="56" x2="94" y2="55" stroke="#7c2d12" strokeWidth="2" strokeLinecap="round" />
+            <line x1="84" y1="62" x2="94" y2="64" stroke="#7c2d12" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </div>
 
-          {/* Dynamic mouth */}
-          {expression === "shocked" ? (
-            <circle cx="50" cy="53" r="3.5" fill="#7c2d12" />
-          ) : expression === "determined" ? (
-            <path d="M 46 53 Q 50 51 54 53" fill="none" stroke="#7c2d12" strokeWidth="2" strokeLinecap="round" />
-          ) : (
-            // Smiling mouth opens
-            <path d="M 45 51 Q 50 55 55 51" fill="none" stroke="#7c2d12" strokeWidth="2" strokeLinecap="round" />
-          )}
-
-          {/* Left and Right Whiskers */}
-          <line x1="20" y1="46" x2="10" y2="45" stroke="#7c2d12" strokeWidth="1.5" />
-          <line x1="20" y1="51" x2="8" y2="52" stroke="#7c2d12" strokeWidth="1.5" />
-          <line x1="80" y1="46" x2="90" y2="45" stroke="#7c2d12" strokeWidth="1.5" />
-          <line x1="80" y1="51" x2="92" y2="52" stroke="#7c2d12" strokeWidth="1.5" />
-
-          {/* Left & Right fluffy tiny paws */}
-          <circle cx="34" cy="80" r="4.5" fill="#fafaf9" stroke="#7c2d12" strokeWidth="2" />
-          <circle cx="66" cy="80" r="4.5" fill="#fafaf9" stroke="#7c2d12" strokeWidth="2" />
-        </svg>
-
-        {/* Small mascot name tag with minimize option */}
-        <div className="flex items-center gap-1.5 mt-1 select-none">
-          <span className="bg-stone-900 border border-amber-600 text-[9px] font-black font-mono text-amber-400 px-2.5 py-0.5 rounded-full shadow-md animate-pulse uppercase tracking-widest scale-90">
-            {isEnglishMode ? "Fuku-chan" : "福狸酱"}
+        {/* Small floating tag & minimize button */}
+        <div className="flex items-center gap-1 mt-1 select-none">
+          <span className="bg-stone-900 border border-amber-500 text-[8px] font-black font-mono text-amber-300 px-1.5 py-0.2 rounded-full shadow-xs uppercase tracking-wider">
+            {isEnglishMode ? "Fuku-Ball" : "福狸球"}
           </span>
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               setIsMinimized(true);
-              audioSynth.playCardSlide();
+              try {
+                audioSynth.playCardSlide();
+              } catch (_) {}
             }}
-            className="p-1 rounded-full bg-stone-100 hover:bg-stone-200 border border-stone-300 text-stone-600 shadow-sm cursor-pointer scale-90 flex items-center justify-center"
-            title={isEnglishMode ? "Minimize Fuku-chan" : "最小化福狸酱"}
+            className="w-4 h-4 rounded-full bg-white hover:bg-stone-100 border border-stone-850 text-stone-700 shadow-2xs cursor-pointer flex items-center justify-center active:scale-90"
+            title={isEnglishMode ? "Minimize Fuku-chan" : "最小化"}
           >
-            <Minus className="w-2.5 h-2.5" />
+            <Minus className="w-2.5 h-2.5 stroke-[3]" />
           </button>
         </div>
       </motion.div>
+
+      {/* Downward Speech Bubble with upward arrow, avoids covering training card */}
+      <AnimatePresence>
+        {showBubble && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.85, y: -6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.85, y: -6 }}
+            className="mt-2 max-w-[210px] bg-white text-stone-900 border-2 border-stone-850 rounded-2xl p-2.5 shadow-[3px_3px_0px_#2E2530] relative cursor-pointer"
+            onClick={() => setShowBubble(false)}
+          >
+            {/* Arrow pointing UP toward the ball */}
+            <div className="absolute right-5 -top-2 w-3.5 h-3.5 bg-white border-l-2 border-t-2 border-stone-850 transform rotate-45" />
+            <div className="text-[11px] font-sans leading-relaxed text-stone-800 flex flex-col gap-1">
+              <span className="font-bold text-amber-800 flex items-center justify-between text-[10px] font-mono tracking-wider border-b border-pink-100 pb-0.5">
+                <span>{isEnglishMode ? "FUKU-CHAN" : "福狸酱"}</span>
+                <span className="flex items-center gap-0.5 text-rose-500">
+                  <Heart className="w-2.5 h-2.5 fill-current" /> {isEnglishMode ? "GUARDIAN" : "守护灵"}
+                </span>
+              </span>
+              <span>{speech}</span>
+              <span className="text-[8px] text-stone-400 text-right mt-0.5 font-mono">
+                {isEnglishMode ? "Tap to close" : "点击对话框可关闭 ✕"}
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

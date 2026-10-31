@@ -110,6 +110,9 @@ function checkAndRecordCompletion(goal: DailyGoalConfig): void {
   if (isCompleted && goal.lastCompletedDate !== today) {
     goal.lastCompletedDate = today;
     goal.streakDays = (goal.streakDays || 0) + 1;
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("katakata_daily_goal_achieved", { detail: goal }));
+    }
   }
 }
 

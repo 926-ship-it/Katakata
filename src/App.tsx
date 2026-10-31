@@ -26,7 +26,23 @@ import { addDailyProgress } from "./utils/dailyGoal";
 import { SessionTrendChart } from "./components/SessionTrendChart";
 import { DataExportSection } from "./components/DataExportSection";
 
-type ScreenState = "start" | "training" | "library" | "unlocked_ceremony" | "spell_rush" | "memory_match" | "kana_training" | "spanish_recite";
+import { DailyCelebrationModal } from "./components/DailyCelebrationModal";
+import { DailyZineModal } from "./components/DailyZineModal";
+import { ArticleLyricsPage } from "./components/ArticleLyricsPage";
+import { PolyglotGamePage } from "./components/PolyglotGamePage";
+
+
+type ScreenState = 
+  | "start" 
+  | "training" 
+  | "library" 
+  | "unlocked_ceremony" 
+  | "spell_rush" 
+  | "memory_match" 
+  | "kana_training" 
+  | "spanish_recite" 
+  | "passage_practice" 
+  | "polyglot_game";
 
 export function toHanNumerals(num: number): string {
   const chars = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
@@ -41,12 +57,26 @@ export default function App() {
     try {
       const saved = localStorage.getItem("fifty_sound_last_screen");
       // Never auto-restore into transient "training" mode without loaded active cards
-      if (saved && ["start", "library", "spell_rush", "memory_match", "kana_training", "spanish_recite"].includes(saved)) {
+      if (saved && ["start", "library", "spell_rush", "memory_match", "kana_training", "spanish_recite", "passage_practice", "polyglot_game"].includes(saved)) {
         return saved as ScreenState;
       }
     } catch (_) {}
     return "start";
   });
+
+  const [isCelebrationOpen, setIsCelebrationOpen] = useState<boolean>(false);
+  const [isDailyZineOpen, setIsDailyZineOpen] = useState<boolean>(false);
+
+
+  useEffect(() => {
+    const handleGoalAchieved = () => {
+      setIsCelebrationOpen(true);
+    };
+    window.addEventListener("katakata_daily_goal_achieved", handleGoalAchieved);
+    return () => {
+      window.removeEventListener("katakata_daily_goal_achieved", handleGoalAchieved);
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -756,18 +786,20 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-paper bg-japanese-pattern text-ink font-sans pb-12 transition-colors">
+    <div className="min-h-screen bg-macaron-canvas text-stone-800 font-sans pb-12 transition-colors">
       {/* Upper Navigation Header (Can be hidden in full immersion mode) */}
       {(!isFullscreen || !hideInAppHeader) && (
-        <header className="bg-[#F3EFE3] border-b border-stone-300 sticky top-0 z-40 select-none transition-all duration-300">
+        <header className="bg-white/85 backdrop-blur-md border-b border-pink-200/80 sticky top-0 z-40 select-none transition-all duration-300 shadow-xs">
           <div className="max-w-4xl mx-auto px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-1 sm:gap-2">
             <div 
               onClick={() => { setCurrentPage("start"); setActiveCards([]); setIsDrawerOpen(false); }} 
-              className="flex items-center gap-1.5 cursor-pointer shrink-0 font-serif font-black tracking-wider sm:tracking-widest text-stone-900 text-xs sm:text-sm md:text-base uppercase"
+              className="flex items-center gap-1.5 cursor-pointer shrink-0"
             >
-              <span className="text-[#C4482A] font-bold">Katakata</span>
-              <span className="text-stone-800">咔嗒</span>
-              <span className="hidden lg:inline text-[11px] font-medium text-stone-500 tracking-normal pl-1 border-l border-stone-300">多语言练习工坊</span>
+              <span className="font-script text-2xl text-rose-500 font-bold leading-none">Atelier</span>
+              <span className="font-serif-vintage font-bold text-stone-900 text-sm tracking-wide">Katakata</span>
+              <span className="hidden lg:inline text-[11px] font-mono text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-200">
+                ✦ 多语言工坊
+              </span>
             </div>
 
             <div className="flex items-center gap-1.5 xs:gap-2.5 sm:gap-4 md:gap-6 shrink-0 font-serif text-[11px] sm:text-xs md:text-sm text-stone-700">
@@ -845,6 +877,39 @@ export default function App() {
                     <span>📖</span>
                     <span className="hidden xs:inline">背诵</span>
                   </button>
+                  <button
+                    onClick={() => { setCurrentPage("passage_practice"); setIsDrawerOpen(false); }}
+                    className={`cursor-pointer hover:text-pink-600 transition-colors py-0.5 flex items-center gap-0.5 ${currentPage === "passage_practice" ? "text-rose-600 font-black border-b-2 border-rose-500" : "text-stone-600"}`}
+                    title="短文与歌词练习工坊（支持西/日/英经典歌词与自定导入）"
+                  >
+                    <span>📜</span>
+                    <span className="hidden xs:inline">短文</span>
+                  </button>
+                  <button
+                    onClick={() => { setCurrentPage("polyglot_game"); setIsDrawerOpen(false); }}
+                    className={`cursor-pointer hover:text-purple-600 transition-colors py-0.5 flex items-center gap-0.5 ${currentPage === "polyglot_game" ? "text-purple-700 font-black border-b-2 border-purple-500" : "text-stone-600"}`}
+                    title="多语种星芒穿梭对决（多语言混合练习游戏）"
+                  >
+                    <span>🎮</span>
+                    <span className="hidden xs:inline">穿梭</span>
+                  </button>
+                  <button
+                    onClick={() => { setIsCelebrationOpen(true); setIsDrawerOpen(false); }}
+                    className="cursor-pointer hover:text-pink-600 transition-colors py-0.5 text-stone-600 flex items-center gap-0.5 text-xs font-serif"
+                    title="今日成就达成庆祝画面"
+                  >
+                    <span>🎉</span>
+                    <span className="hidden md:inline">庆典</span>
+                  </button>
+                  <button
+                    onClick={() => { setIsDailyZineOpen(true); setIsDrawerOpen(false); }}
+                    className="cursor-pointer hover:text-rose-600 transition-colors py-0.5 text-stone-600 flex items-center gap-0.5 text-xs font-serif"
+                    title="生成/查看今日手作日签"
+                  >
+                    <span>💌</span>
+                    <span className="hidden md:inline">日签</span>
+                  </button>
+
                   <button
                     onClick={() => {
                       requirePasskeyForUpload(() => {
@@ -1289,6 +1354,9 @@ export default function App() {
                   setCurrentPage("kana_training");
                 }}
                 onGoToSpanishRecite={() => setCurrentPage("spanish_recite")}
+                onGoToArticleLyrics={() => setCurrentPage("passage_practice")}
+                onGoToPolyglotGame={() => setCurrentPage("polyglot_game")}
+                onOpenCelebration={() => setIsCelebrationOpen(true)}
                 onOpenAddWord={(lang) => {
                   requirePasskeyForUpload(() => {
                     setAddWordDefaultLang(lang || (isEnglishMode ? "en" : "ja"));
@@ -1508,6 +1576,37 @@ export default function App() {
               </ErrorBoundary>
             </motion.div>
           )}
+
+          {currentPage === "passage_practice" && (
+            <motion.div
+              key="passage_practice"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ArticleLyricsPage
+                onBack={() => setCurrentPage("start")}
+                isEnglishMode={isEnglishMode}
+              />
+            </motion.div>
+          )}
+
+          {currentPage === "polyglot_game" && (
+            <motion.div
+              key="polyglot_game"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+            >
+              <PolyglotGamePage
+                onBack={() => setCurrentPage("start")}
+                isEnglishMode={isEnglishMode}
+                onRewardCoins={(earned) => setCoins((c) => c + earned)}
+              />
+            </motion.div>
+          )}
         </AnimatePresence>
       </main>
 
@@ -1613,14 +1712,22 @@ export default function App() {
       )}
 
       {/* Footer information bar */}
-      {(!isFullscreen || !hideInAppHeader) && (
-        <footer className="text-center text-stone-400 py-6 text-xs font-mono max-w-xl mx-auto space-y-1.5 border-t border-stone-200 select-none">
-          <p>©Katakata 咔嗒 · 多语言沉浸练习工坊 2026. 日语五十音 · 英语词汇 · 西班牙语背诵默写.</p>
-          <p className="text-[10px] text-stone-300">
-            IMMERSIVE MULTILINGUAL RETENTION WORKSHOP. ALL INTELLECTUAL PROPERTY SECURED.
-          </p>
-        </footer>
-      )}
+      {/* Daily Goal Celebration Modal */}
+      <DailyCelebrationModal
+        isOpen={isCelebrationOpen}
+        onClose={() => setIsCelebrationOpen(false)}
+        onRewardClaimed={(bonusCoins) => setCoins((c) => c + bonusCoins)}
+        onNavigateToGame={() => setCurrentPage("polyglot_game")}
+        isEnglishMode={isEnglishMode}
+      />
+
+      {/* Global Daily Aesthetic Zine Postcard Modal */}
+      <DailyZineModal
+        isOpen={isDailyZineOpen}
+        onClose={() => setIsDailyZineOpen(false)}
+        isEnglishMode={isEnglishMode}
+      />
     </div>
   );
 }
+

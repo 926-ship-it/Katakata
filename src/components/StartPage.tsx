@@ -11,6 +11,11 @@ import { SessionTrendChart } from "./SessionTrendChart";
 import { getEnglishPhonetic } from "../utils/englishPhonetics";
 import { DailyGoalPanel } from "./DailyGoalPanel";
 import { DailyWordChallengeCard } from "./DailyWordChallengeCard";
+import { DailyZineModal } from "./DailyZineModal";
+import { DailyZineGachaMachine } from "./DailyZineGachaMachine";
+import { PearlString, ScallopLaceTrim, GirlhoodUmbrella, DessertPlateDoodle, HandDrawnPencil, PencilSquiggleUnderline } from "./AestheticDoodles";
+
+
 
 interface StartPageProps {
   onStartTraining: (items: DictionaryItem[], durationMs: number) => void;
@@ -19,6 +24,9 @@ interface StartPageProps {
   onGoToMemoryMatch: () => void;
   onGoToKanaTraining: (type?: "hiragana" | "katakana" | "both") => void;
   onGoToSpanishRecite?: () => void;
+  onGoToArticleLyrics?: () => void;
+  onGoToPolyglotGame?: () => void;
+  onOpenCelebration?: () => void;
   onOpenAddWord?: (lang?: "ja" | "es" | "en") => void;
   onOpenBatchImport?: (lang?: "es" | "ja" | "en") => void;
   onOpenPhotoUpload?: (lang?: "ja" | "es" | "en" | "auto") => void;
@@ -39,6 +47,9 @@ export const StartPage: React.FC<StartPageProps> = ({
   onGoToMemoryMatch,
   onGoToKanaTraining,
   onGoToSpanishRecite,
+  onGoToArticleLyrics,
+  onGoToPolyglotGame,
+  onOpenCelebration,
   onOpenAddWord,
   onOpenBatchImport,
   onOpenPhotoUpload,
@@ -52,6 +63,7 @@ export const StartPage: React.FC<StartPageProps> = ({
   narrativeStyle,
 }) => {
   const [customCards, setCustomCards] = useState<DictionaryItem[]>([]);
+  const [isZineOpen, setIsZineOpen] = useState<boolean>(false);
 
   // Passkey Gate state (Passkey: QQBCJ)
   const [isCustomPasskeyUnlocked, setIsCustomPasskeyUnlocked] = useState<boolean>(() => isUploadPasskeyUnlocked());
@@ -574,51 +586,71 @@ export const StartPage: React.FC<StartPageProps> = ({
   );
 
   return (
-    <div className="max-w-4xl mx-auto space-y-10 px-2 md:px-0 relative">
-      {/* Delicate woodblock corner borders */}
-      <div className="absolute top-0 left-0 w-6 h-6 border-t border-l border-stone-400 pointer-events-none" />
-      <div className="absolute top-0 right-0 w-6 h-6 border-t border-r border-stone-400 pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-6 h-6 border-b border-r border-stone-400 pointer-events-none" />
+    <div className="max-w-4xl mx-auto space-y-8 px-2 md:px-0 relative">
+      {/* Delicate celestial sparkles in corners */}
+      <div className="absolute top-1 left-1 text-pink-300 text-sm animate-sparkle pointer-events-none select-none">✦</div>
+      <div className="absolute top-1 right-1 text-purple-300 text-sm animate-sparkle pointer-events-none select-none" style={{ animationDelay: "1s" }}>✧</div>
       
-      {/* 1. Main Hero Landing Section (pixel perfect representation of the image) */}
-      <div className="relative pt-6 pb-6 overflow-hidden select-none min-h-[310px] md:min-h-[330px] flex flex-col justify-between">
-        <svg style={{ position: "absolute", top: "30px", left: 0, width: "100%", height: "320px", pointerEvents: "none", zIndex: 0 }} viewBox="0 0 1400 320" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M -60 105 C 300 105, 560 40, 800 90 C 1000 120, 1180 130, 1470 110" fill="none" stroke="#C4482A" strokeWidth="13" strokeLinecap="round"/>
+      {/* 1. Main Hero Landing Section (Original Romantic Art Nouveau Multi-Language Atelier) */}
+      <div className="relative pt-6 pb-6 overflow-hidden select-none min-h-[300px] flex flex-col justify-between">
+        {/* Gentle Art Nouveau decorative botanical wave line */}
+        <svg 
+          style={{ position: "absolute", top: "10px", left: 0, width: "100%", height: "260px", pointerEvents: "none", zIndex: 0 }} 
+          viewBox="0 0 1200 260" 
+          fill="none" 
+          aria-hidden="true"
+        >
+          <path 
+            d="M -40 130 C 220 50, 480 200, 780 90 C 960 20, 1100 160, 1260 110" 
+            stroke="url(#pastelGrad)" 
+            strokeWidth="3" 
+            strokeDasharray="6 6"
+            opacity="0.6"
+          />
+          <defs>
+            <linearGradient id="pastelGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#F472B6" />
+              <stop offset="50%" stopColor="#C084FC" />
+              <stop offset="100%" stopColor="#60A5FA" />
+            </linearGradient>
+          </defs>
         </svg>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center relative" style={{ zIndex: 1 }}>
-          {/* Left Column: Stacked Calligraphy logo and Start Controls */}
-          <div className="md:col-span-7 space-y-6 md:space-y-8">
-            {/* The Stacked カタ文字 with shifted overlap */}
-            <div className="relative pl-4">
-              <h1 className="text-7xl md:text-[5.5rem] font-serif font-bold text-stone-900 leading-none tracking-wider select-none" style={{ textShadow: "4px 4px 0px #f2ede0, -4px -4px 0px #f2ede0, 4px -4px 0px #f2ede0, -4px 4px 0px #f2ede0, 0px 4px 0px #f2ede0, 4px 0px 0px #f2ede0, 0px -4px 0px #f2ede0, -4px 0px 0px #f2ede0" }}>
-                カタ
-              </h1>
-              <h1 className="text-7xl md:text-[5.5rem] font-serif font-bold text-[#C4482A] leading-none tracking-wider select-none pl-14 md:pl-16 -mt-8 md:-mt-10" style={{ textShadow: "4px 4px 0px #f2ede0, -4px -4px 0px #f2ede0, 4px -4px 0px #f2ede0, -4px 4px 0px #f2ede0, 0px 4px 0px #f2ede0, 4px 0px 0px #f2ede0, 0px -4px 0px #f2ede0, -4px 0px 0px #f2ede0" }}>
-                カタ
-              </h1>
-            </div>
+          {/* Left Column: Clear Chinese Title and Practice Controls */}
+          <div className="md:col-span-7 space-y-4">
+            <div>
+              {/* Sticker label in clear Chinese */}
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-100/80 text-pink-700 text-xs font-sans font-bold tracking-wider mb-2 border border-pink-200/80 shadow-2xs">
+                <span>✦</span>
+                <span>多语言沉浸练习工坊 · 慢学深练</span>
+                <span>✦</span>
+              </div>
 
-            {/* Tagline/Subtitle for mobile only */}
-            <div className="md:hidden mt-4 pl-4 flex items-center gap-3 select-none">
-              <span className="px-2 py-0.5 bg-[#C4482A] text-[#F3EFE3] text-[10px] font-serif rounded rotate-[-2deg] shadow-xs shrink-0">
-                工坊
-              </span>
-              <span className="font-serif text-xs tracking-widest text-stone-850 leading-relaxed">
-                {isEnglishMode ? "英语单词盲打 · 多语言沉浸练习" : "Katakata 咔嗒 · 多语言沉浸练习工坊"}
-              </span>
+              {/* Clear, bold, readable Main Heading */}
+              <h1 className="font-serif-vintage text-4xl sm:text-5xl md:text-6xl text-rose-600 font-extrabold leading-tight tracking-wide drop-shadow-2xs select-none">
+                咔嗒 · 多语言沉浸工坊
+              </h1>
+
+              {/* Subtitle in plain Chinese */}
+              <div className="text-stone-700 text-base sm:text-lg mt-1.5 font-medium tracking-wide">
+                “每天沉浸练习几分钟，指尖肌肉记忆、水滴石穿”
+              </div>
+              <p className="text-xs text-stone-500 font-sans mt-1 tracking-wide leading-relaxed">
+                包含：🇪🇸 西班牙语必背 2800 词 · 🇯🇵 日语五十音与名曲歌词 · 🇬🇧 英语核心词汇与短文
+              </p>
             </div>
 
             {/* Daily Practice Start Button & Custom Settings */}
-            <div className="flex flex-col gap-4 pl-4 pt-6 md:pt-8 z-20 relative">
-              <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex flex-col gap-3 pt-2 z-20 relative">
+              <div className="flex items-center gap-2.5 flex-wrap">
                 <button
                   onClick={() => {
                     const shuffled = [...activeDict].sort(() => Math.random() - 0.5);
                     const selected = shuffled.slice(0, Math.min(customCardCount, shuffled.length));
                     onStartTraining(selected, customTimerMinutes * 60 * 1000);
                   }}
-                  className="px-6 py-3.5 bg-stone-900 text-[#F3EFE3] hover:bg-[#A33B22] active:scale-98 transition-all font-serif font-bold text-sm tracking-widest rounded-sm shadow-md cursor-pointer flex items-center gap-2"
+                  className="px-6 py-3 bg-gradient-to-r from-rose-400 via-pink-500 to-purple-500 hover:from-rose-500 hover:to-purple-600 text-white font-bold text-sm tracking-wider rounded-2xl shadow-md shadow-pink-300/40 active:scale-98 transition-all cursor-pointer flex items-center gap-2"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
                   <span>开始今日练习</span>
@@ -628,7 +660,7 @@ export const StartPage: React.FC<StartPageProps> = ({
                   <button
                     type="button"
                     onClick={onGoToSpanishRecite}
-                    className="px-4 py-3 bg-amber-500 hover:bg-amber-400 text-stone-950 active:scale-98 transition-all font-serif font-black text-xs tracking-wider rounded-sm shadow-sm cursor-pointer flex items-center gap-1.5"
+                    className="px-4 py-3 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 active:scale-98 transition-all font-bold text-xs tracking-wider rounded-2xl shadow-2xs cursor-pointer flex items-center gap-1.5"
                     title="进入沉浸背诵与活字默写工坊（支持日语、英语、西语）"
                   >
                     <span>📖</span>
@@ -640,11 +672,11 @@ export const StartPage: React.FC<StartPageProps> = ({
                   <button
                     type="button"
                     onClick={() => onOpenAddWord(isEnglishMode ? "en" : "ja")}
-                    className="px-4 py-3 bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 active:scale-98 transition-all font-serif font-bold text-xs tracking-wider rounded-sm shadow-xs cursor-pointer flex items-center gap-1.5"
+                    className="px-3.5 py-3 bg-white hover:bg-pink-50 border border-pink-200 text-stone-700 active:scale-98 transition-all font-bold text-xs rounded-2xl shadow-2xs cursor-pointer flex items-center gap-1"
                     title="录入新的词汇到词库（支持日/西/英与AI智能填充）"
                   >
-                    <Plus className="w-3.5 h-3.5 text-amber-600" />
-                    <span>录入单词</span>
+                    <Plus className="w-3.5 h-3.5 text-pink-500" />
+                    <span>录词</span>
                   </button>
                 )}
 
@@ -652,11 +684,11 @@ export const StartPage: React.FC<StartPageProps> = ({
                   <button
                     type="button"
                     onClick={() => onOpenBatchImport(isEnglishMode ? "en" : "es")}
-                    className="px-4 py-3 bg-white hover:bg-stone-200 border border-stone-300 text-stone-800 active:scale-98 transition-all font-serif font-bold text-xs tracking-wider rounded-sm shadow-xs cursor-pointer flex items-center gap-1.5"
+                    className="px-3.5 py-3 bg-white hover:bg-purple-50 border border-purple-200 text-stone-700 active:scale-98 transition-all font-bold text-xs rounded-2xl shadow-2xs cursor-pointer flex items-center gap-1"
                     title="批量导入短句与词库（支持从Excel/文本粘贴Tab分隔、编号列表）"
                   >
-                    <FileText className="w-3.5 h-3.5 text-amber-600" />
-                    <span>批量导入短句</span>
+                    <FileText className="w-3.5 h-3.5 text-purple-500" />
+                    <span>批量导入</span>
                   </button>
                 )}
 
@@ -667,29 +699,25 @@ export const StartPage: React.FC<StartPageProps> = ({
                       const dueCards = data.filter(item => dueCardIds.includes(item.id));
                       onStartTraining(dueCards, customTimerMinutes * 60 * 1000);
                     }}
-                    className="text-xs font-serif font-bold text-[#C4482A] hover:text-red-700 tracking-wider flex items-center gap-1 transition-colors cursor-pointer"
+                    className="text-xs font-mono font-bold text-rose-600 hover:text-rose-700 tracking-wider flex items-center gap-1 transition-colors cursor-pointer bg-rose-50 px-3 py-1.5 rounded-full border border-rose-200"
                   >
                     <span>待复习</span>
-                    <span className="mx-1">{toHanNumerals(dueCardIds.length)}</span>
+                    <span className="mx-0.5">{dueCardIds.length}</span>
                     <span>张</span>
                   </button>
-                ) : (
-                  <span className="text-xs font-serif text-stone-400 tracking-wider">
-                    （无待复习卡牌）
-                  </span>
-                )}
+                ) : null}
               </div>
 
               {/* Minimalistic Selectors for card count and timer */}
-              <div className="flex items-center gap-6 text-xs font-serif text-stone-750 flex-wrap mt-1">
+              <div className="flex items-center gap-4 text-xs font-sans text-stone-600 flex-wrap mt-1">
                 {/* Custom Card Count selector */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-stone-500">练习张数</span>
-                  <div className="flex items-center border border-stone-400/80 bg-[#f2ede0]/40 rounded-sm overflow-hidden shadow-sm">
+                  <span className="text-stone-500 font-medium">卡牌数:</span>
+                  <div className="flex items-center border border-pink-200 bg-white rounded-xl overflow-hidden shadow-2xs">
                     <button
                       type="button"
                       onClick={() => setCustomCardCount(prev => Math.max(1, prev - 1))}
-                      className="px-2 py-1 bg-stone-100 hover:bg-[#A33B22]/10 transition-colors border-r border-stone-300 font-bold cursor-pointer select-none"
+                      className="px-2 py-1 bg-stone-50 hover:bg-pink-100 transition-colors border-r border-pink-100 font-bold cursor-pointer select-none text-stone-600"
                     >
                       －
                     </button>
@@ -702,56 +730,44 @@ export const StartPage: React.FC<StartPageProps> = ({
                         const val = parseInt(e.target.value) || 5;
                         setCustomCardCount(Math.min(100, Math.max(1, val)));
                       }}
-                      className="w-10 text-center bg-transparent focus:outline-none font-bold text-stone-800"
+                      className="w-10 text-center bg-transparent focus:outline-none font-bold text-stone-800 font-mono"
                     />
                     <button
                       type="button"
                       onClick={() => setCustomCardCount(prev => Math.min(100, prev + 1))}
-                      className="px-2 py-1 bg-stone-100 hover:bg-[#A33B22]/10 transition-colors border-l border-stone-300 font-bold cursor-pointer select-none"
+                      className="px-2 py-1 bg-stone-50 hover:bg-pink-100 transition-colors border-l border-pink-100 font-bold cursor-pointer select-none text-stone-600"
                     >
                       ＋
                     </button>
                   </div>
-                  <span className="text-stone-400">张</span>
 
                   {/* Fast selection chips */}
                   <div className="flex items-center gap-1 ml-1">
-                    {[5, 10, 20, 50].map((num) => (
+                    {[5, 10, 20].map((num) => (
                       <button
                         key={num}
                         type="button"
                         onClick={() => setCustomCardCount(Math.min(activeDict.length, num))}
-                        className={`px-2 py-0.5 rounded text-[11px] font-sans border transition-all cursor-pointer ${
+                        className={`px-2 py-0.5 rounded-lg text-[11px] font-mono border transition-all cursor-pointer ${
                           customCardCount === num
-                            ? "bg-stone-900 text-stone-50 border-stone-900 font-bold"
-                            : "bg-white/80 hover:bg-stone-200 text-stone-700 border-stone-300"
+                            ? "bg-rose-500 text-white border-rose-500 font-bold shadow-2xs"
+                            : "bg-white hover:bg-pink-50 text-stone-600 border-pink-200"
                         }`}
                       >
-                        {num}张
+                        {num}
                       </button>
                     ))}
-                    <button
-                      type="button"
-                      onClick={() => setCustomCardCount(activeDict.length)}
-                      className={`px-2 py-0.5 rounded text-[11px] font-sans border transition-all cursor-pointer ${
-                        customCardCount === activeDict.length
-                          ? "bg-stone-900 text-stone-50 border-stone-900 font-bold"
-                          : "bg-white/80 hover:bg-stone-200 text-stone-700 border-stone-300"
-                      }`}
-                    >
-                      全部
-                    </button>
                   </div>
                 </div>
 
                 {/* Custom Timer Selector (1-30 mins) */}
                 <div className="flex items-center gap-2">
-                  <span className="text-stone-500">定时功能</span>
-                  <div className="flex items-center border border-stone-400/80 bg-[#f2ede0]/40 rounded-sm overflow-hidden shadow-sm">
+                  <span className="text-stone-500 font-medium">定时:</span>
+                  <div className="flex items-center border border-purple-200 bg-white rounded-xl overflow-hidden shadow-2xs">
                     <button
                       type="button"
                       onClick={() => setCustomTimerMinutes(prev => Math.max(1, prev - 1))}
-                      className="px-2 py-1 bg-stone-100 hover:bg-[#A33B22]/10 transition-colors border-r border-stone-300 font-bold cursor-pointer select-none"
+                      className="px-2 py-1 bg-stone-50 hover:bg-purple-100 transition-colors border-r border-purple-100 font-bold cursor-pointer select-none text-stone-600"
                     >
                       －
                     </button>
@@ -764,46 +780,50 @@ export const StartPage: React.FC<StartPageProps> = ({
                         const val = parseInt(e.target.value) || 3;
                         setCustomTimerMinutes(Math.min(30, Math.max(1, val)));
                       }}
-                      className="w-10 text-center bg-transparent focus:outline-none font-bold text-stone-800"
+                      className="w-10 text-center bg-transparent focus:outline-none font-bold text-stone-800 font-mono"
                     />
                     <button
                       type="button"
                       onClick={() => setCustomTimerMinutes(prev => Math.min(30, prev + 1))}
-                      className="px-2 py-1 bg-stone-100 hover:bg-[#A33B22]/10 transition-colors border-l border-stone-300 font-bold cursor-pointer select-none"
+                      className="px-2 py-1 bg-stone-50 hover:bg-purple-100 transition-colors border-l border-purple-100 font-bold cursor-pointer select-none text-stone-600"
                     >
                       ＋
                     </button>
                   </div>
-                  <span className="text-stone-400">分钟</span>
+                  <span className="text-stone-400 font-mono text-xs">min</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Double Ornament Circle & Vertical texts */}
-          <div className="hidden md:flex md:col-span-5 items-center justify-center relative min-h-[220px]">
-            {/* Large Concentric circles removed as requested to keep the layout minimal and premium */}
+          {/* Right Column: Daily Zine Gacha Machine (今日日签手作扭蛋机) */}
+          <div className="md:col-span-5 flex items-center justify-center relative min-h-[300px]">
+            {/* Ambient Four-point Star Twinkles */}
+            <div className="absolute -top-3 left-4 text-pink-400 text-lg animate-sparkle">✦</div>
+            <div className="absolute top-6 right-2 text-yellow-400 text-xl animate-sparkle" style={{ animationDelay: "0.8s" }}>✧</div>
+            <div className="absolute bottom-2 left-6 text-purple-400 text-sm animate-sparkle" style={{ animationDelay: "1.4s" }}>⋆</div>
 
-            {/* Double columns vertical text running right-to-left replaced with single div */}
-            <div style={{ writingMode: "vertical-rl", height: "220px", fontFamily: "'Yu Mincho','Hiragino Mincho ProN',serif", fontSize: "14px", letterSpacing: "0.35em", lineHeight: 1.9, color: "#221E18" }} className="relative z-10 select-none">
-              {isEnglishMode ? "英语单词盲打・多语言沉浸练习" : "咔嗒多语言・沉浸式击键工坊"}
-            </div>
-
-            {/* Stamp Box '秘藏' */}
-            <div style={{ width: "44px", height: "44px", background: "#C4482A", color: "#F3EFE3", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Yu Mincho','Hiragino Mincho ProN',serif", fontSize: "15px", writingMode: "vertical-rl", letterSpacing: "0.15em", transform: "rotate(-3deg)", borderRadius: "3px" }} className="absolute top-6 right-6 z-20 select-none shadow-sm">秘藏</div>
+            <DailyZineGachaMachine
+              onOpenZine={() => setIsZineOpen(true)}
+              isEnglishMode={isEnglishMode}
+            />
           </div>
+
         </div>
       </div>
 
       {/* 2. Daily Practice Goal Panel (每日练习目标面板 & 圆环进度条) */}
       <DailyGoalPanel
         isEnglishMode={isEnglishMode}
+        onOpenCelebration={onOpenCelebration}
+        onOpenZine={() => setIsZineOpen(true)}
         onStartPracticeQuick={(mins) => {
           const shuffled = [...activeDict].sort(() => Math.random() - 0.5);
           const selected = shuffled.slice(0, Math.min(customCardCount, shuffled.length));
           onStartTraining(selected, mins * 60 * 1000);
         }}
       />
+
 
       {/* 2.5 Daily Word Challenge (每日一词挑战 · Gemini API 词源解读与五十音平假名/片假名练习) */}
       <DailyWordChallengeCard
@@ -822,25 +842,25 @@ export const StartPage: React.FC<StartPageProps> = ({
         }}
       />
 
-      {/* 3. Three Interactive Activity Tracks */}
-      <div className="border-t border-stone-300 pt-6 select-none relative">
-        {/* Giant transparent Kanji watermark in left background */}
-        <div className="absolute -left-6 -bottom-16 text-[18rem] md:text-[22rem] font-serif text-stone-900/[0.03] leading-none pointer-events-none select-none z-0">
-          力
+      {/* 3. Interactive Activity Tracks */}
+      <div className="border-t border-pink-200/80 pt-6 select-none relative">
+        {/* Ambient celestial constellation background */}
+        <div className="absolute -left-4 -bottom-6 text-pink-200/30 text-8xl font-serif pointer-events-none select-none z-0">
+          ✦
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 relative z-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 relative z-10">
           {/* Track 1: 风雅学宫 (Handwriting/typing single character exercise) */}
           <div 
-            className="group p-4 border border-stone-300/40 hover:border-stone-300 rounded transition-all duration-300 relative select-none bg-stone-50/30 flex flex-col justify-between"
+            className="group p-4 border-2 border-stone-850 rounded-2xl transition-all duration-300 relative select-none bg-stone-50 flex flex-col justify-between shadow-[3px_3px_0px_#2E2530] hover:shadow-[4px_4px_0px_#2E2530] hover:-translate-y-0.5"
           >
             <div>
-              <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-300/40 mb-3 font-serif">
-                <span className="text-[#C4482A] font-black text-sm">壹</span>
-                <span className="text-stone-500 font-bold">熟记</span>
+              <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-200 mb-3 font-mono font-bold">
+                <span className="text-rose-600 font-black text-sm">✦ 01</span>
+                <span className="text-stone-500 font-bold bg-white px-1.5 py-0.5 rounded border border-stone-200 text-[10px]">基础单字</span>
               </div>
-              <h3 className="font-serif font-black text-stone-900 text-lg tracking-wider">
-                风雅学宫
+              <h3 className="font-serif-vintage font-black text-stone-900 text-base tracking-wider">
+                风雅学宫 · 五十音
               </h3>
               <p className="text-xs text-stone-500 font-sans mt-2 tracking-wide leading-relaxed">
                 五十音单字高频练习，巩固地基
@@ -849,101 +869,136 @@ export const StartPage: React.FC<StartPageProps> = ({
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
                 onClick={() => onGoToKanaTraining("hiragana")}
-                className="py-1.5 px-2 rounded border border-stone-300 hover:border-[#C4482A] hover:bg-[#C4482A] hover:text-white transition-all text-[11px] font-serif font-bold text-stone-700 bg-white shadow-xs cursor-pointer text-center"
+                className="py-1.5 px-2 rounded-xl border-2 border-stone-850 hover:bg-rose-500 hover:text-white transition-all text-[11px] font-mono font-bold text-stone-800 bg-white shadow-[2px_2px_0px_#2E2530] active:scale-95 cursor-pointer text-center"
               >
-                平假名熟化
+                平假名
               </button>
               <button
                 onClick={() => onGoToKanaTraining("katakana")}
-                className="py-1.5 px-2 rounded border border-stone-300 hover:border-amber-600 hover:bg-amber-600 hover:text-white transition-all text-[11px] font-serif font-bold text-stone-700 bg-white shadow-xs cursor-pointer text-center"
+                className="py-1.5 px-2 rounded-xl border-2 border-stone-850 hover:bg-amber-500 hover:text-white transition-all text-[11px] font-mono font-bold text-stone-800 bg-white shadow-[2px_2px_0px_#2E2530] active:scale-95 cursor-pointer text-center"
               >
-                片假名训练区
+                片假名
               </button>
             </div>
           </div>
 
-          {/* Track 2: 时钟疾驰 (Speed run romanization race) */}
-          <div 
-            onClick={onGoToSpellRush}
-            className="group cursor-pointer hover:bg-stone-200/20 p-4 border border-transparent hover:border-stone-300 rounded transition-all duration-300 relative select-none bg-stone-50/30"
-          >
-            <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-300/40 mb-3 font-serif">
-              <span className="text-[#C4482A] font-black text-sm">贰</span>
-              <span className="text-stone-500 font-bold">竞速</span>
-            </div>
-            <h3 className="font-serif font-black text-stone-900 text-lg tracking-wider group-hover:text-[#C4482A] transition-colors">
-              时钟疾驰
-            </h3>
-            <p className="text-xs text-stone-500 font-sans mt-2 tracking-wide leading-relaxed">
-              六十秒罗马音限时竞速
-            </p>
-          </div>
-
-          {/* Track 3: 风雅和歌 (Classic card pair memory match game) */}
-          <div 
-            onClick={onGoToMemoryMatch}
-            className="group cursor-pointer hover:bg-stone-200/20 p-4 border border-transparent hover:border-stone-300 rounded transition-all duration-300 relative select-none bg-stone-50/30"
-          >
-            <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-300/40 mb-3 font-serif">
-              <span className="text-[#C4482A] font-black text-sm">叁</span>
-              <span className="text-stone-500 font-bold">对碰</span>
-            </div>
-            <h3 className="font-serif font-black text-stone-900 text-lg tracking-wider group-hover:text-[#C4482A] transition-colors">
-              风雅和歌
-            </h3>
-            <p className="text-xs text-stone-500 font-sans mt-2 tracking-wide leading-relaxed">
-              经典翻牌记忆配对
-            </p>
-          </div>
-
-          {/* Track 4: 沉浸背诵与活字默写工坊 (Multilingual Recitation Workshop) */}
+          {/* Track 2: 沉浸背诵与活字默写工坊 (Multilingual Recitation Workshop) */}
           <div 
             onClick={onGoToSpanishRecite}
-            className="group cursor-pointer hover:bg-amber-100/40 p-4 border border-amber-300/60 hover:border-amber-500 rounded transition-all duration-300 relative select-none bg-amber-50/40 shadow-xs"
+            className="group cursor-pointer p-4 border-2 border-stone-850 rounded-2xl transition-all duration-300 relative select-none bg-amber-50 shadow-[3px_3px_0px_#2E2530] hover:shadow-[4px_4px_0px_#2E2530] hover:-translate-y-0.5"
           >
-            <div className="flex justify-between items-center text-xs pb-2 border-b border-amber-300/60 mb-3 font-serif">
-              <span className="text-amber-700 font-black text-sm">肆</span>
-              <span className="text-amber-800 font-bold">背诵</span>
+            <div className="flex justify-between items-center text-xs pb-2 border-b border-amber-200 mb-3 font-mono font-bold">
+              <span className="text-amber-800 font-black text-sm">✦ 02</span>
+              <span className="text-amber-900 font-bold bg-white px-1.5 py-0.5 rounded border border-amber-300 text-[10px]">活字默写</span>
             </div>
-            <h3 className="font-serif font-black text-stone-900 text-lg tracking-wider group-hover:text-amber-700 transition-colors flex items-center gap-1.5">
-              <span>📖 沉浸背诵与默写工坊</span>
+            <h3 className="font-serif-vintage font-black text-stone-900 text-base tracking-wider group-hover:text-amber-800 transition-colors flex items-center gap-1.5">
+              <span>📖 沉浸背诵工坊</span>
             </h3>
             <p className="text-xs text-stone-600 font-sans mt-2 tracking-wide leading-relaxed">
-              支持日语、英语、西语！翻卡记忆、逐字活字默写与自然发音自动切词
+              西语 2800 词 / 日语 / 英语活字默写与变位
             </p>
           </div>
 
-          {/* Track 5: 自定义词条录入 (Add Words with AI) */}
+          {/* Track 3: 📜 短文与歌词练习工坊 */}
+          <div 
+            onClick={onGoToArticleLyrics}
+            className="group cursor-pointer p-4 border-2 border-stone-850 rounded-2xl transition-all duration-300 relative select-none bg-gradient-to-br from-pink-50 via-purple-50 to-white shadow-[3px_3px_0px_#2E2530] hover:shadow-[4px_4px_0px_#2E2530] hover:-translate-y-0.5"
+          >
+            <div className="flex justify-between items-center text-xs pb-2 border-b border-pink-200 mb-3 font-mono font-bold">
+              <span className="text-pink-600 font-black text-sm">✦ 03</span>
+              <span className="text-purple-700 font-bold font-mono text-[10px] bg-purple-100 border border-purple-200 px-1.5 py-0.5 rounded-full">NEW</span>
+            </div>
+            <h3 className="font-serif-vintage font-bold text-stone-900 text-base tracking-wide group-hover:text-rose-600 transition-colors flex items-center gap-1.5">
+              <span>📜 短文与歌词练习</span>
+            </h3>
+            <p className="text-xs text-stone-600 font-sans mt-2 tracking-wide leading-relaxed">
+              导入自定文章/歌词，跟打西语《Bésame Mucho》与经典昭和抒情名曲
+            </p>
+          </div>
+
+          {/* Track 4: 🎮 多语种混合星芒穿梭对决 */}
+          <div 
+            onClick={onGoToPolyglotGame}
+            className="group cursor-pointer p-4 border-2 border-stone-850 rounded-2xl transition-all duration-300 relative select-none bg-gradient-to-br from-purple-50 via-sky-50 to-white shadow-[3px_3px_0px_#2E2530] hover:shadow-[4px_4px_0px_#2E2530] hover:-translate-y-0.5"
+          >
+            <div className="flex justify-between items-center text-xs pb-2 border-b border-purple-200 mb-3 font-mono font-bold">
+              <span className="text-purple-600 font-black text-sm">✦ 04</span>
+              <span className="text-pink-700 font-bold font-mono text-[10px] bg-pink-100 border border-pink-200 px-1.5 py-0.5 rounded-full">HOT</span>
+            </div>
+            <h3 className="font-serif-vintage font-bold text-stone-900 text-base tracking-wide group-hover:text-purple-700 transition-colors flex items-center gap-1.5">
+              <span>🎮 多语种穿梭赛</span>
+            </h3>
+            <p className="text-xs text-stone-600 font-sans mt-2 tracking-wide leading-relaxed">
+              勾选西/日/英混合击键消除，连击共鸣与星光净化大招
+            </p>
+          </div>
+
+          {/* Track 5: 时钟疾驰 */}
+          <div 
+            onClick={onGoToSpellRush}
+            className="group cursor-pointer hover:bg-pink-50/50 p-4 border-2 border-stone-850 rounded-2xl transition-all duration-300 relative select-none bg-white shadow-[3px_3px_0px_#2E2530] hover:shadow-[4px_4px_0px_#2E2530] hover:-translate-y-0.5"
+          >
+            <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-200 mb-2 font-mono font-bold">
+              <span className="text-rose-600 font-black text-sm">✦ 05</span>
+              <span className="text-stone-500 font-bold bg-stone-100 px-1.5 py-0.5 rounded text-[10px]">竞速</span>
+            </div>
+            <h3 className="font-serif font-black text-stone-900 text-base tracking-wider group-hover:text-rose-600 transition-colors">
+              时钟疾驰
+            </h3>
+            <p className="text-xs text-stone-500 font-sans mt-1.5">
+              六十秒极速打字与反应挑战
+            </p>
+          </div>
+
+          {/* Track 6: 风雅和歌 (Memory Match) */}
+          <div 
+            onClick={onGoToMemoryMatch}
+            className="group cursor-pointer hover:bg-purple-50/50 p-4 border-2 border-stone-850 rounded-2xl transition-all duration-300 relative select-none bg-white shadow-[3px_3px_0px_#2E2530] hover:shadow-[4px_4px_0px_#2E2530] hover:-translate-y-0.5"
+          >
+            <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-200 mb-2 font-mono font-bold">
+              <span className="text-purple-600 font-black text-sm">✦ 06</span>
+              <span className="text-stone-500 font-bold bg-stone-100 px-1.5 py-0.5 rounded text-[10px]">对碰</span>
+            </div>
+            <h3 className="font-serif font-black text-stone-900 text-base tracking-wider group-hover:text-purple-700 transition-colors">
+              风雅和歌
+            </h3>
+            <p className="text-xs text-stone-500 font-sans mt-1.5">
+              经典翻牌记忆与假名配对
+            </p>
+          </div>
+
+
+          {/* Track 7: 自定义词条录入 */}
           <div 
             onClick={() => onOpenAddWord && onOpenAddWord(isEnglishMode ? "en" : "ja")}
-            className="group cursor-pointer hover:bg-stone-200/40 p-4 border border-stone-300/60 hover:border-stone-500 rounded transition-all duration-300 relative select-none bg-stone-50/50 shadow-xs"
+            className="group cursor-pointer hover:bg-stone-200/40 p-4 border border-stone-200 hover:border-stone-400 rounded-2xl transition-all duration-300 relative select-none bg-white shadow-2xs"
           >
-            <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-300/60 mb-3 font-serif">
-              <span className="text-stone-700 font-black text-sm">伍</span>
+            <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-200 mb-2 font-serif">
+              <span className="text-stone-700 font-black text-sm">柒</span>
               <span className="text-stone-500 font-bold">录词</span>
             </div>
-            <h3 className="font-serif font-black text-stone-900 text-lg tracking-wider group-hover:text-stone-950 transition-colors flex items-center gap-1.5">
+            <h3 className="font-serif font-black text-stone-900 text-base tracking-wider flex items-center gap-1.5">
               <span>➕ 录入新单词</span>
             </h3>
-            <p className="text-xs text-stone-600 font-sans mt-2 tracking-wide leading-relaxed">
-              一键录入日/西/英单词，支持试听发音与 AI 智能注音释义
+            <p className="text-xs text-stone-500 font-sans mt-1.5">
+              一键录入日/西/英单词与 AI 注音
             </p>
           </div>
 
-          {/* Track 6: 批量短句导入 (Batch Import Sentences) */}
+          {/* Track 8: 批量短句导入 */}
           <div 
             onClick={() => onOpenBatchImport && onOpenBatchImport(isEnglishMode ? "en" : "es")}
-            className="group cursor-pointer hover:bg-amber-100/40 p-4 border border-amber-300/60 hover:border-amber-500 rounded transition-all duration-300 relative select-none bg-amber-50/40 shadow-xs"
+            className="group cursor-pointer hover:bg-stone-200/40 p-4 border border-stone-200 hover:border-stone-400 rounded-2xl transition-all duration-300 relative select-none bg-white shadow-2xs"
           >
-            <div className="flex justify-between items-center text-xs pb-2 border-b border-amber-300/60 mb-3 font-serif">
-              <span className="text-amber-800 font-black text-sm">陆</span>
+            <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-200 mb-2 font-serif">
+              <span className="text-amber-800 font-black text-sm">捌</span>
               <span className="text-amber-700 font-bold">批量</span>
             </div>
-            <h3 className="font-serif font-black text-stone-900 text-lg tracking-wider group-hover:text-amber-800 transition-colors flex items-center gap-1.5">
+            <h3 className="font-serif font-black text-stone-900 text-base tracking-wider flex items-center gap-1.5">
               <span>📥 批量短句导入</span>
             </h3>
-            <p className="text-xs text-stone-600 font-sans mt-2 tracking-wide leading-relaxed">
-              支持从表格粘贴多行短句（Tab/编号分隔），自动解析并试听发音
+            <p className="text-xs text-stone-500 font-sans mt-1.5">
+              表格粘贴多行短句与自动试听
             </p>
           </div>
         </div>
@@ -2252,6 +2307,14 @@ export const StartPage: React.FC<StartPageProps> = ({
           </motion.div>
         )}
       </div>
+
+      {/* Daily Aesthetic Zine Postcard Modal (Supermarket Aesthetic) */}
+      <DailyZineModal
+        isOpen={isZineOpen}
+        onClose={() => setIsZineOpen(false)}
+        isEnglishMode={isEnglishMode}
+      />
     </div>
   );
 };
+
