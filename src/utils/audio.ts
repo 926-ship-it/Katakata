@@ -1430,6 +1430,50 @@ class RetroAudioSynth {
     });
   }
 
+  // Crisp and ceremonial Japanese & Polyglot "Ensemble / Harmony" sound effect (和鸣合奏音效)
+  // Triggered when both players in multiplayer co-op/versus complete syllables synchronously.
+  // Layers a bright celesta duo chime (C6, E6, G6, C7), a warm resonant triad,
+  // and a crystalline shimmer overtone for maximum collaborative ceremony.
+  playHarmonyEnsemble() {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const hp = this.ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 520;
+      hp.connect(this.ctx.destination);
+
+      // Ensemble chord progression (C6, E6, G6, A6, C7, with warm G5 undertone)
+      const ensembleNotes = [
+        { freq: 783.99, delay: 0.000, dur: 0.38, gain: 0.08, type: "triangle" as OscillatorType },
+        { freq: 1046.50, delay: 0.012, dur: 0.45, gain: 0.13, type: "sine" as OscillatorType },
+        { freq: 1318.51, delay: 0.032, dur: 0.50, gain: 0.15, type: "triangle" as OscillatorType },
+        { freq: 1567.98, delay: 0.055, dur: 0.55, gain: 0.12, type: "sine" as OscillatorType },
+        { freq: 2093.00, delay: 0.078, dur: 0.65, gain: 0.10, type: "sine" as OscillatorType },
+      ];
+
+      ensembleNotes.forEach((n) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = n.type;
+        osc.frequency.setValueAtTime(n.freq, now + n.delay);
+
+        g.gain.setValueAtTime(0, now + n.delay);
+        g.gain.linearRampToValueAtTime(n.gain, now + n.delay + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + n.delay + n.dur);
+
+        osc.connect(g);
+        g.connect(hp);
+        osc.start(now + n.delay);
+        osc.stop(now + n.delay + n.dur + 0.02);
+      });
+    } catch (_) {}
+  }
+
   // Retro alarm sound for training session complete
   playTimeCompleted() {
     if (this.isMuted) return;

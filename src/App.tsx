@@ -30,6 +30,7 @@ import { DailyCelebrationModal } from "./components/DailyCelebrationModal";
 import { DailyZineModal } from "./components/DailyZineModal";
 import { ArticleLyricsPage } from "./components/ArticleLyricsPage";
 import { PolyglotGamePage } from "./components/PolyglotGamePage";
+import { MultiplayerPage } from "./components/MultiplayerPage";
 
 
 type ScreenState = 
@@ -42,7 +43,8 @@ type ScreenState =
   | "kana_training" 
   | "spanish_recite" 
   | "passage_practice" 
-  | "polyglot_game";
+  | "polyglot_game"
+  | "multiplayer";
 
 export function toHanNumerals(num: number): string {
   const chars = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
@@ -53,11 +55,24 @@ export function toHanNumerals(num: number): string {
 }
 
 export default function App() {
+  const [roomCodeFromUrl] = useState<string | null>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("room");
+    } catch (_) {
+      return null;
+    }
+  });
+
   const [currentPage, setCurrentPage] = useState<ScreenState>(() => {
     try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("room")) {
+        return "multiplayer";
+      }
       const saved = localStorage.getItem("fifty_sound_last_screen");
       // Never auto-restore into transient "training" mode without loaded active cards
-      if (saved && ["start", "library", "spell_rush", "memory_match", "kana_training", "spanish_recite", "passage_practice", "polyglot_game"].includes(saved)) {
+      if (saved && ["start", "library", "spell_rush", "memory_match", "kana_training", "spanish_recite", "passage_practice", "polyglot_game", "multiplayer"].includes(saved)) {
         return saved as ScreenState;
       }
     } catch (_) {}
@@ -789,22 +804,25 @@ export default function App() {
     <div className={`min-h-screen bg-macaron-canvas text-stone-800 font-sans transition-colors ${currentPage === "training" ? "pb-2" : "pb-12"}`}>
       {/* Upper Navigation Header (Can be hidden in full immersion mode) */}
       {(!isFullscreen || !hideInAppHeader) && (
-        <header className="bg-white/85 backdrop-blur-md border-b border-pink-200/80 sticky top-0 z-40 select-none transition-all duration-300 shadow-xs">
-          <div className={`max-w-4xl mx-auto px-2 sm:px-4 ${currentPage === "training" ? "py-1 sm:py-1.5" : "py-2 sm:py-3"} flex items-center justify-between gap-1 sm:gap-2`}>
+        <header className="bg-white/90 backdrop-blur-md border-b border-pink-200/80 sticky top-0 z-40 select-none transition-all duration-300 shadow-xs">
+          {/* Main Top Bar */}
+          <div className={`max-w-4xl mx-auto px-2.5 sm:px-4 ${currentPage === "training" ? "py-1 sm:py-1.5" : "py-1.5 sm:py-2.5"} flex items-center justify-between gap-1.5 sm:gap-2`}>
+            {/* Logo */}
             <div 
               onClick={() => { setCurrentPage("start"); setActiveCards([]); setIsDrawerOpen(false); }} 
-              className="flex items-center gap-1.5 cursor-pointer shrink-0"
+              className="flex items-center gap-1 sm:gap-1.5 cursor-pointer shrink-0"
             >
-              <span className="font-script text-2xl text-rose-500 font-bold leading-none">Atelier</span>
-              <span className="font-serif-vintage font-bold text-stone-900 text-sm tracking-wide">Katakata</span>
+              <span className="font-script text-xl sm:text-2xl text-rose-500 font-bold leading-none">Atelier</span>
+              <span className="font-serif-vintage font-bold text-stone-900 text-xs sm:text-sm tracking-wide">Katakata</span>
               <span className="hidden lg:inline text-[11px] font-mono text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-200">
                 ✦ 多语言工坊
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 xs:gap-2.5 sm:gap-4 md:gap-6 shrink-0 font-serif text-[11px] sm:text-xs md:text-sm text-stone-700">
-              {/* Premium Mode Segmented Toggle Switch (Highly Visible & Responsive 3-Way Mode) */}
-              <div className="flex items-center bg-stone-200/60 p-0.5 rounded-full border border-stone-300 shadow-inner select-none">
+            {/* Right Controls Container */}
+            <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-3 md:gap-4 shrink-0 font-serif text-[11px] sm:text-xs text-stone-700">
+              {/* Premium Mode Segmented Toggle Switch (Compact on mobile) */}
+              <div className="flex items-center bg-stone-200/60 p-0.5 rounded-full border border-stone-300 shadow-inner select-none shrink-0">
                 <button
                   onClick={() => {
                     setIsEnglishMode(false);
@@ -813,13 +831,13 @@ export default function App() {
                   }}
                   className={`px-1.5 xs:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-0.5 xs:gap-1 ${
                     !isEnglishMode && !isKatakanaMode
-                      ? "bg-[#C4482A] text-white shadow-xs font-black scale-102"
+                      ? "bg-[#C4482A] text-white shadow-xs font-black"
                       : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
                   }`}
                   title="平假名模式"
                 >
                   <span>🇯🇵</span>
-                  <span className="hidden xs:inline">平假</span>
+                  <span className="hidden sm:inline">平假</span>
                 </button>
                 <button
                   onClick={() => {
@@ -829,13 +847,13 @@ export default function App() {
                   }}
                   className={`px-1.5 xs:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-0.5 xs:gap-1 ${
                     isEnglishMode
-                      ? "bg-stone-900 text-[#F3EFE3] shadow-xs font-black scale-102"
+                      ? "bg-stone-900 text-[#F3EFE3] shadow-xs font-black"
                       : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
                   }`}
                   title="英文模式"
                 >
                   <span>🔤</span>
-                  <span className="hidden xs:inline">EN</span>
+                  <span className="hidden sm:inline">EN</span>
                 </button>
                 <button
                   onClick={() => {
@@ -845,18 +863,19 @@ export default function App() {
                   }}
                   className={`px-1.5 xs:px-2 md:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] md:text-xs font-bold tracking-wider transition-all cursor-pointer flex items-center gap-0.5 xs:gap-1 ${
                     !isEnglishMode && isKatakanaMode
-                      ? "bg-amber-600 text-white shadow-xs font-black scale-102"
+                      ? "bg-amber-600 text-white shadow-xs font-black"
                       : "text-stone-600 hover:text-stone-900 hover:bg-stone-300/30"
                   }`}
                   title="片假名模式"
                 >
                   <span>⛩️</span>
-                  <span className="hidden xs:inline">片假</span>
+                  <span className="hidden sm:inline">片假</span>
                 </button>
               </div>
 
+              {/* Desktop-Only Navigation Menu Items (md:flex) */}
               {currentPage !== "training" ? (
-                <>
+                <div className="hidden md:flex items-center gap-3 lg:gap-4 shrink-0">
                   <button
                     onClick={() => { setCurrentPage("start"); setIsDrawerOpen(false); }}
                     className={`cursor-pointer hover:text-[#C4482A] transition-colors py-0.5 ${currentPage === "start" ? "text-stone-950 font-black border-b-2 border-stone-900" : "text-stone-600"}`}
@@ -875,7 +894,7 @@ export default function App() {
                     title="沉浸背诵与活字默写工坊（支持日语、英语、西语）"
                   >
                     <span>📖</span>
-                    <span className="hidden xs:inline">背诵</span>
+                    <span>背诵</span>
                   </button>
                   <button
                     onClick={() => { setCurrentPage("passage_practice"); setIsDrawerOpen(false); }}
@@ -883,7 +902,7 @@ export default function App() {
                     title="短文与歌词练习工坊（支持西/日/英经典歌词与自定导入）"
                   >
                     <span>📜</span>
-                    <span className="hidden xs:inline">短文</span>
+                    <span>短文</span>
                   </button>
                   <button
                     onClick={() => { setCurrentPage("polyglot_game"); setIsDrawerOpen(false); }}
@@ -891,7 +910,15 @@ export default function App() {
                     title="多语种星芒穿梭对决（多语言混合练习游戏）"
                   >
                     <span>🎮</span>
-                    <span className="hidden xs:inline">穿梭</span>
+                    <span>穿梭</span>
+                  </button>
+                  <button
+                    onClick={() => { setCurrentPage("multiplayer"); setIsDrawerOpen(false); }}
+                    className={`cursor-pointer hover:text-emerald-600 transition-colors py-0.5 flex items-center gap-0.5 ${currentPage === "multiplayer" ? "text-emerald-700 font-black border-b-2 border-emerald-600" : "text-stone-600"}`}
+                    title="双人实时联机对决与协力拼写（房间对战/协力合鸣）"
+                  >
+                    <span>⚔️</span>
+                    <span>连线</span>
                   </button>
                   <button
                     onClick={() => { setIsCelebrationOpen(true); setIsDrawerOpen(false); }}
@@ -899,7 +926,7 @@ export default function App() {
                     title="今日成就达成庆祝画面"
                   >
                     <span>🎉</span>
-                    <span className="hidden md:inline">庆典</span>
+                    <span>庆典</span>
                   </button>
                   <button
                     onClick={() => { setIsDailyZineOpen(true); setIsDrawerOpen(false); }}
@@ -907,9 +934,8 @@ export default function App() {
                     title="生成/查看今日手作日签"
                   >
                     <span>💌</span>
-                    <span className="hidden md:inline">日签</span>
+                    <span>日签</span>
                   </button>
-
                   <button
                     onClick={() => {
                       requirePasskeyForUpload(() => {
@@ -922,7 +948,7 @@ export default function App() {
                     title="录入新单词到词库（需通关卡密）"
                   >
                     <span className="text-amber-600 font-bold">➕</span>
-                    <span className="hidden xs:inline">录词</span>
+                    <span>录词</span>
                   </button>
                   <button
                     onClick={() => {
@@ -936,7 +962,7 @@ export default function App() {
                     title="批量导入多行短句与生词（需通关卡密）"
                   >
                     <span className="text-amber-600 font-bold">📥</span>
-                    <span className="hidden xs:inline">批量</span>
+                    <span>批量</span>
                   </button>
                   <button
                     onClick={() => {
@@ -950,24 +976,29 @@ export default function App() {
                     title="拍照圈词/荧光笔识别错题本（需通关卡密）"
                   >
                     <span className="text-amber-600 font-bold">📸</span>
-                    <span className="hidden xs:inline">圈词</span>
+                    <span>圈词</span>
                   </button>
-                  <div className="flex items-center gap-0.5 sm:gap-1 text-stone-700 select-none">
-                    <span className="hidden xs:inline">岁币</span>
-                    <span className="xs:hidden">🪙</span>
-                    <span className="font-bold text-[#C4482A] text-xs sm:text-sm">{toHanNumerals(coins)}</span>
-                  </div>
-                </>
+                </div>
               ) : (
-                <div className="px-2 py-0.5 bg-amber-50 border border-amber-300 rounded text-[10px] font-mono font-bold text-amber-700 flex items-center gap-0.5 animate-pulse">
+                <div className="px-2 py-0.5 bg-amber-50 border border-amber-300 rounded text-[10px] font-mono font-bold text-amber-700 flex items-center gap-0.5 animate-pulse shrink-0">
                   <span>锁定熟练中...</span>
                 </div>
               )}
 
+              {/* Coins Balance Indicator (Clickable to jump to Gacha Shrine) */}
+              <div 
+                onClick={() => { setCurrentPage("library"); setIsDrawerOpen(false); }}
+                className="flex items-center gap-0.5 px-2 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 rounded-full border border-amber-500/30 text-stone-800 text-[11px] font-mono font-bold cursor-pointer transition-all select-none shrink-0"
+                title="我的岁币余额，点击前往神社扭蛋祈愿"
+              >
+                <span>🪙</span>
+                <span className="font-bold text-[#C4482A]">{toHanNumerals(coins)}</span>
+              </div>
+
               {/* Fullscreen Immersion Toggle Button */}
               <button
                 onClick={toggleFullscreen}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-serif font-bold transition-all cursor-pointer shadow-xs ${
+                className={`p-1 sm:px-2 sm:py-1 rounded-lg border text-xs font-serif font-bold transition-all cursor-pointer shadow-xs shrink-0 ${
                   isFullscreen
                     ? "bg-[#C4482A]/10 border-[#C4482A] text-[#C4482A]"
                     : "bg-white/80 hover:bg-white border-stone-300 text-stone-700 hover:text-stone-950"
@@ -975,27 +1006,169 @@ export default function App() {
                 title={isFullscreen ? "退出全屏 (Esc / F11)" : "全屏沉浸模式 (隐藏浏览器域名与系统工具栏，快捷键 F11)"}
               >
                 {isFullscreen ? (
-                  <>
+                  <div className="flex items-center gap-1">
                     <Minimize2 className="w-3.5 h-3.5 text-[#C4482A]" />
                     <span className="hidden sm:inline text-[11px]">退出全屏</span>
-                  </>
+                  </div>
                 ) : (
-                  <>
+                  <div className="flex items-center gap-1">
                     <Maximize2 className="w-3.5 h-3.5 text-stone-700" />
-                    <span className="hidden sm:inline text-[11px]">全屏模式</span>
-                  </>
+                    <span className="hidden sm:inline text-[11px]">全屏</span>
+                  </div>
                 )}
               </button>
 
+              {/* Hamburger Drawer Toggle Button */}
               <button
                 onClick={() => setIsDrawerOpen(prev => !prev)}
-                className="p-1 text-stone-850 hover:text-[#C4482A] transition-colors text-lg md:text-xl font-bold focus:outline-none cursor-pointer"
-                title="设置与工具"
+                className="p-1 sm:p-1.5 rounded-lg border border-stone-300 hover:border-stone-400 bg-white/80 hover:bg-stone-100 text-stone-850 hover:text-[#C4482A] transition-all text-base md:text-lg font-bold focus:outline-none cursor-pointer shrink-0 shadow-2xs"
+                title="快捷功能与设置导航"
+                aria-label="打开功能菜单"
               >
                 ☰
               </button>
             </div>
           </div>
+
+          {/* Mobile Dedicated Horizontally Scrollable Category & Navigation Strip (md:hidden) */}
+          {currentPage !== "training" && (
+            <div className="md:hidden relative border-t border-pink-150/70 bg-gradient-to-r from-stone-50/90 via-pink-50/40 to-stone-50/90 backdrop-blur-xs">
+              {/* Fade Indicator on the right edge */}
+              <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white/95 to-transparent pointer-events-none z-10" />
+
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 overflow-x-auto whitespace-nowrap scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <button
+                  onClick={() => { setCurrentPage("start"); setIsDrawerOpen(false); }}
+                  className={`px-3 py-1 rounded-full text-xs font-serif transition-all shrink-0 flex items-center gap-1 select-none active:scale-95 ${
+                    currentPage === "start"
+                      ? "bg-stone-900 text-[#F3EFE3] font-bold shadow-xs border border-stone-950"
+                      : "bg-white/90 text-stone-700 border border-stone-200 hover:bg-stone-100"
+                  }`}
+                >
+                  <span>🎯</span>
+                  <span>练习大厅</span>
+                </button>
+
+                <button
+                  onClick={() => { setCurrentPage("library"); setIsDrawerOpen(false); }}
+                  className={`px-3 py-1 rounded-full text-xs font-serif transition-all shrink-0 flex items-center gap-1 select-none active:scale-95 ${
+                    currentPage === "library"
+                      ? "bg-amber-600 text-white font-bold shadow-xs border border-amber-700"
+                      : "bg-white/90 text-stone-700 border border-stone-200 hover:bg-stone-100"
+                  }`}
+                >
+                  <span>🎴</span>
+                  <span>个人收藏馆</span>
+                </button>
+
+                <button
+                  onClick={() => { setCurrentPage("spanish_recite"); setIsDrawerOpen(false); }}
+                  className={`px-3 py-1 rounded-full text-xs font-serif transition-all shrink-0 flex items-center gap-1 select-none active:scale-95 ${
+                    currentPage === "spanish_recite"
+                      ? "bg-amber-500 text-stone-950 font-black shadow-xs border border-amber-600"
+                      : "bg-white/90 text-stone-700 border border-stone-200 hover:bg-stone-100"
+                  }`}
+                >
+                  <span>📖</span>
+                  <span>沉浸背诵</span>
+                </button>
+
+                <button
+                  onClick={() => { setCurrentPage("passage_practice"); setIsDrawerOpen(false); }}
+                  className={`px-3 py-1 rounded-full text-xs font-serif transition-all shrink-0 flex items-center gap-1 select-none active:scale-95 ${
+                    currentPage === "passage_practice"
+                      ? "bg-rose-500 text-white font-bold shadow-xs border border-rose-600"
+                      : "bg-white/90 text-stone-700 border border-stone-200 hover:bg-stone-100"
+                  }`}
+                >
+                  <span>📜</span>
+                  <span>短文与歌词</span>
+                </button>
+
+                <button
+                  onClick={() => { setCurrentPage("polyglot_game"); setIsDrawerOpen(false); }}
+                  className={`px-3 py-1 rounded-full text-xs font-serif transition-all shrink-0 flex items-center gap-1 select-none active:scale-95 ${
+                    currentPage === "polyglot_game"
+                      ? "bg-purple-600 text-white font-bold shadow-xs border border-purple-700"
+                      : "bg-white/90 text-stone-700 border border-stone-200 hover:bg-stone-100"
+                  }`}
+                >
+                  <span>🎮</span>
+                  <span>星芒穿梭</span>
+                </button>
+
+                <button
+                  onClick={() => { setCurrentPage("multiplayer"); setIsDrawerOpen(false); }}
+                  className={`px-3 py-1 rounded-full text-xs font-serif transition-all shrink-0 flex items-center gap-1 select-none active:scale-95 ${
+                    currentPage === "multiplayer"
+                      ? "bg-emerald-600 text-white font-bold shadow-xs border border-emerald-700"
+                      : "bg-white/90 text-emerald-800 border border-emerald-300 hover:bg-emerald-50"
+                  }`}
+                >
+                  <span>⚔️</span>
+                  <span>连线对决</span>
+                </button>
+
+                <button
+                  onClick={() => { setIsDailyZineOpen(true); setIsDrawerOpen(false); }}
+                  className="px-3 py-1 rounded-full text-xs font-serif transition-all shrink-0 flex items-center gap-1 select-none active:scale-95 bg-white/90 text-rose-700 border border-rose-200 hover:bg-rose-50"
+                >
+                  <span>💌</span>
+                  <span>今日日签</span>
+                </button>
+
+                <button
+                  onClick={() => { setIsCelebrationOpen(true); setIsDrawerOpen(false); }}
+                  className="px-3 py-1 rounded-full text-xs font-serif transition-all shrink-0 flex items-center gap-1 select-none active:scale-95 bg-white/90 text-amber-800 border border-amber-200 hover:bg-amber-50"
+                >
+                  <span>🎉</span>
+                  <span>今日成就</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    requirePasskeyForUpload(() => {
+                      setAddWordDefaultLang(isEnglishMode ? "en" : "ja");
+                      setIsAddWordModalOpen(true);
+                      setIsDrawerOpen(false);
+                    });
+                  }}
+                  className="px-3 py-1 rounded-full text-xs font-serif transition-all shrink-0 flex items-center gap-1 select-none active:scale-95 bg-white/90 text-stone-700 border border-stone-200 hover:bg-stone-100"
+                >
+                  <span className="text-amber-600 font-bold">➕</span>
+                  <span>录词</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    requirePasskeyForUpload(() => {
+                      setBatchModalLang(currentPage === "spanish_recite" ? "es" : (isEnglishMode ? "en" : "ja"));
+                      setIsBatchModalOpen(true);
+                      setIsDrawerOpen(false);
+                    });
+                  }}
+                  className="px-3 py-1 rounded-full text-xs font-serif transition-all shrink-0 flex items-center gap-1 select-none active:scale-95 bg-white/90 text-stone-700 border border-stone-200 hover:bg-stone-100"
+                >
+                  <span className="text-amber-600 font-bold">📥</span>
+                  <span>批量</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    requirePasskeyForUpload(() => {
+                      setPhotoModalLang(currentPage === "spanish_recite" ? "es" : (isEnglishMode ? "en" : "auto"));
+                      setIsPhotoModalOpen(true);
+                      setIsDrawerOpen(false);
+                    });
+                  }}
+                  className="px-3 py-1 rounded-full text-xs font-serif transition-all shrink-0 flex items-center gap-1 select-none active:scale-95 bg-white/90 text-stone-700 border border-stone-200 hover:bg-stone-100"
+                >
+                  <span className="text-amber-600 font-bold">📸</span>
+                  <span>圈词</span>
+                </button>
+              </div>
+            </div>
+          )}
         </header>
       )}
 
@@ -1083,6 +1256,143 @@ export default function App() {
                   >
                     ✕
                   </button>
+                </div>
+
+                {/* Mobile & Desktop Quick Feature Navigation */}
+                <div className="space-y-2.5">
+                  <h4 className="font-serif font-bold text-stone-800 text-xs uppercase tracking-widest text-[#C4482A]">
+                    🧭 快捷功能导航 / Quick Navigation
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-serif">
+                    <button
+                      onClick={() => { setCurrentPage("start"); setIsDrawerOpen(false); }}
+                      className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2 cursor-pointer ${
+                        currentPage === "start"
+                          ? "bg-stone-900 text-[#F3EFE3] font-bold border-stone-950 shadow-xs"
+                          : "bg-white/80 hover:bg-white text-stone-800 border-stone-200"
+                      }`}
+                    >
+                      <span className="text-base">🎯</span>
+                      <div className="min-w-0">
+                        <div className="font-bold">练习大厅</div>
+                        <div className="text-[10px] text-stone-500 font-sans">五十音与单词拼写</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => { setCurrentPage("library"); setIsDrawerOpen(false); }}
+                      className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2 cursor-pointer ${
+                        currentPage === "library"
+                          ? "bg-amber-600 text-white font-bold border-amber-700 shadow-xs"
+                          : "bg-white/80 hover:bg-white text-stone-800 border-stone-200"
+                      }`}
+                    >
+                      <span className="text-base">🎴</span>
+                      <div className="min-w-0">
+                        <div className="font-bold">个人收藏馆</div>
+                        <div className="text-[10px] text-stone-500 font-sans">闪卡图鉴与升级</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => { setCurrentPage("spanish_recite"); setIsDrawerOpen(false); }}
+                      className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2 cursor-pointer ${
+                        currentPage === "spanish_recite"
+                          ? "bg-amber-500 text-stone-950 font-black border-amber-600 shadow-xs"
+                          : "bg-white/80 hover:bg-white text-stone-800 border-stone-200"
+                      }`}
+                    >
+                      <span className="text-base">📖</span>
+                      <div className="min-w-0">
+                        <div className="font-bold">沉浸背诵工坊</div>
+                        <div className="text-[10px] text-stone-500 font-sans">艾宾浩斯与活字默写</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => { setCurrentPage("passage_practice"); setIsDrawerOpen(false); }}
+                      className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2 cursor-pointer ${
+                        currentPage === "passage_practice"
+                          ? "bg-rose-500 text-white font-bold border-rose-600 shadow-xs"
+                          : "bg-white/80 hover:bg-white text-stone-800 border-stone-200"
+                      }`}
+                    >
+                      <span className="text-base">📜</span>
+                      <div className="min-w-0">
+                        <div className="font-bold">短文与歌词</div>
+                        <div className="text-[10px] text-stone-500 font-sans">多语名曲与诗篇</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => { setCurrentPage("polyglot_game"); setIsDrawerOpen(false); }}
+                      className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2 cursor-pointer ${
+                        currentPage === "polyglot_game"
+                          ? "bg-purple-600 text-white font-bold border-purple-700 shadow-xs"
+                          : "bg-white/80 hover:bg-white text-stone-800 border-stone-200"
+                      }`}
+                    >
+                      <span className="text-base">🎮</span>
+                      <div className="min-w-0">
+                        <div className="font-bold">星芒穿梭对决</div>
+                        <div className="text-[10px] text-stone-500 font-sans">多语言混拼竞速</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => { setCurrentPage("multiplayer"); setIsDrawerOpen(false); }}
+                      className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2 cursor-pointer ${
+                        currentPage === "multiplayer"
+                          ? "bg-emerald-600 text-white font-bold border-emerald-700 shadow-xs"
+                          : "bg-white/80 hover:bg-white text-stone-800 border-stone-200"
+                      }`}
+                    >
+                      <span className="text-base">⚔️</span>
+                      <div className="min-w-0">
+                        <div className="font-bold">好友连线对决</div>
+                        <div className="text-[10px] text-stone-500 font-sans">双人竞速与协力合鸣</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => { setIsDailyZineOpen(true); setIsDrawerOpen(false); }}
+                      className="p-2.5 rounded-xl border text-left transition-all flex items-center gap-2 cursor-pointer bg-white/80 hover:bg-rose-50 border-stone-200 text-stone-800"
+                    >
+                      <span className="text-base">💌</span>
+                      <div className="min-w-0">
+                        <div className="font-bold text-rose-700">今日手作日签</div>
+                        <div className="text-[10px] text-stone-500 font-sans">扭蛋抽签与分享</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => { setIsCelebrationOpen(true); setIsDrawerOpen(false); }}
+                      className="p-2.5 rounded-xl border text-left transition-all flex items-center gap-2 cursor-pointer bg-white/80 hover:bg-amber-50 border-stone-200 text-stone-800"
+                    >
+                      <span className="text-base">🎉</span>
+                      <div className="min-w-0">
+                        <div className="font-bold text-amber-800">今日成就庆典</div>
+                        <div className="text-[10px] text-stone-500 font-sans">圆满礼包与战报</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        requirePasskeyForUpload(() => {
+                          setAddWordDefaultLang(isEnglishMode ? "en" : "ja");
+                          setIsAddWordModalOpen(true);
+                          setIsDrawerOpen(false);
+                        });
+                      }}
+                      className="p-2.5 rounded-xl border text-left transition-all flex items-center gap-2 cursor-pointer bg-white/80 hover:bg-stone-100 border-stone-200 text-stone-800"
+                    >
+                      <span className="text-base">➕</span>
+                      <div className="min-w-0">
+                        <div className="font-bold text-stone-900">录入新词条</div>
+                        <div className="text-[10px] text-stone-500 font-sans">自定专属词库</div>
+                      </div>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Fullscreen Immersion Mode Section */}
@@ -1356,6 +1666,7 @@ export default function App() {
                 onGoToSpanishRecite={() => setCurrentPage("spanish_recite")}
                 onGoToArticleLyrics={() => setCurrentPage("passage_practice")}
                 onGoToPolyglotGame={() => setCurrentPage("polyglot_game")}
+                onGoToMultiplayer={() => setCurrentPage("multiplayer")}
                 onOpenCelebration={() => setIsCelebrationOpen(true)}
                 onOpenAddWord={(lang) => {
                   requirePasskeyForUpload(() => {
@@ -1605,6 +1916,25 @@ export default function App() {
                 isEnglishMode={isEnglishMode}
                 onRewardCoins={(earned) => setCoins((c) => c + earned)}
               />
+            </motion.div>
+          )}
+
+          {currentPage === "multiplayer" && (
+            <motion.div
+              key="multiplayer"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ErrorBoundary onReset={() => setCurrentPage("start")}>
+                <MultiplayerPage
+                  onBack={() => setCurrentPage("start")}
+                  coins={coins}
+                  setCoins={setCoins}
+                  initialRoomCode={roomCodeFromUrl}
+                />
+              </ErrorBoundary>
             </motion.div>
           )}
         </AnimatePresence>

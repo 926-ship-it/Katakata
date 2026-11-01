@@ -1,5 +1,7 @@
 import express from "express";
+import http from "http";
 import path from "path";
+import { WebSocketServer, WebSocket } from "ws";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
@@ -799,6 +801,106 @@ Return your response strictly as JSON with this structure:
     res.json({ status: "ok", time: new Date() });
   });
 
+  // =========================================================================
+  // MULTIPLAYER REAL-TIME ROOM & WEBSOCKET ENGINE
+  // =========================================================================
+
+  interface MultiplayerPlayer {
+    id: string;
+    name: string;
+    avatar: string;
+    isHost: boolean;
+    isReady: boolean;
+    score: number;
+    currentWordIndex: number;
+    currentSegmentIndex: number;
+    romajiProgress?: string;
+    combo: number;
+    maxCombo: number;
+    finished: boolean;
+    finishTime?: number;
+    accuracy: number;
+    wpm: number;
+    connected: boolean;
+  }
+
+  interface MultiplayerRoom {
+    id: string;
+    name: string;
+    mode: "duel" | "coop";
+    language: "ja" | "en" | "es";
+    status: "waiting" | "countdown" | "playing" | "finished";
+    countdown: number;
+    wordCount: number;
+    words: any[];
+    players: Map<string, MultiplayerPlayer>;
+    startTime?: number;
+    endTime?: number;
+    reactions: Array<{ id: string; sender: string; emoji: string; text: string; time: number }>;
+    coopTotalScore?: number;
+    lastSyllable?: {
+      playerId: string;
+      playerName: string;
+      syllable: string;
+      time: number;
+    };
+  }
+
+  const multiplayerRooms = new Map<string, MultiplayerRoom>();
+  const clientSockets = new Map<string, { ws: WebSocket; roomId: string; playerId: string }>();
+
+  function serializeRoom(room: MultiplayerRoom) {
+    return {
+      id: room.id,
+      name: room.name,
+      mode: room.mode,
+      language: room.language,
+      status: room.status,
+      countdown: room.countdown,
+      wordCount: room.wordCount,
+      words: room.words,
+      players: Array.from(room.players.values()),
+      startTime: room.startTime,
+      endTime: room.endTime,
+      reactions: room.reactions.slice(-10),
+      coopTotalScore: room.coopTotalScore || 0,
+    };
+  }
+
+  function broadcastToRoom(roomId: string, message: any, excludePlayerId?: string) {
+    const raw = JSON.stringify(message);
+    clientSockets.forEach(({ ws, roomId: rId, playerId }) => {
+      if (rId === roomId && playerId !== excludePlayerId && ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(raw);
+        } catch (_) {}
+      }
+    });
+  }
+
+  // REST endpoints for room queries
+  app.get("/api/multiplayer/room/:id", (req, res) => {
+    const room = multiplayerRooms.get(req.params.id.toUpperCase());
+    if (!room) {
+      return res.status(404).json({ error: "Room not found" });
+    }
+    res.json(serializeRoom(room));
+  });
+
+  app.get("/api/multiplayer/rooms", (req, res) => {
+    const list = Array.from(multiplayerRooms.values())
+      .filter((r) => r.status === "waiting" && r.players.size < 4)
+      .map((r) => ({
+        id: r.id,
+        name: r.name,
+        mode: r.mode,
+        language: r.language,
+        playerCount: r.players.size,
+        wordCount: r.wordCount,
+      }));
+    res.json(list);
+  });
+
   // Vite dev server middleware or static directory serve
   if (process.env.NODE_ENV !== "production") {
     console.log("Configuring Vite Dev Server middleware...");
@@ -817,8 +919,363 @@ Return your response strictly as JSON with this structure:
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Server] Running on http://0.0.0.0:${PORT}`);
+  // Wrap express app in http.Server to attach WebSocket server
+  const server = http.createServer(app);
+  const wss = new WebSocketServer({ noServer: true });
+
+  server.on("upgrade", (request, socket, head) => {
+    try {
+      const { pathname } = new URL(request.url || "", `http://${request.headers.host || "localhost"}`);
+      if (pathname === "/ws/multiplayer") {
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          wss.emit("connection", ws, request);
+        });
+      }
+    } catch (e) {
+      socket.destroy();
+    }
+  });
+
+  function handlePlayerLeave(roomId: string, playerId: string) {
+    clientSockets.delete(playerId);
+    const room = multiplayerRooms.get(roomId);
+    if (room) {
+      room.players.delete(playerId);
+      if (room.players.size === 0) {
+        multiplayerRooms.delete(roomId);
+      } else {
+        // If the host left, assign new host
+        const remaining = Array.from(room.players.values());
+        if (!remaining.some((p) => p.isHost)) {
+          remaining[0].isHost = true;
+        }
+        broadcastToRoom(roomId, {
+          type: "room_updated",
+          payload: serializeRoom(room),
+        });
+      }
+    }
+  }
+
+  wss.on("connection", (ws: WebSocket) => {
+    let currentSocketId = "";
+
+    ws.on("message", (data: any) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        const { type, payload } = msg;
+
+        if (type === "join_room") {
+          const roomId = (payload.roomId || "").trim().toUpperCase();
+          const playerId = (payload.playerId || `p_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`);
+          currentSocketId = playerId;
+
+          let room = multiplayerRooms.get(roomId);
+          const isNewRoom = !room;
+
+          if (!room) {
+            room = {
+              id: roomId,
+              name: payload.roomName || `${payload.playerName || "旅人"}的和风茶室`,
+              mode: payload.mode || "duel",
+              language: payload.language || "ja",
+              status: "waiting",
+              countdown: 3,
+              wordCount: payload.words?.length || payload.wordCount || 8,
+              words: payload.words || [],
+              players: new Map(),
+              reactions: [],
+              coopTotalScore: 0,
+            };
+            multiplayerRooms.set(roomId, room);
+          }
+
+          const isHost = isNewRoom || room.players.size === 0;
+          const player: MultiplayerPlayer = {
+            id: playerId,
+            name: payload.playerName || (isHost ? "房主" : `同行者 ${room.players.size + 1}`),
+            avatar: payload.playerAvatar || "fox",
+            isHost,
+            isReady: isHost, // Host is ready by default
+            score: 0,
+            currentWordIndex: 0,
+            currentSegmentIndex: 0,
+            combo: 0,
+            maxCombo: 0,
+            finished: false,
+            accuracy: 100,
+            wpm: 0,
+            connected: true,
+          };
+
+          room.players.set(playerId, player);
+          clientSockets.set(playerId, { ws, roomId, playerId });
+
+          // Send confirmation to client
+          ws.send(JSON.stringify({
+            type: "joined_room",
+            payload: {
+              roomId,
+              playerId,
+              isHost,
+              room: serializeRoom(room),
+            },
+          }));
+
+          // Notify others in room
+          broadcastToRoom(roomId, {
+            type: "room_updated",
+            payload: serializeRoom(room),
+          }, playerId);
+        }
+
+        else if (type === "toggle_ready") {
+          const { roomId, playerId, isReady } = payload;
+          const room = multiplayerRooms.get(roomId);
+          if (room && room.players.has(playerId)) {
+            const p = room.players.get(playerId)!;
+            p.isReady = Boolean(isReady);
+            broadcastToRoom(roomId, {
+              type: "room_updated",
+              payload: serializeRoom(room),
+            });
+          }
+        }
+
+        else if (type === "start_game") {
+          const { roomId } = payload;
+          const room = multiplayerRooms.get(roomId);
+          if (!room || room.status !== "waiting") return;
+
+          room.status = "countdown";
+          room.countdown = 3;
+          broadcastToRoom(roomId, {
+            type: "room_updated",
+            payload: serializeRoom(room),
+          });
+
+          // Countdown sequence 3 -> 2 -> 1 -> 0 -> PLAY
+          let count = 3;
+          const countdownInterval = setInterval(() => {
+            count--;
+            if (count > 0) {
+              room.countdown = count;
+              broadcastToRoom(roomId, {
+                type: "countdown_tick",
+                payload: { count },
+              });
+            } else {
+              clearInterval(countdownInterval);
+              room.status = "playing";
+              room.startTime = Date.now();
+              room.countdown = 0;
+              // Reset all player game states
+              room.players.forEach((p) => {
+                p.score = 0;
+                p.currentWordIndex = 0;
+                p.currentSegmentIndex = 0;
+                p.combo = 0;
+                p.maxCombo = 0;
+                p.finished = false;
+                p.finishTime = undefined;
+              });
+              broadcastToRoom(roomId, {
+                type: "game_started",
+                payload: {
+                  room: serializeRoom(room),
+                  startTime: room.startTime,
+                },
+              });
+            }
+          }, 1000);
+        }
+
+        else if (type === "typing_progress") {
+          const { roomId, playerId, wordIndex, segmentIndex, romajiProgress, combo } = payload;
+          const room = multiplayerRooms.get(roomId);
+          if (!room || room.status !== "playing") return;
+          const player = room.players.get(playerId);
+          if (player) {
+            player.currentWordIndex = wordIndex;
+            player.currentSegmentIndex = segmentIndex;
+            player.romajiProgress = romajiProgress;
+            player.combo = combo;
+            player.maxCombo = Math.max(player.maxCombo, combo);
+
+            broadcastToRoom(roomId, {
+              type: "player_progress",
+              payload: {
+                playerId,
+                wordIndex,
+                segmentIndex,
+                romajiProgress,
+                combo,
+              },
+            }, playerId);
+          }
+        }
+
+        else if (type === "syllable_completed") {
+          const { roomId, playerId, syllable } = payload;
+          const room = multiplayerRooms.get(roomId);
+          if (!room || room.status !== "playing") return;
+          const player = room.players.get(playerId);
+          if (!player) return;
+
+          const now = Date.now();
+          const prev = room.lastSyllable;
+
+          // If another player in the room completed a syllable within synchronous window (<= 1800ms)
+          if (prev && prev.playerId !== playerId && (now - prev.time) <= 1800) {
+            const bonus = room.mode === "coop" ? 60 : 30;
+            if (room.mode === "coop") {
+              room.coopTotalScore = (room.coopTotalScore || 0) + bonus;
+            }
+            player.score += bonus;
+            const otherPlayer = room.players.get(prev.playerId);
+            if (otherPlayer) {
+              otherPlayer.score += bonus;
+            }
+
+            // Reset lastSyllable to prevent duplicate double-triggers on a single event
+            room.lastSyllable = undefined;
+
+            // Broadcast the ceremonial harmony ensemble event to all connected clients in the room!
+            broadcastToRoom(roomId, {
+              type: "harmony_syllable",
+              payload: {
+                player1Id: prev.playerId,
+                player1Name: prev.playerName,
+                player2Id: playerId,
+                player2Name: player.name,
+                syllable1: prev.syllable,
+                syllable2: syllable,
+                coopBonus: bonus,
+                timeDiffMs: now - prev.time,
+                room: serializeRoom(room),
+              },
+            });
+          } else {
+            room.lastSyllable = {
+              playerId,
+              playerName: player.name,
+              syllable: syllable || "",
+              time: now,
+            };
+          }
+        }
+
+        else if (type === "word_completed") {
+          const { roomId, playerId, wordIndex, accuracy, timeTakenMs, combo } = payload;
+          const room = multiplayerRooms.get(roomId);
+          if (!room || room.status !== "playing") return;
+          const player = room.players.get(playerId);
+          if (player) {
+            player.score += 100 + (combo * 10);
+            player.combo = combo;
+            player.maxCombo = Math.max(player.maxCombo, combo);
+            player.accuracy = Math.round((player.accuracy + accuracy) / 2);
+            player.currentWordIndex = wordIndex + 1;
+            player.currentSegmentIndex = 0;
+            player.romajiProgress = "";
+
+            if (room.mode === "coop") {
+              room.coopTotalScore = (room.coopTotalScore || 0) + 100 + (combo * 10);
+            }
+
+            // Check if player finished all words
+            if (player.currentWordIndex >= room.words.length) {
+              player.finished = true;
+              player.finishTime = Date.now();
+            }
+
+            // Check if game is over
+            const allFinished = Array.from(room.players.values()).every((p) => p.finished);
+            if (allFinished || (room.mode === "duel" && player.finished && room.players.size === 1)) {
+              room.status = "finished";
+              room.endTime = Date.now();
+            }
+
+            broadcastToRoom(roomId, {
+              type: "player_scored",
+              payload: {
+                playerId,
+                player: { ...player },
+                room: serializeRoom(room),
+                isGameOver: room.status === "finished",
+              },
+            });
+          }
+        }
+
+        else if (type === "send_reaction") {
+          const { roomId, playerId, emoji, text } = payload;
+          const room = multiplayerRooms.get(roomId);
+          if (room) {
+            const player = room.players.get(playerId);
+            const reaction = {
+              id: `rx_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+              sender: player?.name || "匿名伙伴",
+              emoji: emoji || "👏",
+              text: text || "加油！",
+              time: Date.now(),
+            };
+            room.reactions.push(reaction);
+            broadcastToRoom(roomId, {
+              type: "reaction_received",
+              payload: reaction,
+            });
+          }
+        }
+
+        else if (type === "rematch") {
+          const { roomId } = payload;
+          const room = multiplayerRooms.get(roomId);
+          if (room) {
+            room.status = "waiting";
+            room.startTime = undefined;
+            room.endTime = undefined;
+            room.reactions = [];
+            room.coopTotalScore = 0;
+            room.players.forEach((p) => {
+              p.score = 0;
+              p.currentWordIndex = 0;
+              p.currentSegmentIndex = 0;
+              p.romajiProgress = "";
+              p.combo = 0;
+              p.maxCombo = 0;
+              p.finished = false;
+              p.finishTime = undefined;
+              p.isReady = p.isHost;
+            });
+            broadcastToRoom(roomId, {
+              type: "room_updated",
+              payload: serializeRoom(room),
+            });
+          }
+        }
+
+        else if (type === "leave_room") {
+          const { roomId, playerId } = payload;
+          handlePlayerLeave(roomId, playerId);
+        }
+      } catch (err) {
+        console.error("Multiplayer message parse error:", err);
+      }
+    });
+
+    ws.on("close", () => {
+      if (currentSocketId) {
+        const socketInfo = clientSockets.get(currentSocketId);
+        if (socketInfo) {
+          handlePlayerLeave(socketInfo.roomId, socketInfo.playerId);
+        }
+      }
+    });
+  });
+
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`[Server] Running on http://0.0.0.0:${PORT} with WebSocket multiplayer engine`);
   });
 }
 

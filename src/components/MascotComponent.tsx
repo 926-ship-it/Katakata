@@ -259,7 +259,7 @@ export const MascotComponent: React.FC<MascotComponentProps> = ({
             audioSynth.playCardSlide();
           } catch (_) {}
         }}
-        className="fixed top-14 sm:top-16 right-3 sm:right-5 z-[70] flex flex-col items-center gap-1 cursor-pointer select-none pointer-events-auto"
+        className="fixed top-24 sm:top-18 right-3 sm:right-5 z-[70] flex flex-col items-center gap-1 cursor-pointer select-none pointer-events-auto"
       >
         {/* Cute small floating orb when minimized */}
         <div className="relative w-9 h-9 rounded-full bg-amber-400 border-2 border-stone-850 flex items-center justify-center shadow-[2px_2px_0px_#2E2530] group hover:scale-110 transition-all">
@@ -285,7 +285,7 @@ export const MascotComponent: React.FC<MascotComponentProps> = ({
       dragMomentum={false}
       dragElastic={0.1}
       dragConstraints={{ left: -360, right: 10, top: -10, bottom: 600 }}
-      className="fixed top-14 sm:top-16 right-3 sm:right-5 z-[70] flex flex-col items-end select-none cursor-grab active:cursor-grabbing pointer-events-auto"
+      className="fixed top-24 sm:top-18 right-3 sm:right-5 z-[70] flex flex-col items-end select-none cursor-grab active:cursor-grabbing pointer-events-auto"
       style={{ touchAction: "none" }}
     >
       {/* Round Ball Mascot Avatar (Floating at Top) */}

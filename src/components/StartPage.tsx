@@ -26,6 +26,7 @@ interface StartPageProps {
   onGoToSpanishRecite?: () => void;
   onGoToArticleLyrics?: () => void;
   onGoToPolyglotGame?: () => void;
+  onGoToMultiplayer?: () => void;
   onOpenCelebration?: () => void;
   onOpenAddWord?: (lang?: "ja" | "es" | "en") => void;
   onOpenBatchImport?: (lang?: "es" | "ja" | "en") => void;
@@ -49,6 +50,7 @@ export const StartPage: React.FC<StartPageProps> = ({
   onGoToSpanishRecite,
   onGoToArticleLyrics,
   onGoToPolyglotGame,
+  onGoToMultiplayer,
   onOpenCelebration,
   onOpenAddWord,
   onOpenBatchImport,
@@ -848,6 +850,42 @@ export const StartPage: React.FC<StartPageProps> = ({
         <div className="absolute -left-4 -bottom-6 text-pink-200/30 text-8xl font-serif pointer-events-none select-none z-0">
           ✦
         </div>
+
+        {/* FEATURE: Real-time Friends Online Spelling Duel & Co-op */}
+        {onGoToMultiplayer && (
+          <div 
+            onClick={onGoToMultiplayer}
+            className="mb-4 group cursor-pointer p-4 sm:p-5 border-2 border-amber-500 rounded-3xl transition-all duration-300 relative select-none bg-gradient-to-r from-stone-900 via-rose-950 to-amber-950 text-stone-100 shadow-[4px_4px_0px_#2E2530] hover:shadow-[6px_6px_0px_#2E2530] hover:-translate-y-0.5 flex flex-col sm:flex-row items-center justify-between gap-4 overflow-hidden"
+          >
+            <div className="flex items-center gap-3.5 relative z-10">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center justify-center text-2xl shadow-inner shrink-0">
+                ⚔️
+              </div>
+              <div className="text-left">
+                <div className="flex items-center gap-2">
+                  <span className="font-serif-vintage font-black text-amber-300 text-lg tracking-wide">
+                    和风对决庵 · 好友实时连线对决
+                  </span>
+                  <span className="text-[10px] bg-rose-500 text-white font-mono px-2 py-0.2 rounded-full font-bold animate-pulse">
+                    ONLINE
+                  </span>
+                </div>
+                <p className="text-xs text-stone-300 font-sans mt-0.5 leading-relaxed">
+                  发链接一键邀请好友！双人同屏极速竞速 ⚔️ 或 同心协力和鸣 🤝，多语种词库实时切磋！
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 relative z-10">
+              <button
+                type="button"
+                className="px-4 py-2 bg-gradient-to-r from-amber-400 to-rose-400 hover:from-amber-500 hover:to-rose-500 text-stone-950 font-serif font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5"
+              >
+                <span>立即连线入席 ＞</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 relative z-10">
           {/* Track 1: 风雅学宫 (Handwriting/typing single character exercise) */}
