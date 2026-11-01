@@ -7,6 +7,8 @@ import { audioSynth } from "../utils/audio";
 import { CalligraphyCanvas } from "./CalligraphyCanvas";
 import { CardIllustration } from "./CardIllustration";
 import { uiTranslate, LANG_MAPPING } from "../utils/lang";
+import { ColoredSyllableWord } from "./ColoredSyllableWord";
+import { mapWordSegmentsToSyllables } from "../utils/syllableColorHelper";
 
 interface CardLibraryPageProps {
   collectedIds: string[];
@@ -802,6 +804,13 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
           <div className="flex flex-wrap items-center gap-1.5 border-b border-stone-200 pb-3">
             {[
               { id: "all", label: "全部图鉴" },
+              { id: "en_kids", label: "🎈 幼小启蒙" },
+              { id: "en_highschool", label: "🎒 初高中必背" },
+              { id: "en_college", label: "🎓 大学与考研" },
+              { id: "en_trade", label: "🚢 外贸商务" },
+              { id: "fairy", label: "🧚 童话仙境" },
+              { id: "poetry", label: "📜 抒情诗歌" },
+              { id: "music", label: "🎵 流行与乐章" },
               { id: "custom", label: isEnglishMode ? "✨ 自定生词" : "✨ 自定词库" },
               { id: "collected", label: "已收集闪卡" },
               { id: "locked", label: "未解锁图纸" },
@@ -1355,12 +1364,22 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   </div>
                   
                   <div className="space-y-0.5 text-center">
-                    <h2 
-                      className="text-2xl sm:text-3xl font-black text-stone-950 font-serif leading-none tracking-wide"
-                      style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
-                    >
-                      {selectedCard.kanji}
-                    </h2>
+                    {(() => {
+                      const cardLang: "en" | "ja" | "es" = (selectedCard as any).lang
+                        ? (selectedCard as any).lang
+                        : (isEnglishMode ? "en" : /^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s\-_.'’]+$/.test(selectedCard.kanji) ? "es" : "ja");
+
+                      return (
+                        <ColoredSyllableWord
+                          word={selectedCard.kanji}
+                          lang={cardLang}
+                          kanaStr={selectedCard.kanaStr}
+                          isEnglishMode={cardLang !== "ja"}
+                          showDots={true}
+                          className="text-2xl sm:text-3xl font-black font-serif leading-none tracking-wide justify-center"
+                        />
+                      );
+                    })()}
                     <div className="flex justify-center items-center flex-wrap gap-1 text-[9px] text-stone-650 font-medium">
                       <span>{isEnglishMode ? "单词:" : "假名:"} <b>{isEnglishMode ? selectedCard.kanji : selectedCard.kanaStr}</b></span>
                       <span className="text-stone-300">|</span>
@@ -1380,10 +1399,13 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                   <div className="flex justify-center">
                     <button
                       onClick={() => {
-                        if (isEnglishMode) {
-                          audioSynth.speakFullWord(selectedCard.kanji, undefined, selectedCard.kanji, undefined, "en");
+                        const cardLang: "en" | "ja" | "es" = (selectedCard as any).lang
+                          ? (selectedCard as any).lang
+                          : (isEnglishMode ? "en" : /^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s\-_.'’]+$/.test(selectedCard.kanji) ? "es" : "ja");
+                        if (cardLang === "ja") {
+                          audioSynth.speakJapanese(selectedCard.kanaStr || selectedCard.kanji);
                         } else {
-                          audioSynth.speakJapanese(selectedCard.kanaStr);
+                          audioSynth.speakFullWord(selectedCard.kanji, undefined, selectedCard.kanji, undefined, cardLang);
                         }
                       }}
                       className="px-3 py-1 rounded-full bg-stone-900/10 hover:bg-stone-900/20 text-stone-800 transition-all text-[9px] font-bold flex items-center gap-1 cursor-pointer shadow-xs animate-pulse"
@@ -1393,14 +1415,33 @@ export const CardLibraryPage: React.FC<CardLibraryPageProps> = ({
                     </button>
                   </div>
 
-                  <div className="flex gap-0.5 justify-center flex-wrap scale-95 origin-center">
-                    {selectedCard.segments.map((s, idx) => (
-                      <div key={idx} className="bg-stone-900/5 px-1.5 py-0.5 rounded text-[9px] flex flex-col items-center min-w-[32px]">
-                        <span className="font-serif font-black">{(s as any).text || s.kana}</span>
-                        <span className="font-mono text-[7px] text-stone-500 scale-90">{s.displayRomaji}</span>
+                  {/* Syllable-tinted segment letter chips (Japanese moras, Spanish and English syllables) */}
+                  {(() => {
+                    const cardLang: "en" | "ja" | "es" = (selectedCard as any).lang
+                      ? (selectedCard as any).lang
+                      : (isEnglishMode ? "en" : /^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s\-_.'’]+$/.test(selectedCard.kanji) ? "es" : "ja");
+                    const sylMap = mapWordSegmentsToSyllables(selectedCard.kanji, selectedCard.segments.length, cardLang);
+                    return (
+                      <div className="flex gap-0.5 justify-center flex-wrap scale-95 origin-center">
+                        {selectedCard.segments.map((s, idx) => {
+                          const syl = sylMap[idx];
+                          return (
+                            <div 
+                              key={idx} 
+                              className={`px-1.5 py-0.5 rounded text-[9px] flex flex-col items-center min-w-[32px] border ${
+                                syl 
+                                  ? `${syl.color.bgColor} ${syl.color.borderColor} ${syl.color.textColor}` 
+                                  : "bg-stone-900/5 border-stone-200 text-stone-800"
+                              }`}
+                            >
+                              <span className="font-serif font-black">{(s as any).text || s.kana}</span>
+                              <span className="font-mono text-[7px] opacity-75 scale-90">{s.displayRomaji}</span>
+                            </div>
+                          );
+                        })}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
                 </div>
               </motion.div>
 

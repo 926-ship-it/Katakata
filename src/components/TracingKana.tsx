@@ -1,5 +1,6 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { SyllableColorDef } from "../utils/syllableColorHelper";
 
 interface TracingKanaProps {
   kana: string;
@@ -8,6 +9,7 @@ interface TracingKanaProps {
   displayRomaji: string;
   romajiProgress: string; // what the user has currently typed for this kana (e.g., "s" for "sa")
   isEnglishMode?: boolean;
+  syllableColor?: SyllableColorDef;
 }
 
 export const TracingKana: React.FC<TracingKanaProps> = ({
@@ -17,21 +19,26 @@ export const TracingKana: React.FC<TracingKanaProps> = ({
   displayRomaji,
   romajiProgress,
   isEnglishMode = false,
+  syllableColor,
 }) => {
   const isLatin = isEnglishMode || /[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]/.test(kana);
 
-  // Let's create a beautiful traditional Japanese gridded paper (田字格)
+  // Traditional Japanese gridded paper (田字格) with dynamic syllable color tinting
   return (
     <div
       className={`relative rounded-lg border-2 flex flex-col items-center justify-center bg-stone-50 transition-all duration-300 ${
         isLatin 
-          ? "w-10 h-14 sm:w-12 sm:h-16 md:w-16 md:h-22" 
-          : "w-14 h-16 sm:w-18 sm:h-20 md:w-24 md:h-28"
+          ? "w-9 h-12 sm:w-11 sm:h-14 md:w-13 md:h-16" 
+          : "w-11 h-14 sm:w-14 sm:h-16 md:w-18 md:h-22"
       } ${
         active
-          ? "border-amber-500 shadow-md ring-2 ring-amber-200"
+          ? syllableColor 
+            ? `${syllableColor.borderColor} shadow-md ring-2 ${syllableColor.ringColor}` 
+            : "border-amber-500 shadow-md ring-2 ring-amber-200"
           : isCorrect
           ? "border-rose-400 bg-rose-50/20"
+          : syllableColor
+          ? `${syllableColor.borderColor}/60 ${syllableColor.bgColor}/40`
           : "border-stone-300"
       }`}
     >
@@ -41,23 +48,36 @@ export const TracingKana: React.FC<TracingKanaProps> = ({
         <div className="absolute left-1/2 top-0 bottom-0 border-l-2 border-dashed border-stone-400" />
       </div>
 
+      {/* Syllable tiny accent dot indicator on corner */}
+      {syllableColor && (
+        <div 
+          className="absolute bottom-1 left-1.5 w-1.5 h-1.5 rounded-full pointer-events-none opacity-80"
+          style={{ backgroundColor: syllableColor.accentHex }}
+          title={syllableColor.label}
+        />
+      )}
+
       {/* Rarity/Progress indicator inside grid corner */}
-      <div className={`absolute top-1 right-1.5 font-mono text-stone-400 select-none ${
-        isLatin ? "text-[6px] sm:text-[8px] md:text-[9px]" : "text-[8px] sm:text-[10px]"
-      }`}>
+      <div className={`absolute top-0.5 right-1 font-mono font-bold select-none ${
+        isLatin ? "text-[6px] sm:text-[8px] md:text-[8.5px]" : "text-[7px] sm:text-[9px]"
+      } ${syllableColor ? syllableColor.textColor : "text-stone-400"}`}>
         {displayRomaji === " " ? "SPACE" : displayRomaji.toUpperCase()}
       </div>
 
       {/* Main Calligraphic Character */}
-      <div className="relative select-none text-center flex items-center justify-center min-h-[1.8rem] sm:min-h-[2.5rem] md:min-h-[3.5rem]">
+      <div className="relative select-none text-center flex items-center justify-center min-h-[1.5rem] sm:min-h-[2rem] md:min-h-[2.75rem]">
         {/* Underlay character - grayed out or placeholder */}
         <span
           className={`font-bold tracking-normal transition-colors duration-300 ${
             isLatin 
-              ? "text-lg sm:text-2xl md:text-3xl" 
-              : "text-3xl sm:text-4xl md:text-6xl"
+              ? "text-base sm:text-xl md:text-2xl" 
+              : "text-2xl sm:text-3xl md:text-4xl"
           } ${
-            isCorrect ? "text-stone-300/40" : active ? "text-stone-800" : "text-stone-400"
+            isCorrect 
+              ? "text-stone-300/40" 
+              : active 
+              ? (syllableColor ? syllableColor.textColor : "text-stone-900")
+              : (syllableColor ? `${syllableColor.textColor}/70` : "text-stone-400")
           }`}
           style={{ fontFamily: isLatin ? 'ui-sans-serif, system-ui, sans-serif' : '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
         >
@@ -76,8 +96,8 @@ export const TracingKana: React.FC<TracingKanaProps> = ({
               transition={{ duration: 0.75, ease: "easeInOut" }}
               className={`absolute text-rose-600 font-bold drop-shadow-[0_0_8px_rgba(225,29,72,0.6)] ${
                 isLatin 
-                  ? "text-lg sm:text-2xl md:text-3xl" 
-                  : "text-3xl sm:text-4xl md:text-6xl"
+                  ? "text-base sm:text-xl md:text-2xl" 
+                  : "text-2xl sm:text-3xl md:text-4xl"
               }`}
               style={{
                 fontFamily: isLatin ? 'ui-sans-serif, system-ui, sans-serif' : '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif',

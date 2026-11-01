@@ -67,6 +67,8 @@ import { getSpanishGrammarDetails, WordGrammarDetails } from "../utils/spanishGr
 import { loadSrsData, isDue, recordPracticeBatch, getDueDate } from "../utils/srs";
 import { calculateBadges, LearnerBadge } from "../utils/badgesHelper";
 import { LearnerBadgesModal } from "./LearnerBadgesModal";
+import { ColoredSyllableWord } from "./ColoredSyllableWord";
+import { getSyllableColor, splitWordIntoSyllables, mapWordSegmentsToSyllables } from "../utils/syllableColorHelper";
 
 export type ReciteLanguage = "ja" | "en" | "es";
 
@@ -1731,9 +1733,14 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                     {/* Word Display & Pronunciation */}
                     <div className="my-auto space-y-3 py-6">
                       <div className="flex items-center justify-center gap-2.5">
-                        <h2 className="text-3xl sm:text-4xl font-black font-serif text-stone-900 tracking-tight">
-                          {currentWord.displayTitle}
-                        </h2>
+                        <ColoredSyllableWord
+                          word={currentWord.displayTitle}
+                          lang={currentWord.lang || currentLang}
+                          kanaStr={currentWord.lang === "ja" ? currentWord.subTitle : undefined}
+                          isEnglishMode={currentWord.lang !== "ja"}
+                          showDots={true}
+                          className="text-3xl sm:text-4xl font-black font-serif text-stone-900 tracking-tight justify-center"
+                        />
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1769,6 +1776,30 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                           <span>{currentWord.subTitle}</span>
                         </div>
                       )}
+
+                      {/* Syllable / Mora breakdown badges */}
+                      {(() => {
+                        const wordLang = currentWord.lang || currentLang;
+                        const syls = splitWordIntoSyllables(currentWord.displayTitle, wordLang);
+                        if (syls.filter(s => s !== " " && !/^\s+$/.test(s)).length <= 1) return null;
+                        return (
+                          <div className="flex items-center justify-center gap-1 flex-wrap pt-0.5 select-none">
+                            {syls.map((syl, sIdx) => {
+                              if (syl === " " || /^\s+$/.test(syl)) return null;
+                              const c = getSyllableColor(sIdx);
+                              return (
+                                <span
+                                  key={sIdx}
+                                  className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${c.badgeColor} shadow-2xs`}
+                                  title={`${wordLang === "ja" ? "拍" : "音节"} ${sIdx + 1}: ${syl}`}
+                                >
+                                  {syl}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
 
                       {/* Meaning Reveal */}
                       <div className="pt-4">
@@ -2159,124 +2190,143 @@ export const SpanishRecitePage: React.FC<SpanishRecitePageProps> = ({
                           }
                         }}
                       />
-                      {currentWord.segments.map((seg, idx) => {
-                        const char = seg.display;
-                        const isTyped = idx < typedChars.length;
-                        const isActive = idx === typedChars.length;
-                        const isSpace = char === " ";
-                        const isPunct = /[\-,\.!\?¡¿']/.test(char);
-                        const isShaking = shakeIndex === idx;
+                      {(() => {
+                        const wordLang = currentWord.lang || currentLang;
+                        const sylMap = mapWordSegmentsToSyllables(currentWord.displayTitle, currentWord.segments.length, wordLang);
+                        return currentWord.segments.map((seg, idx) => {
+                          const char = seg.display;
+                          const isTyped = idx < typedChars.length;
+                          const isActive = idx === typedChars.length;
+                          const isSpace = char === " ";
+                          const isPunct = /[\-,\.!\?¡¿']/.test(char);
+                          const isShaking = shakeIndex === idx;
+                          const sylInfo = sylMap[idx];
+                          const sylColor = sylInfo?.color;
 
-                        // Prompt text
-                        let promptChar = "";
-                        if (promptMode === "guided") {
-                          promptChar = char;
-                        } else if (promptMode === "hint") {
-                          if (idx === 0 || isPunct) {
+                          // Prompt text
+                          let promptChar = "";
+                          if (promptMode === "guided") {
                             promptChar = char;
+                          } else if (promptMode === "hint") {
+                            if (idx === 0 || isPunct) {
+                              promptChar = char;
+                            } else {
+                              promptChar = "·";
+                            }
                           } else {
-                            promptChar = "·";
+                            promptChar = isPunct ? char : "·";
                           }
-                        } else {
-                          promptChar = isPunct ? char : "·";
-                        }
 
-                        if (isSpace) {
+                          if (isSpace) {
+                            return (
+                              <div
+                                key={idx}
+                                className="w-4 sm:w-6 flex items-center justify-center text-stone-300 font-mono text-sm select-none"
+                              >
+                                ␣
+                              </div>
+                            );
+                          }
+
                           return (
                             <div
                               key={idx}
-                              className="w-4 sm:w-6 flex items-center justify-center text-stone-300 font-mono text-sm select-none"
+                              className={`relative rounded-xl border-2 flex flex-col items-center justify-center transition-all select-none ${
+                                char.length > 1
+                                  ? "w-12 h-16 sm:w-14 sm:h-20"
+                                  : "w-10 h-15 sm:w-12 sm:h-18 md:w-14 md:h-20"
+                              } ${
+                                isTyped
+                                  ? "border-emerald-500 bg-emerald-50/80 text-emerald-800 shadow-xs"
+                                  : isActive
+                                  ? sylColor
+                                    ? `${sylColor.borderColor} ${sylColor.bgColor}/60 shadow-md ring-2 ${sylColor.ringColor} ${isShaking ? "animate-shake border-rose-500 bg-rose-50 ring-rose-300" : ""}`
+                                    : `border-amber-500 bg-amber-50/60 shadow-md ring-2 ring-amber-300/90 ${
+                                      isShaking ? "animate-shake border-rose-500 bg-rose-50 ring-rose-300" : ""
+                                    }`
+                                  : sylColor
+                                  ? `${sylColor.borderColor}/50 ${sylColor.bgColor}/30 text-stone-600`
+                                  : "border-stone-300 bg-stone-50/40 text-stone-400"
+                              }`}
                             >
-                              ␣
-                            </div>
-                          );
-                        }
+                              {/* Syllable tiny accent dot */}
+                              {sylColor && (
+                                <div
+                                  className="absolute bottom-1 left-1.5 w-1.5 h-1.5 rounded-full pointer-events-none opacity-80"
+                                  style={{ backgroundColor: sylColor.accentHex }}
+                                  title={sylColor.label}
+                                />
+                              )}
 
-                        return (
-                          <div
-                            key={idx}
-                            className={`relative rounded-xl border-2 flex flex-col items-center justify-center transition-all select-none ${
-                              char.length > 1
-                                ? "w-12 h-16 sm:w-14 sm:h-20"
-                                : "w-10 h-15 sm:w-12 sm:h-18 md:w-14 md:h-20"
-                            } ${
-                              isTyped
-                                ? "border-emerald-500 bg-emerald-50/80 text-emerald-800 shadow-xs"
-                                : isActive
-                                ? `border-amber-500 bg-amber-50/60 shadow-md ring-2 ring-amber-300/90 ${
-                                    isShaking ? "animate-shake border-rose-500 bg-rose-50 ring-rose-300" : ""
-                                  }`
-                                : "border-stone-300 bg-stone-50/40 text-stone-400"
-                            }`}
-                          >
-                            {/* Wabi-sabi paper grid lines */}
-                            <div className="absolute inset-0 pointer-events-none opacity-20">
-                              <div className="absolute top-1/2 left-0 right-0 border-t border-dashed border-stone-500" />
-                              <div className="absolute left-1/2 top-0 bottom-0 border-l border-dashed border-stone-500" />
-                            </div>
+                              {/* Wabi-sabi paper grid lines */}
+                              <div className="absolute inset-0 pointer-events-none opacity-20">
+                                <div className="absolute top-1/2 left-0 right-0 border-t border-dashed border-stone-500" />
+                                <div className="absolute left-1/2 top-0 bottom-0 border-l border-dashed border-stone-500" />
+                              </div>
 
-                            {/* Position number */}
-                            <div className="absolute top-1 right-1.5 font-mono text-[8px] text-stone-400">
-                              {idx + 1}
-                            </div>
+                              {/* Position number */}
+                              <div className="absolute top-1 right-1.5 font-mono text-[8px] text-stone-400">
+                                {idx + 1}
+                              </div>
 
-                            {/* Main Character / Syllable text */}
-                            <div className="relative text-2xl sm:text-3xl font-bold font-sans">
-                              {isTyped ? (
-                                <motion.span
-                                  initial={{ scale: 0.5, opacity: 0 }}
-                                  animate={{ scale: 1, opacity: 1 }}
-                                  className="text-emerald-700 font-black"
-                                >
-                                  {typedChars[idx]}
-                                </motion.span>
-                              ) : isActive ? (
-                                <div className="flex flex-col items-center">
-                                  <span className="text-amber-700 font-bold opacity-75">
+                              {/* Main Character / Syllable text */}
+                              <div className="relative text-2xl sm:text-3xl font-bold font-sans">
+                                {isTyped ? (
+                                  <motion.span
+                                    initial={{ scale: 0.5, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    className="text-emerald-700 font-black"
+                                  >
+                                    {typedChars[idx]}
+                                  </motion.span>
+                                ) : isActive ? (
+                                  <div className="flex flex-col items-center">
+                                    <span className="text-amber-700 font-bold opacity-75">
+                                      {promptChar}
+                                    </span>
+                                    {/* In Japanese mode: display live Romaji buffer progress */}
+                                    {currentLang === "ja" && romajiBuffer && (
+                                      <span className="text-[10px] font-mono font-black text-amber-900 animate-pulse -mt-1">
+                                        {romajiBuffer}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-stone-300 font-medium">
                                     {promptChar}
                                   </span>
-                                  {/* In Japanese mode: display live Romaji buffer progress */}
-                                  {currentLang === "ja" && romajiBuffer && (
-                                    <span className="text-[10px] font-mono font-black text-amber-900 animate-pulse -mt-1">
-                                      {romajiBuffer}_
-                                    </span>
+                                )}
+                              </div>
+
+                              {/* Romaji guide under Kana for Japanese */}
+                              {currentLang === "ja" && seg.displayRomaji && (
+                                <div className="absolute bottom-1 font-mono text-[9px] text-stone-400">
+                                  {isTyped ? (
+                                    <span className="text-emerald-600 font-bold">✓</span>
+                                  ) : isActive ? (
+                                    <span className="text-amber-700 font-bold">{seg.displayRomaji}</span>
+                                  ) : (
+                                    <span>{promptMode === "guided" ? seg.displayRomaji : ""}</span>
                                   )}
                                 </div>
-                              ) : (
-                                <span className="text-stone-300 font-medium">
-                                  {promptChar}
-                                </span>
+                              )}
+
+                              {/* Bottom guide marker for Latin */}
+                              {currentLang !== "ja" && (
+                                <div className="absolute bottom-1 text-[9px] font-mono">
+                                  {isTyped ? (
+                                    <span className="text-emerald-600 font-bold">✓</span>
+                                  ) : isActive ? (
+                                    <span className="text-amber-600 font-black animate-pulse">▲</span>
+                                  ) : (
+                                    <span className="text-stone-300">_</span>
+                                  )}
+                                </div>
                               )}
                             </div>
-
-                            {/* Romaji guide under Kana for Japanese */}
-                            {currentLang === "ja" && seg.displayRomaji && (
-                              <div className="absolute bottom-1 font-mono text-[9px] text-stone-400">
-                                {isTyped ? (
-                                  <span className="text-emerald-600 font-bold">✓</span>
-                                ) : isActive ? (
-                                  <span className="text-amber-700 font-bold">{seg.displayRomaji}</span>
-                                ) : (
-                                  <span>{promptMode === "guided" ? seg.displayRomaji : ""}</span>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Bottom guide marker for Latin */}
-                            {currentLang !== "ja" && (
-                              <div className="absolute bottom-1 text-[9px] font-mono">
-                                {isTyped ? (
-                                  <span className="text-emerald-600 font-bold">✓</span>
-                                ) : isActive ? (
-                                  <span className="text-amber-600 font-black animate-pulse">▲</span>
-                                ) : (
-                                  <span className="text-stone-300">_</span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                     </div>
 
                     {/* Virtual Keypad Toolbar */}

@@ -258,6 +258,7 @@ export function resolveJapaneseSpeechPayload(
 }
 
 export type TypingSoundStyle = "crisp" | "typewriter" | "bubble";
+export type AmbientSoundType = "none" | "typewriter" | "paper" | "rain" | "study";
 
 class RetroAudioSynth {
   private ctx: AudioContext | null = null;
@@ -273,6 +274,15 @@ class RetroAudioSynth {
   private isWordSpeaking: boolean = false;
   private lastFullWordRecord: { text: string; time: number } = { text: "", time: 0 };
   private typingSoundStyle: TypingSoundStyle = "crisp";
+
+  // Ambient sound synthesizer properties
+  private activeAmbientType: AmbientSoundType = "none";
+  private ambientVolume: number = 0.35;
+  private ambientGain: GainNode | null = null;
+  private ambientNoiseSource: AudioBufferSourceNode | null = null;
+  private ambientOscillators: OscillatorNode[] = [];
+  private ambientTimer: any = null;
+  private isAmbientPlaying: boolean = false;
 
   constructor() {
     if (typeof window !== "undefined") {
@@ -291,6 +301,19 @@ class RetroAudioSynth {
           // If previously set to "soft" (the muffled sound) or anything else, auto-reset to "crisp"
           this.typingSoundStyle = "crisp";
           localStorage.setItem("typing_sound_style", "crisp");
+        }
+
+        const savedAmbient = localStorage.getItem("katakata_ambient_sound") as string;
+        if (savedAmbient && ["none", "typewriter", "paper", "rain", "study"].includes(savedAmbient)) {
+          this.activeAmbientType = savedAmbient as AmbientSoundType;
+        }
+
+        const savedVol = localStorage.getItem("katakata_ambient_volume");
+        if (savedVol) {
+          const pVol = parseFloat(savedVol);
+          if (!isNaN(pVol) && pVol >= 0.05 && pVol <= 1.0) {
+            this.ambientVolume = pVol;
+          }
         }
       } catch (_) {}
 
@@ -1735,6 +1758,276 @@ class RetroAudioSynth {
       this.droneGain.gain.setValueAtTime(this.droneGain.gain.value, now);
       this.droneGain.gain.linearRampToValueAtTime(this.isMuted ? 0 : 0.02, now + 0.5);
     } catch (e) {}
+  }
+
+  getAmbientType(): AmbientSoundType {
+    return this.activeAmbientType;
+  }
+
+  getAmbientVolume(): number {
+    return this.ambientVolume;
+  }
+
+  setAmbientVolume(vol: number) {
+    this.ambientVolume = Math.max(0.05, Math.min(1.0, vol));
+    try {
+      localStorage.setItem("katakata_ambient_volume", String(this.ambientVolume));
+    } catch (_) {}
+    if (this.ambientGain && this.ctx) {
+      try {
+        const now = this.ctx.currentTime;
+        this.ambientGain.gain.cancelScheduledValues(now);
+        this.ambientGain.gain.setValueAtTime(this.ambientGain.gain.value, now);
+        this.ambientGain.gain.linearRampToValueAtTime(this.isMuted ? 0 : this.ambientVolume * 0.45, now + 0.2);
+      } catch (_) {}
+    }
+  }
+
+  // Starts procedural ambient soundscape
+  startAmbient(type: AmbientSoundType, volume?: number) {
+    if (volume !== undefined) {
+      this.ambientVolume = Math.max(0.05, Math.min(1.0, volume));
+    }
+    this.stopAmbient();
+    this.activeAmbientType = type;
+    try {
+      localStorage.setItem("katakata_ambient_sound", type);
+    } catch (_) {}
+
+    if (type === "none" || this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    try {
+      this.isAmbientPlaying = true;
+      const now = this.ctx.currentTime;
+      this.ambientGain = this.ctx.createGain();
+      const targetGain = this.isMuted ? 0 : this.ambientVolume * 0.45;
+      this.ambientGain.gain.setValueAtTime(0, now);
+      this.ambientGain.gain.linearRampToValueAtTime(targetGain, now + 0.8);
+      this.ambientGain.connect(this.ctx.destination);
+
+      if (type === "rain") {
+        this.startRainAmbience();
+      } else if (type === "study") {
+        this.startStudyAmbience();
+      } else if (type === "typewriter") {
+        this.startTypewriterAmbience();
+      } else if (type === "paper") {
+        this.startPaperAmbience();
+      }
+    } catch (e) {
+      console.warn("Ambient sound init failed:", e);
+    }
+  }
+
+  stopAmbient() {
+    this.isAmbientPlaying = false;
+    if (this.ambientTimer) {
+      clearInterval(this.ambientTimer);
+      clearTimeout(this.ambientTimer);
+      this.ambientTimer = null;
+    }
+
+    if (this.ambientNoiseSource) {
+      try {
+        this.ambientNoiseSource.stop();
+        this.ambientNoiseSource.disconnect();
+      } catch (_) {}
+      this.ambientNoiseSource = null;
+    }
+
+    this.ambientOscillators.forEach((osc) => {
+      try {
+        osc.stop();
+        osc.disconnect();
+      } catch (_) {}
+    });
+    this.ambientOscillators = [];
+
+    if (this.ambientGain && this.ctx) {
+      try {
+        const now = this.ctx.currentTime;
+        this.ambientGain.gain.cancelScheduledValues(now);
+        this.ambientGain.gain.setValueAtTime(this.ambientGain.gain.value, now);
+        this.ambientGain.gain.linearRampToValueAtTime(0, now + 0.3);
+      } catch (_) {}
+      this.ambientGain = null;
+    }
+  }
+
+  // 1. Rain on Window (细雨拍打窗棂 · 柔和舒缓白噪音)
+  private startRainAmbience() {
+    if (!this.ctx || !this.ambientGain) return;
+    try {
+      const bufferSize = this.ctx.sampleRate * 4;
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      let lastOut = 0.0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        lastOut = (lastOut + 0.02 * white) / 1.02;
+        data[i] = lastOut * 3.5;
+      }
+
+      const noiseSource = this.ctx.createBufferSource();
+      noiseSource.buffer = buffer;
+      noiseSource.loop = true;
+
+      const lowpass = this.ctx.createBiquadFilter();
+      lowpass.type = "lowpass";
+      lowpass.frequency.setValueAtTime(850, this.ctx.currentTime);
+      lowpass.Q.setValueAtTime(0.8, this.ctx.currentTime);
+
+      const highpass = this.ctx.createBiquadFilter();
+      highpass.type = "highpass";
+      highpass.frequency.setValueAtTime(140, this.ctx.currentTime);
+
+      const lfo = this.ctx.createOscillator();
+      lfo.type = "sine";
+      lfo.frequency.setValueAtTime(0.2, this.ctx.currentTime);
+      lfo.connect(lowpass.frequency);
+
+      noiseSource.connect(highpass);
+      highpass.connect(lowpass);
+      lowpass.connect(this.ambientGain);
+
+      noiseSource.start();
+      lfo.start();
+      this.ambientNoiseSource = noiseSource;
+      this.ambientOscillators.push(lfo);
+    } catch (_) {}
+  }
+
+  // 2. Vintage Antique Study & Fireplace (古风书斋 · 暖炉微炭与纸墨沉香)
+  private startStudyAmbience() {
+    if (!this.ctx || !this.ambientGain) return;
+    try {
+      const bufferSize = this.ctx.sampleRate * 3;
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        last = (last + 0.02 * white) / 1.02;
+        data[i] = last * 1.8;
+      }
+      const noiseSource = this.ctx.createBufferSource();
+      noiseSource.buffer = buffer;
+      noiseSource.loop = true;
+
+      const lp = this.ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.setValueAtTime(220, this.ctx.currentTime);
+
+      noiseSource.connect(lp);
+      lp.connect(this.ambientGain);
+      noiseSource.start();
+      this.ambientNoiseSource = noiseSource;
+
+      this.ambientTimer = setInterval(() => {
+        if (!this.ctx || !this.ambientGain || !this.isAmbientPlaying) return;
+        if (Math.random() > 0.4) {
+          const crackleTime = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(600 + Math.random() * 800, crackleTime);
+          gain.gain.setValueAtTime(0.0001, crackleTime);
+          gain.gain.linearRampToValueAtTime(0.04 * (this.ambientVolume || 0.4), crackleTime + 0.002);
+          gain.gain.exponentialRampToValueAtTime(0.0001, crackleTime + 0.02);
+          osc.connect(gain);
+          gain.connect(this.ambientGain);
+          osc.start(crackleTime);
+          osc.stop(crackleTime + 0.025);
+        }
+      }, 450);
+    } catch (_) {}
+  }
+
+  // 3. Mechanical Typewriter Room (打字机书房 · 机械轻敲与回车清脆感)
+  private startTypewriterAmbience() {
+    if (!this.ctx || !this.ambientGain) return;
+    try {
+      const humOsc = this.ctx.createOscillator();
+      const humGain = this.ctx.createGain();
+      humOsc.type = "sine";
+      humOsc.frequency.setValueAtTime(110, this.ctx.currentTime);
+      humGain.gain.setValueAtTime(0.02 * this.ambientVolume, this.ctx.currentTime);
+      humOsc.connect(humGain);
+      humGain.connect(this.ambientGain);
+      humOsc.start();
+      this.ambientOscillators.push(humOsc);
+
+      this.ambientTimer = setInterval(() => {
+        if (!this.ctx || !this.ambientGain || !this.isAmbientPlaying) return;
+        const now = this.ctx.currentTime;
+        const burstCount = 2 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < burstCount; i++) {
+          const clickTime = now + i * 0.14;
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(3200 + Math.random() * 600, clickTime);
+          osc.frequency.exponentialRampToValueAtTime(800, clickTime + 0.012);
+          g.gain.setValueAtTime(0.0001, clickTime);
+          g.gain.linearRampToValueAtTime(0.08 * (this.ambientVolume || 0.4), clickTime + 0.002);
+          g.gain.exponentialRampToValueAtTime(0.0001, clickTime + 0.015);
+          osc.connect(g);
+          g.connect(this.ambientGain);
+          osc.start(clickTime);
+          osc.stop(clickTime + 0.02);
+        }
+      }, 3200);
+    } catch (_) {}
+  }
+
+  // 4. Paper Rustling & Page Turning (古风书卷 · 宣纸轻翻与翻书沙沙声)
+  private startPaperAmbience() {
+    if (!this.ctx || !this.ambientGain) return;
+    try {
+      this.ambientTimer = setInterval(() => {
+        if (!this.ctx || !this.ambientGain || !this.isAmbientPlaying) return;
+        this.playPaperRustle(0.12 * (this.ambientVolume || 0.4));
+      }, 3800);
+    } catch (_) {}
+  }
+
+  // Play realistic paper rustle sound effect (for card flipping or ambient)
+  playPaperRustle(volume?: number) {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const vol = volume !== undefined ? volume : 0.18;
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.22);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * 0.7;
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.setValueAtTime(1800, now);
+      bp.frequency.exponentialRampToValueAtTime(3200, now + 0.12);
+      bp.Q.setValueAtTime(1.4, now);
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(vol, now + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+
+      noise.connect(bp);
+      bp.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      noise.start(now);
+      noise.stop(now + 0.22);
+    } catch (_) {}
   }
 }
 

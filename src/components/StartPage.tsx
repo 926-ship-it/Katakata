@@ -637,7 +637,7 @@ export const StartPage: React.FC<StartPageProps> = ({
                 “每天沉浸练习几分钟，指尖肌肉记忆、水滴石穿”
               </div>
               <p className="text-xs text-stone-500 font-sans mt-1 tracking-wide leading-relaxed">
-                包含：🇪🇸 西班牙语必背 2800 词 · 🇯🇵 日语五十音与名曲歌词 · 🇬🇧 英语核心词汇与短文
+                包含：🇬🇧 英语全阶词库（幼小启蒙 / 初高中必背 / 大学考研雅思 / 外贸商务）· 🇪🇸 西语 2800 词 · 🇯🇵 日语五十音与抒情名曲
               </p>
             </div>
 
@@ -1514,6 +1514,41 @@ export const StartPage: React.FC<StartPageProps> = ({
             <div className="flex flex-wrap items-center gap-1.5">
               {[
                 { id: "all", label: "全部词库", count: activeDict.length },
+                { 
+                  id: "en_kids", 
+                  label: "🎈 幼小启蒙", 
+                  count: activeDict.filter(it => it.category === "en_kids").length 
+                },
+                { 
+                  id: "en_highschool", 
+                  label: "🎒 初高中必背", 
+                  count: activeDict.filter(it => it.category === "en_highschool").length 
+                },
+                { 
+                  id: "en_college", 
+                  label: "🎓 大学与考研", 
+                  count: activeDict.filter(it => it.category === "en_college").length 
+                },
+                { 
+                  id: "en_trade", 
+                  label: "🚢 外贸商务", 
+                  count: activeDict.filter(it => it.category === "en_trade").length 
+                },
+                { 
+                  id: "fairy", 
+                  label: "🧚 童话仙境", 
+                  count: activeDict.filter(it => it.category === "fairy").length 
+                },
+                { 
+                  id: "poetry", 
+                  label: "📜 抒情诗歌", 
+                  count: activeDict.filter(it => it.category === "poetry").length 
+                },
+                { 
+                  id: "music", 
+                  label: "🎵 流行与乐章", 
+                  count: activeDict.filter(it => it.category === "music").length 
+                },
                 { 
                   id: "celebrity", 
                   label: "🌟 影视流行名人", 

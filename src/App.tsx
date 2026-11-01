@@ -786,11 +786,11 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-macaron-canvas text-stone-800 font-sans pb-12 transition-colors">
+    <div className={`min-h-screen bg-macaron-canvas text-stone-800 font-sans transition-colors ${currentPage === "training" ? "pb-2" : "pb-12"}`}>
       {/* Upper Navigation Header (Can be hidden in full immersion mode) */}
       {(!isFullscreen || !hideInAppHeader) && (
         <header className="bg-white/85 backdrop-blur-md border-b border-pink-200/80 sticky top-0 z-40 select-none transition-all duration-300 shadow-xs">
-          <div className="max-w-4xl mx-auto px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-1 sm:gap-2">
+          <div className={`max-w-4xl mx-auto px-2 sm:px-4 ${currentPage === "training" ? "py-1 sm:py-1.5" : "py-2 sm:py-3"} flex items-center justify-between gap-1 sm:gap-2`}>
             <div 
               onClick={() => { setCurrentPage("start"); setActiveCards([]); setIsDrawerOpen(false); }} 
               className="flex items-center gap-1.5 cursor-pointer shrink-0"
@@ -1334,7 +1334,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Pages Container with smooth animations */}
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className={`max-w-4xl mx-auto px-2 sm:px-4 ${currentPage === "training" ? "py-1 sm:py-2" : "py-8"}`}>
         <AnimatePresence mode="wait">
           {currentPage === "start" && (
             <motion.div

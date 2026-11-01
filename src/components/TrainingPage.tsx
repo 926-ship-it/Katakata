@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Keyboard, ArrowLeft, RefreshCw, Volume2, VolumeX, AlertTriangle, Play, Pause, AlertCircle, HelpCircle, ChevronLeft, ChevronRight, PenTool, Maximize2, Minimize2, Zap, BookOpen } from "lucide-react";
 import { DictionaryItem } from "../data/dictionary";
 import { TracingKana } from "./TracingKana";
-import { audioSynth, TypingSoundStyle } from "../utils/audio";
+import { audioSynth, TypingSoundStyle, AmbientSoundType } from "../utils/audio";
 import { CardIllustration } from "./CardIllustration";
 import { CalligraphyCanvas } from "./CalligraphyCanvas";
 import { uiTranslate, LANG_MAPPING } from "../utils/lang";
@@ -11,6 +11,8 @@ import { SessionTrendChart } from "./SessionTrendChart";
 import { saveSessionLog } from "../utils/sessionLogs";
 import { getEnglishPhonetic } from "../utils/englishPhonetics";
 import { DailyZineModal } from "./DailyZineModal";
+import { ColoredSyllableWord } from "./ColoredSyllableWord";
+import { mapWordSegmentsToSyllables, splitWordIntoSyllables, getSyllableColor } from "../utils/syllableColorHelper";
 
 
 interface TrainingPageProps {
@@ -68,6 +70,31 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   const [speechRate, setSpeechRate] = useState<number>(() => audioSynth.getSpeechRate());
   const [typingSoundStyle, setTypingSoundStyle] = useState<TypingSoundStyle>(() => audioSynth.getTypingSoundStyle());
 
+  // Ambient soundscape states (雨落窗棂、打字机书房、古风书斋、翻书沙沙声)
+  const [ambientType, setAmbientType] = useState<AmbientSoundType>(() => audioSynth.getAmbientType());
+  const [ambientVolume, setAmbientVolume] = useState<number>(() => audioSynth.getAmbientVolume());
+  const [showAmbientMenu, setShowAmbientMenu] = useState<boolean>(false);
+
+  // Synchronize ambient audio lifecycle during full-screen or standard practice
+  useEffect(() => {
+    if (ambientType !== "none" && !isPaused && !timerFinished && !muted) {
+      audioSynth.startAmbient(ambientType, ambientVolume);
+    } else {
+      audioSynth.stopAmbient();
+    }
+    return () => {
+      audioSynth.stopAmbient();
+    };
+  }, [ambientType, isPaused, timerFinished, muted, ambientVolume]);
+
+  const AMBIENT_OPTIONS: { id: AmbientSoundType; label: string; icon: string; desc: string }[] = [
+    { id: "none", label: "无白噪音", icon: "🔇", desc: "静心练习，仅敲击音效" },
+    { id: "rain", label: "雨落窗棂", icon: "🌧️", desc: "细雨拍打 Art Nouveau 彩窗" },
+    { id: "study", label: "古风书斋", icon: "🕯️", desc: "暖炉微炭与沉浸式书斋" },
+    { id: "typewriter", label: "打字机室", icon: "⌨️", desc: "机械轻敲与滚轮回车氛围" },
+    { id: "paper", label: "古风书卷", icon: "📜", desc: "宣纸轻翻与翻书沙沙声" },
+  ];
+
   const handleCycleSpeechRate = () => {
     const rates = [1.0, 1.25, 1.5, 1.75, 0.8];
     const current = audioSynth.getSpeechRate();
@@ -101,6 +128,47 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   const [handwritingPassed, setHandwritingPassed] = useState<boolean>(false);
   const [isZineOpen, setIsZineOpen] = useState<boolean>(false);
 
+  // Virtual Keyboard collapsible state (saves ~220px vertical space to keep entire word card in view)
+  const [showVirtualKeyboard, setShowVirtualKeyboard] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem("fifty_sound_show_vk");
+      if (saved !== null) return saved === "true";
+      return true;
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleVirtualKeyboard = () => {
+    setShowVirtualKeyboard((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("fifty_sound_show_vk", String(next));
+      } catch (_) {}
+      return next;
+    });
+  };
+
+  // Phonics Syllable Color-Coding (e.g. TODAY: to in green, day in red)
+  const [showSyllableColor, setShowSyllableColor] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem("fifty_sound_syllable_color");
+      if (saved !== null) return saved === "true";
+      return true; // Enabled by default to guide phonics chunking
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleSyllableColor = () => {
+    setShowSyllableColor((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("fifty_sound_syllable_color", String(next));
+      } catch (_) {}
+      return next;
+    });
+  };
 
   // Game/RPG Arcade States
   const [combo, setCombo] = useState<number>(0);
@@ -183,6 +251,11 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
   const currentSegmentIdxRef = useRef<number>(0);
   const romajiProgressRef = useRef<string>("");
   const completedSegmentsCountRef = useRef<number>(0);
+
+  // Scroll to the very top upon entering training mode so full card and countdown are immediately visible
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, []);
 
   // Automatically keep keyboard focus on initial mount if desired, but NEVER re-focus on currentItemIdx changes
   // Calling .focus() on item transitions causes mobile WebKit/Chrome to violently scroll to the top!
@@ -574,7 +647,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
   return (
     <div 
-      className="max-w-3xl mx-auto space-y-2.5 sm:space-y-6 px-2 md:px-0 relative"
+      className="max-w-3xl mx-auto space-y-1 sm:space-y-2.5 px-1.5 md:px-0 relative"
       onClick={() => {
         if (practiceMode !== "handwriting" && !isPaused && !timerFinished && !showQuitConfirm) {
           const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
@@ -584,6 +657,27 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         }
       }}
     >
+      {/* Hidden input placed at top-0 left-0: guarantees focusing will never trigger browser downward scroll! */}
+      <input
+        ref={inputRef}
+        type="text"
+        value=""
+        onChange={(e) => {
+          const val = e.target.value;
+          if (val.length > 0) {
+            const lastChar = val[val.length - 1];
+            processInputKey(lastChar.toLowerCase());
+          }
+          e.target.value = "";
+        }}
+        className="fixed top-0 left-0 w-1 h-1 opacity-0 pointer-events-none -z-50"
+        aria-hidden="true"
+        autoCapitalize="none"
+        autoCorrect="off"
+        autoComplete="off"
+        spellCheck={false}
+      />
+
       {/* Universal Floating Exit Button: always visible & clickable at all times */}
       <button
         type="button"
@@ -601,15 +695,15 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         <span>退出训练 (Esc)</span>
       </button>
 
-      {/* Upper bar: Quit & Controls */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      {/* Upper bar: Quit & Controls (Compact responsive flex wrap) */}
+      <div className="flex flex-wrap items-center justify-between gap-1 sm:gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             onClick={() => setShowQuitConfirm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-300 text-stone-700 bg-white hover:bg-red-50 hover:border-red-300 hover:text-red-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-stone-300 text-stone-700 bg-white hover:bg-red-50 hover:border-red-300 hover:text-red-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
             title="退出训练"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-3.5 h-3.5" />
             <span>退出练习</span>
           </button>
 
@@ -622,7 +716,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                 setTimerFinished(true);
                 audioSynth.playTimeCompleted();
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold transition-all cursor-pointer shadow-2xs"
               title="提前达成练习目标并结算生成成长轨迹"
             >
               <span>🏁 提前结算 ({completedRounds}轮)</span>
@@ -630,13 +724,13 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
           {/* Phonetic toggle for English mode */}
           {isEnglishMode && (
             <button
               type="button"
               onClick={() => setShowPhonetic(prev => !prev)}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95 ${
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95 ${
                 showPhonetic
                   ? "border-amber-400 bg-amber-50 text-amber-900"
                   : "border-stone-300 bg-white text-stone-500 hover:bg-stone-50"
@@ -657,25 +751,57 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                 return next;
               });
             }}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95 ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95 ${
               showMeaning
                 ? "border-amber-400 bg-amber-50 text-amber-900"
                 : "border-stone-300 bg-white text-stone-500 hover:bg-stone-50"
             }`}
             title={showMeaning ? "点击隐藏词意显示" : "点击开启词意显示"}
           >
-            <BookOpen className="w-3.5 h-3.5 text-amber-700" />
+            <BookOpen className="w-3 h-3 text-amber-700" />
             <span>{showMeaning ? "词意: 显" : "词意: 隐"}</span>
           </button>
+
+          {/* Phonics Syllable Color-Coding Toggle (e.g. TODAY -> to in green, day in red) */}
+          <button
+            type="button"
+            onClick={toggleSyllableColor}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95 ${
+              showSyllableColor
+                ? "border-emerald-500 bg-emerald-50 text-emerald-900"
+                : "border-stone-300 bg-white text-stone-500 hover:bg-stone-50"
+            }`}
+            title={showSyllableColor ? "音节分色已开启 (如 TODAY: to绿/day红)，点击可切换单色" : "点击开启音节分色助记 (不同音节不同色彩)"}
+          >
+            <span>🎨</span>
+            <span>{showSyllableColor ? "音节: 分色" : "音节: 单色"}</span>
+          </button>
+
+          {/* Virtual Keyboard Collapse/Expand Toggle (Saves 220px to show 100% of card) */}
+          {practiceMode !== "handwriting" && (
+            <button
+              type="button"
+              onClick={toggleVirtualKeyboard}
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95 ${
+                showVirtualKeyboard
+                  ? "border-amber-400 bg-amber-50 text-amber-900"
+                  : "border-stone-300 bg-white text-stone-500 hover:bg-stone-50"
+              }`}
+              title={showVirtualKeyboard ? "收起虚拟按键，节省垂直空间，一屏完整尽收眼底" : "展开虚拟按键"}
+            >
+              <Keyboard className="w-3 h-3 text-amber-700" />
+              <span>{showVirtualKeyboard ? "按键: 显" : "按键: 隐"}</span>
+            </button>
+          )}
 
           {/* Quick Speech Rate Cycler */}
           <button
             type="button"
             onClick={handleCycleSpeechRate}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-stone-300 bg-white hover:bg-amber-50 text-stone-700 text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+            className="flex items-center gap-0.5 px-2 py-1 rounded-lg border border-stone-300 bg-white hover:bg-amber-50 text-stone-700 text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
             title={`点击循环调整朗读语速 (当前: ${speechRate}x)`}
           >
-            <Zap className="w-3.5 h-3.5 text-amber-600" />
+            <Zap className="w-3 h-3 text-amber-600" />
             <span>{speechRate}x</span>
           </button>
 
@@ -683,12 +809,100 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
           <button
             type="button"
             onClick={handleCycleTypingSound}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-stone-300 bg-white hover:bg-amber-50 text-stone-700 text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg border border-stone-300 bg-white hover:bg-amber-50 text-stone-700 text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
             title={`点击切换击键音效 (当前: ${typingSoundStyle === "crisp" ? "清脆青轴" : typingSoundStyle === "typewriter" ? "复古打字机" : "水滴气泡"})`}
           >
-            <Keyboard className="w-3.5 h-3.5 text-amber-600" />
-            <span>{typingSoundStyle === "crisp" ? "清脆青轴" : typingSoundStyle === "typewriter" ? "打字机" : "水滴气泡"}</span>
+            <span>{typingSoundStyle === "crisp" ? "青轴" : typingSoundStyle === "typewriter" ? "打字机" : "水滴"}</span>
           </button>
+
+          {/* Ambient Soundscape White Noise Switcher (环境白噪音) */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowAmbientMenu(prev => !prev)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs active:scale-95 ${
+                ambientType !== "none"
+                  ? "border-pink-400 bg-pink-100 text-pink-900 shadow-sm"
+                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+              }`}
+              title="设置练习背景环境音效与白噪音（雨声、古风书斋、打字机、宣纸翻书）"
+            >
+              <span>{ambientType === "none" ? "🎧" : ambientType === "rain" ? "🌧️" : ambientType === "study" ? "🕯️" : ambientType === "typewriter" ? "⌨️" : "📜"}</span>
+              <span className="hidden sm:inline">环境:</span>
+              <span>{ambientType === "none" ? "无" : ambientType === "rain" ? "窗雨" : ambientType === "study" ? "书斋" : ambientType === "typewriter" ? "打字机" : "翻书"}</span>
+            </button>
+
+            {/* Dropdown Menu */}
+            {showAmbientMenu && (
+              <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl border-2 border-stone-850 shadow-[4px_4px_0px_#2E2530] p-3 z-50 text-stone-800 space-y-2 select-none animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center justify-between border-b border-stone-200 pb-1.5">
+                  <span className="font-sans font-bold text-xs text-stone-900 flex items-center gap-1">
+                    <span>🎧</span>
+                    <span>沉浸环境音效</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowAmbientMenu(false)}
+                    className="text-stone-400 hover:text-stone-700 text-xs font-bold px-1 py-0.5 rounded cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Sound options list */}
+                <div className="space-y-1">
+                  {AMBIENT_OPTIONS.map((opt) => {
+                    const isSel = ambientType === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          setAmbientType(opt.id);
+                          audioSynth.startAmbient(opt.id, ambientVolume);
+                        }}
+                        className={`w-full text-left p-1.5 rounded-xl border text-xs transition-all flex items-start gap-2 cursor-pointer ${
+                          isSel
+                            ? "bg-pink-100/90 border-pink-400 text-pink-950 font-bold"
+                            : "bg-stone-50/70 border-stone-200 hover:bg-pink-50/50 text-stone-700"
+                        }`}
+                      >
+                        <span className="text-base shrink-0">{opt.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[11px] leading-tight">{opt.label}</div>
+                          <div className="text-[9.5px] text-stone-500 font-normal leading-tight truncate">{opt.desc}</div>
+                        </div>
+                        {isSel && <span className="text-pink-600 font-black text-xs">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Volume slider */}
+                {ambientType !== "none" && (
+                  <div className="pt-2 border-t border-stone-200 space-y-1">
+                    <div className="flex justify-between items-center text-[10px] text-stone-500 font-mono">
+                      <span>环境音量</span>
+                      <span>{Math.round(ambientVolume * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.05"
+                      max="1.0"
+                      step="0.05"
+                      value={ambientVolume}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value);
+                        setAmbientVolume(v);
+                        audioSynth.setAmbientVolume(v);
+                      }}
+                      className="w-full accent-pink-500 cursor-pointer h-1.5 bg-stone-200 rounded-lg"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {onToggleFullscreen && (
             <button
@@ -716,19 +930,19 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
         </div>
       </div>
 
-      {/* Main retro Terminal casing */}
-      <div ref={mainTerminalRef} className={`p-3 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 relative scroll-mt-6 ${
+      {/* Main retro Terminal casing (Compact, responsive padding to fit viewport) */}
+      <div ref={mainTerminalRef} className={`p-2 sm:p-3.5 md:p-4 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 relative scroll-mt-2 ${
         errorFlash 
           ? "border-red-600 bg-red-50/20 shadow-[0_0_20px_rgba(239,68,68,0.25)]" 
           : "border-stone-800 bg-stone-50 shadow-md"
       }`}>
         
         {/* Top ribbon: Clock and Score counter */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-4 pb-2 sm:pb-4 border-b border-stone-300 items-center">
-          <div className="space-y-0.5 sm:space-y-1">
-            <div className="text-[8px] sm:text-[10px] font-mono text-stone-500 tracking-wider">RETRO TERMINAL COUNTDOWN</div>
-            <div className="flex items-center gap-2 sm:gap-3">
-              <span className={`text-xl sm:text-3xl md:text-4xl font-mono font-black ${
+        <div className="grid grid-cols-2 gap-1.5 sm:gap-3 pb-1.5 sm:pb-2.5 border-b border-stone-300 items-center">
+          <div className="space-y-0.5">
+            <div className="text-[7.5px] sm:text-[9px] font-mono text-stone-500 tracking-wider">RETRO TERMINAL COUNTDOWN</div>
+            <div className="flex items-center gap-1.5 sm:gap-2.5">
+              <span className={`text-lg sm:text-2xl md:text-3xl font-mono font-black ${
                 timeLeftMs < 30000 && !isPaused ? "text-red-600 animate-pulse font-extrabold" : "text-stone-900"
               }`}>
                 {formatTime(timeLeftMs)}
@@ -736,30 +950,30 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
               <button
                 onClick={handleTogglePause}
                 disabled={timerFinished}
-                className={`px-3 py-1 rounded text-xs font-bold flex items-center gap-1 cursor-pointer ${
+                className={`px-2.5 py-0.5 sm:py-1 rounded text-[11px] sm:text-xs font-bold flex items-center gap-1 cursor-pointer ${
                   isPaused 
                     ? "bg-emerald-600 hover:bg-emerald-700 text-stone-50" 
                     : "bg-amber-600 hover:bg-amber-700 text-stone-900"
                 }`}
               >
-                {isPaused ? <Play className="w-3.5 h-3.5 fill-current" /> : <Pause className="w-3.5 h-3.5" />}
+                {isPaused ? <Play className="w-3 h-3 fill-current" /> : <Pause className="w-3 h-3" />}
                 <span>{isPaused ? "继续" : "暂停"}</span>
               </button>
             </div>
           </div>
 
-          <div className="text-right space-y-0.5 sm:space-y-1">
-            <div className="text-[8px] sm:text-[10px] font-mono text-stone-500 tracking-wider">COMPLETED ROUNDS</div>
-            <div className="text-xl sm:text-3xl md:text-4xl font-extrabold font-serif text-indigo-900">
-              {completedRounds} <span className="text-xs sm:text-sm font-sans font-medium text-stone-500">轮</span>
+          <div className="text-right space-y-0.5">
+            <div className="text-[7.5px] sm:text-[9px] font-mono text-stone-500 tracking-wider">COMPLETED ROUNDS</div>
+            <div className="text-lg sm:text-2xl md:text-3xl font-extrabold font-serif text-indigo-900">
+              {completedRounds} <span className="text-xs font-sans font-medium text-stone-500">轮</span>
             </div>
           </div>
         </div>
 
         {/* If group training, show queue progress indicator */}
         {items.length > 1 && (
-          <div className="flex flex-wrap items-center justify-center gap-1.5 pb-2 sm:pb-4 pt-2 sm:pt-4 border-b border-stone-200 select-none">
-            <span className="text-[8px] sm:text-[9px] font-mono font-bold text-stone-400 uppercase tracking-widest mr-1">
+          <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-1.5 py-1 sm:py-1.5 border-b border-stone-200 select-none">
+            <span className="text-[7.5px] sm:text-[8.5px] font-mono font-bold text-stone-400 uppercase tracking-widest mr-1">
               联训序列:
             </span>
             {items.map((it, idx) => {
@@ -767,7 +981,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
               return (
                 <div
                   key={it.id}
-                  className={`px-3 py-1 rounded-xl text-xs transition-all font-serif font-black ${
+                  className={`px-2 sm:px-2.5 py-0.5 rounded-lg text-[11px] sm:text-xs transition-all font-serif font-black ${
                     isActive
                       ? "bg-amber-500 text-stone-950 scale-105 shadow-sm border border-amber-600 animate-pulse"
                       : "bg-stone-200 text-stone-500 border border-stone-300 opacity-60"
@@ -780,8 +994,8 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
           </div>
         )}
 
-        {/* Dynamic Card Slider Carousel Area */}
-        <div className="relative overflow-hidden my-2 sm:my-4 min-h-[240px] sm:min-h-[300px] py-3 sm:py-6 flex items-center justify-between px-1 sm:px-12 bg-white/40 rounded-xl sm:rounded-2xl border border-stone-200 shadow-inner">
+        {/* Dynamic Card Slider Carousel Area (Compact height & padding) */}
+        <div className="relative overflow-hidden my-1 sm:my-2 min-h-[160px] sm:min-h-[190px] py-1.5 sm:py-2.5 flex items-center justify-between px-1 sm:px-6 bg-white/40 rounded-xl sm:rounded-2xl border border-stone-200 shadow-inner">
           
           {/* Slide Left Button */}
           <button
@@ -873,20 +1087,92 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                     </button>
                   </div>
 
-                  {/* Target Word Main Title Display */}
-                  <div className="mt-1 flex items-baseline justify-center gap-2 flex-wrap">
-                    <span 
-                      className="text-2xl sm:text-3xl md:text-4xl font-black text-stone-900 font-serif tracking-wide drop-shadow-2xs select-none"
-                      style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
-                    >
-                      {item.kanji}
-                    </span>
-                    {!isEnglishMode && item.kanaStr && item.kanaStr !== item.kanji && (
-                      <span className="text-sm sm:text-base font-serif font-bold text-amber-800/90 select-none">
-                        ({item.kanaStr})
-                      </span>
-                    )}
-                  </div>
+                  {/* Target Word Main Title Display with Multilingual Syllable Color-Coding (English, Spanish & Japanese) */}
+                  {(() => {
+                    const itemLang: "en" | "ja" | "es" = (item as any).lang || (isEnglishMode ? "en" : /^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s\-_.'’]+$/.test(item.kanji) ? "es" : "ja");
+                    const syllables = splitWordIntoSyllables(item.kanji, itemLang);
+
+                    return (
+                      <div className="mt-1 flex flex-col items-center justify-center">
+                        <div className="flex items-baseline justify-center gap-2 flex-wrap">
+                          {showSyllableColor ? (
+                            <ColoredSyllableWord
+                              word={item.kanji}
+                              kanaStr={item.kanaStr}
+                              lang={itemLang}
+                              showDots={itemLang !== "ja"}
+                              className="text-2xl sm:text-3xl md:text-4xl font-black font-serif tracking-wide drop-shadow-2xs select-none"
+                            />
+                          ) : (
+                            <span 
+                              className="text-2xl sm:text-3xl md:text-4xl font-black text-stone-900 font-serif tracking-wide drop-shadow-2xs select-none"
+                              style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
+                            >
+                              {item.kanji}
+                            </span>
+                          )}
+
+                          {/* Japanese Kana Furigana Reading Display with matching mora colors */}
+                          {itemLang === "ja" && item.kanaStr && item.kanaStr !== item.kanji && (
+                            <span className="text-sm sm:text-base font-serif font-bold text-stone-700 select-none flex items-center">
+                              <span>(</span>
+                              {showSyllableColor ? (
+                                <span className="inline-flex items-baseline">
+                                  {item.segments.map((seg, sIdx) => {
+                                    const c = getSyllableColor(sIdx);
+                                    return (
+                                      <span key={sIdx} className={`${c.textColor} font-bold`}>
+                                        {seg.kana}
+                                      </span>
+                                    );
+                                  })}
+                                </span>
+                              ) : (
+                                <span className="text-amber-800/90">{item.kanaStr}</span>
+                              )}
+                              <span>)</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Syllable / Mora breakdown badges below multi-syllable word */}
+                        {showSyllableColor && (
+                          <div className="mt-1 flex items-center justify-center gap-1 flex-wrap select-none">
+                            {itemLang === "ja" ? (
+                              item.segments.length > 1 && item.segments.map((seg, sIdx) => {
+                                const sylColor = getSyllableColor(sIdx);
+                                return (
+                                  <span
+                                    key={sIdx}
+                                    className={`text-[9px] sm:text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full border ${sylColor.badgeColor} shadow-2xs`}
+                                    title={`第 ${sIdx + 1} 拍 (Mora): ${seg.kana} (${seg.displayRomaji})`}
+                                  >
+                                    {seg.kana} <span className="opacity-70 text-[8px]">{seg.displayRomaji}</span>
+                                  </span>
+                                );
+                              })
+                            ) : (
+                              syllables.filter(s => s !== " " && !/^\s+$/.test(s)).length > 1 && (
+                                syllables.map((syl, sIdx) => {
+                                  if (syl === " " || /^\s+$/.test(syl)) return null;
+                                  const sylColor = getSyllableColor(sIdx);
+                                  return (
+                                    <span
+                                      key={sIdx}
+                                      className={`text-[9px] sm:text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full border ${sylColor.badgeColor} shadow-2xs`}
+                                      title={`音节 ${sIdx + 1}: ${syl}`}
+                                    >
+                                      {syl}
+                                    </span>
+                                  );
+                                })
+                              )
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* English Mode Phonetic Symbol (IPA) Badge */}
                   {isEnglishMode && showPhonetic && (item.phonetic || getEnglishPhonetic(item.kanji)) && (
@@ -998,30 +1284,43 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                   </div>
                 ) : (
                   <>
-                    {/* Gridded TracingKana slots array */}
-                    <div className={`flex items-center justify-center py-2 max-w-full ${
-                      isEnglishMode 
-                        ? "flex-nowrap gap-1 sm:gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-1" 
-                        : "flex-wrap gap-2.5 sm:gap-4"
-                    }`}>
-                      {item.segments.map((segment, idx) => {
-                        const isCorrectSegment = wordCorrect || idx < currentSegmentIdx;
-                        const isActiveSegment = !wordCorrect && idx === currentSegmentIdx;
-                        const currentTypingProgress = isActiveSegment ? romajiProgress : "";
+                    {/* Gridded TracingKana slots array with Syllable Color-Coding (Japanese Mora, Spanish & English) */}
+                    {(() => {
+                      const itemLang: "en" | "ja" | "es" = (item as any).lang 
+                        ? (item as any).lang 
+                        : (isEnglishMode ? "en" : /^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s\-_.'’]+$/.test(item.kanji) ? "es" : "ja");
+                      const segmentSyllableMap = showSyllableColor
+                        ? mapWordSegmentsToSyllables(item.kanji, item.segments.length, itemLang)
+                        : [];
 
-                        return (
-                          <TracingKana
-                            key={idx}
-                            kana={segment.kana}
-                            displayRomaji={segment.displayRomaji}
-                            romajiProgress={currentTypingProgress}
-                            isCorrect={isCorrectSegment}
-                            active={isActiveSegment}
-                            isEnglishMode={isEnglishMode}
-                          />
-                        );
-                      })}
-                    </div>
+                      return (
+                        <div className={`flex items-center justify-center py-2 max-w-full ${
+                          isEnglishMode 
+                            ? "flex-nowrap gap-1 sm:gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-1" 
+                            : "flex-wrap gap-2.5 sm:gap-4"
+                        }`}>
+                          {item.segments.map((segment, idx) => {
+                            const isCorrectSegment = wordCorrect || idx < currentSegmentIdx;
+                            const isActiveSegment = !wordCorrect && idx === currentSegmentIdx;
+                            const currentTypingProgress = isActiveSegment ? romajiProgress : "";
+                            const syllableInfo = segmentSyllableMap[idx];
+
+                            return (
+                              <TracingKana
+                                key={idx}
+                                kana={segment.kana}
+                                displayRomaji={segment.displayRomaji}
+                                romajiProgress={currentTypingProgress}
+                                isCorrect={isCorrectSegment}
+                                active={isActiveSegment}
+                                isEnglishMode={isEnglishMode}
+                                syllableColor={syllableInfo?.color}
+                              />
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
 
                     {/* Guidelines info label under input block */}
                     <div className={`text-[10px] sm:text-xs px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border transition-all font-mono select-none ${
@@ -1075,169 +1374,177 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
           </button>
         </div>
 
-        {/* The Retro Mechanical Keyboard Emulator */}
+        {/* The Retro Mechanical Keyboard Emulator (Collapsible to guarantee zero-scroll viewport fitting) */}
         {practiceMode !== "handwriting" && (
-          <div className="mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-stone-300 space-y-1 sm:space-y-2">
-            <div className="text-center text-[8px] sm:text-[10px] font-mono text-stone-400 tracking-wider select-none">
-              VIRTUAL TYPEWRITER PRESSURE PLATES
-            </div>
-            
-            <div className="flex flex-col gap-1 sm:gap-1.5 max-w-lg mx-auto bg-stone-900 p-1.5 sm:p-3 rounded-lg sm:rounded-xl border border-stone-700 shadow-inner">
-              {KEYBOARD_ROWS.map((row, rowIdx) => (
-                <div key={rowIdx} className="flex justify-center gap-1">
-                  {row.map((char) => {
-                    const isPressed = pressedKey === char;
-                    
-                    // Highlight keys that could be next character targets
-                    const isGuideKey = !isPaused && !timerFinished && !wordCorrect &&
-                      Boolean(currentSegment?.romaji?.some(
-                        r => r.startsWith(romajiProgress) && 
-                        r[romajiProgress.length]?.toUpperCase() === char
-                      ));
-
-                    return (
-                      <motion.button
-                        key={char}
-                        whileTap={{ scale: 0.85 }}
-                        animate={{
-                          scale: isPressed ? 0.9 : 1,
-                          y: isPressed ? 2 : 0,
-                        }}
-                        onClick={() => {
-                          processInputKey(char.toLowerCase());
-                        }}
-                        className={`w-6 h-6 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center rounded text-[9px] sm:text-xs font-mono font-bold transition-all select-none cursor-pointer ${
-                          isPressed
-                            ? "bg-amber-500 text-stone-950 shadow-inner"
-                            : isGuideKey
-                            ? "bg-emerald-950 text-emerald-400 border border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse"
-                            : "bg-stone-800 text-stone-300 border border-stone-700 hover:bg-stone-750"
-                        }`}
-                      >
-                        {char}
-                      </motion.button>
-                    );
-                  })}
-                </div>
-              ))}
-
-              {isEnglishMode && (
-                <div className="flex justify-center items-center gap-1.5 sm:gap-2 mt-1">
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    animate={{
-                      scale: pressedKey === "SPACE" ? 0.95 : 1,
-                      y: pressedKey === "SPACE" ? 2 : 0,
-                    }}
-                    onClick={() => {
-                      if (isPaused) {
-                        handleTogglePause();
-                        return;
-                      }
-                      if ((wordCorrect || isPronouncing) && advanceRoundRef.current) {
-                        advanceRoundRef.current();
-                        return;
-                      }
-                      processInputKey(" ");
-                    }}
-                    title={
-                      isPaused 
-                        ? "恢复训练 (或按空格键)" 
-                        : (wordCorrect || isPronouncing) 
-                        ? "前往下一词 (或按空格键)" 
-                        : "空格键 (Space)"
-                    }
-                    className={`w-28 sm:w-40 h-5.5 sm:h-7 flex items-center justify-center rounded text-[9px] sm:text-[10px] font-mono font-bold uppercase transition-all select-none border cursor-pointer ${
-                      pressedKey === "SPACE"
-                        ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"
-                        : (!isPaused && !timerFinished && !wordCorrect && Boolean(currentSegment?.romaji?.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === " ")))
-                        ? "bg-emerald-950 text-emerald-400 border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse"
-                        : "bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-750"
-                    }`}
-                  >
-                    {isPaused ? "继续 (Space)" : (wordCorrect || isPronouncing) ? "下一词 (Space)" : "Space"}
-                  </motion.button>
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    animate={{
-                      scale: pressedKey === "." ? 0.95 : 1,
-                      y: pressedKey === "." ? 2 : 0,
-                    }}
-                    onClick={() => {
-                      processInputKey(".");
-                    }}
-                    title="Dot / Period (.)"
-                    className={`w-8 sm:w-10 h-5.5 sm:h-7 flex items-center justify-center rounded text-xs font-mono font-bold transition-all select-none border cursor-pointer ${
-                      pressedKey === "."
-                        ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"
-                        : (!isPaused && !timerFinished && !wordCorrect && Boolean(currentSegment?.romaji?.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === ".")))
-                        ? "bg-emerald-950 text-emerald-400 border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse"
-                        : "bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-750"
-                    }`}
-                  >
-                    .
-                  </motion.button>
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    animate={{
-                      scale: pressedKey === "-" ? 0.95 : 1,
-                      y: pressedKey === "-" ? 2 : 0,
-                    }}
-                    onClick={() => {
-                      processInputKey("-");
-                    }}
-                    title="Hyphen (-)"
-                    className={`w-8 sm:w-10 h-5.5 sm:h-7 flex items-center justify-center rounded text-xs font-mono font-bold transition-all select-none border cursor-pointer ${
-                      pressedKey === "-"
-                        ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"
-                        : (!isPaused && !timerFinished && !wordCorrect && Boolean(currentSegment?.romaji?.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === "-")))
-                        ? "bg-emerald-950 text-emerald-400 border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse"
-                        : "bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-750"
-                    }`}
-                  >
-                    -
-                  </motion.button>
-                </div>
-              )}
-            </div>
-
-            {/* Hidden Input for Mobile Native Keyboard Triggering (Centered without jumping) */}
-            <div className="flex flex-col items-center justify-center pt-1.5 sm:pt-3 gap-1 sm:gap-2 relative">
-              <input
-                ref={inputRef}
-                type="text"
-                value=""
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val.length > 0) {
-                    const lastChar = val[val.length - 1];
-                    processInputKey(lastChar.toLowerCase());
-                  }
-                  e.target.value = "";
-                }}
-                className="opacity-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 pointer-events-none z-0"
-                aria-hidden="true"
-                autoCapitalize="none"
-                autoCorrect="off"
-                autoComplete="off"
-                spellCheck={false}
-              />
+          <div className="mt-1.5 sm:mt-2 pt-1.5 sm:pt-2 border-t border-stone-300 space-y-1">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[7.5px] sm:text-[9px] font-mono text-stone-500 font-bold uppercase tracking-wider select-none flex items-center gap-1">
+                  <span>⌨️</span>
+                  <span>VIRTUAL TYPEWRITER</span>
+                </span>
+                <span className="hidden sm:inline text-[8.5px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                  支持实体键盘直接打字
+                </span>
+              </div>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  audioSynth.playCardSlide();
-                  inputRef.current?.focus({ preventScroll: true });
-                }}
-                className="md:hidden relative z-10 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-95 transition-all"
+                onClick={toggleVirtualKeyboard}
+                className="text-[10px] sm:text-[11px] font-serif font-bold text-amber-800 hover:text-amber-950 px-2 py-0.5 rounded hover:bg-amber-100/70 transition-all cursor-pointer flex items-center gap-1"
+                title={showVirtualKeyboard ? "收起虚拟按键，节省垂直空间，一屏完整尽收眼底" : "展开虚拟按键"}
               >
-                <Keyboard className="w-3.5 h-3.5 text-stone-950" />
-                <span>唤起手机键盘</span>
+                <span>{showVirtualKeyboard ? "▴ 收起按键 (一屏显示全貌)" : "▾ 展开按键"}</span>
               </button>
-              <p className="md:hidden relative z-10 text-[8px] sm:text-[9px] text-stone-400 font-mono text-center leading-normal">
-                (提示: 点击上方虚拟按键或点击唤起键盘)
-              </p>
             </div>
+            
+            {!showVirtualKeyboard ? (
+              <div 
+                onClick={toggleVirtualKeyboard}
+                className="py-1 px-3 bg-stone-100/90 hover:bg-amber-50 rounded-lg border border-dashed border-stone-300 text-center cursor-pointer transition-all flex items-center justify-center gap-2 text-stone-600 hover:text-stone-900 select-none active:scale-99"
+                title="点击展开虚拟键盘"
+              >
+                <Keyboard className="w-3.5 h-3.5 text-stone-400" />
+                <span className="text-[10.5px] font-sans">
+                  虚拟按键已收起（当前支持直接使用电脑实体键盘盲打，整张词条卡一屏尽收眼底）
+                </span>
+                <span className="text-[10px] font-mono font-bold text-amber-700">展开 ▾</span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-0.5 sm:gap-1 max-w-lg mx-auto bg-stone-900 p-1 sm:p-2 rounded-lg sm:rounded-xl border border-stone-700 shadow-inner">
+                {KEYBOARD_ROWS.map((row, rowIdx) => (
+                  <div key={rowIdx} className="flex justify-center gap-0.5 sm:gap-1">
+                    {row.map((char) => {
+                      const isPressed = pressedKey === char;
+                      
+                      // Highlight keys that could be next character targets
+                      const isGuideKey = !isPaused && !timerFinished && !wordCorrect &&
+                        Boolean(currentSegment?.romaji?.some(
+                          r => r.startsWith(romajiProgress) && 
+                          r[romajiProgress.length]?.toUpperCase() === char
+                        ));
+
+                      return (
+                        <motion.button
+                          key={char}
+                          whileTap={{ scale: 0.85 }}
+                          animate={{
+                            scale: isPressed ? 0.9 : 1,
+                            y: isPressed ? 2 : 0,
+                          }}
+                          onClick={() => {
+                            processInputKey(char.toLowerCase());
+                          }}
+                          className={`w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 md:w-7.5 md:h-7.5 flex items-center justify-center rounded text-[9px] sm:text-xs font-mono font-bold transition-all select-none cursor-pointer ${
+                            isPressed
+                              ? "bg-amber-500 text-stone-950 shadow-inner"
+                              : isGuideKey
+                              ? "bg-emerald-950 text-emerald-400 border border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse"
+                              : "bg-stone-800 text-stone-300 border border-stone-700 hover:bg-stone-750"
+                          }`}
+                        >
+                          {char}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                ))}
+
+                {isEnglishMode && (
+                  <div className="flex justify-center items-center gap-1 sm:gap-1.5 mt-0.5">
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      animate={{
+                        scale: pressedKey === "SPACE" ? 0.95 : 1,
+                        y: pressedKey === "SPACE" ? 2 : 0,
+                      }}
+                      onClick={() => {
+                        if (isPaused) {
+                          handleTogglePause();
+                          return;
+                        }
+                        if ((wordCorrect || isPronouncing) && advanceRoundRef.current) {
+                          advanceRoundRef.current();
+                          return;
+                        }
+                        processInputKey(" ");
+                      }}
+                      title={
+                        isPaused 
+                          ? "恢复训练 (或按空格键)" 
+                          : (wordCorrect || isPronouncing) 
+                          ? "前往下一词 (或按空格键)" 
+                          : "空格键 (Space)"
+                      }
+                      className={`w-24 sm:w-36 h-5 sm:h-6 flex items-center justify-center rounded text-[9px] sm:text-[10px] font-mono font-bold uppercase transition-all select-none border cursor-pointer ${
+                        pressedKey === "SPACE"
+                          ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"
+                          : (!isPaused && !timerFinished && !wordCorrect && Boolean(currentSegment?.romaji?.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === " ")))
+                          ? "bg-emerald-950 text-emerald-400 border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse"
+                          : "bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-750"
+                      }`}
+                    >
+                      {isPaused ? "继续 (Space)" : (wordCorrect || isPronouncing) ? "下一词 (Space)" : "Space"}
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      animate={{
+                        scale: pressedKey === "." ? 0.95 : 1,
+                        y: pressedKey === "." ? 2 : 0,
+                      }}
+                      onClick={() => {
+                        processInputKey(".");
+                      }}
+                      title="Dot / Period (.)"
+                      className={`w-7 sm:w-8 h-5 sm:h-6 flex items-center justify-center rounded text-xs font-mono font-bold transition-all select-none border cursor-pointer ${
+                        pressedKey === "."
+                          ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"
+                          : (!isPaused && !timerFinished && !wordCorrect && Boolean(currentSegment?.romaji?.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === ".")))
+                          ? "bg-emerald-950 text-emerald-400 border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse"
+                          : "bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-750"
+                      }`}
+                    >
+                      .
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      animate={{
+                        scale: pressedKey === "-" ? 0.95 : 1,
+                        y: pressedKey === "-" ? 2 : 0,
+                      }}
+                      onClick={() => {
+                        processInputKey("-");
+                      }}
+                      title="Hyphen (-)"
+                      className={`w-7 sm:w-8 h-5 sm:h-6 flex items-center justify-center rounded text-xs font-mono font-bold transition-all select-none border cursor-pointer ${
+                        pressedKey === "-"
+                          ? "bg-amber-500 text-stone-950 border-amber-600 shadow-inner"
+                          : (!isPaused && !timerFinished && !wordCorrect && Boolean(currentSegment?.romaji?.some(r => r.startsWith(romajiProgress) && r[romajiProgress.length] === "-")))
+                          ? "bg-emerald-950 text-emerald-400 border-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.3)] animate-pulse"
+                          : "bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-750"
+                      }`}
+                    >
+                      -
+                    </motion.button>
+                  </div>
+                )}
+
+                {/* Mobile Keyboard Trigger inside collapsed space */}
+                <div className="flex items-center justify-center pt-1 md:hidden">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      audioSynth.playCardSlide();
+                      inputRef.current?.focus({ preventScroll: true });
+                    }}
+                    className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-[9.5px] flex items-center justify-center gap-1 cursor-pointer shadow-xs active:scale-95 transition-all"
+                  >
+                    <Keyboard className="w-3 h-3 text-stone-950" />
+                    <span>唤起手机输入法</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

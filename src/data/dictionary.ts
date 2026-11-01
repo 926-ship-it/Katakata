@@ -1,6 +1,7 @@
 import { CELEBRITY_DICTIONARY, CELEBRITY_ENGLISH_OVERLAYS } from "./celebrityData";
 import { KPOP_RIVALRY_DICTIONARY, KPOP_RIVALRY_ENGLISH_OVERLAYS } from "./kpopAndRivalryData";
 import { getEnglishPhonetic } from "../utils/englishPhonetics";
+import { ENGLISH_CURRICULUM_ITEMS } from "./englishCurriculumData";
 
 export interface KanaSegment {
   kana: string;
@@ -12,7 +13,7 @@ export interface DictionaryItem {
   id: string;
   kanji: string;
   kanaStr: string;
-  category: "name" | "nature" | "culture" | "food" | "custom" | "fairy" | "poetry" | "music";
+  category: "name" | "nature" | "culture" | "food" | "custom" | "fairy" | "poetry" | "music" | "en_kids" | "en_highschool" | "en_college" | "en_trade";
   categoryName: string;
   meaning: string;
   rarity: "N" | "R" | "SR" | "SSR";
@@ -2627,7 +2628,7 @@ export function getDictionary(isEnglishMode: boolean, isKatakanaMode?: boolean):
         ...c,
         phonetic: c.phonetic || getEnglishPhonetic(c.kanji),
       }));
-    return [...englishCustoms, ...mappedBase];
+    return [...englishCustoms, ...ENGLISH_CURRICULUM_ITEMS, ...mappedBase];
   }
   
   if (isKatakanaMode) {
@@ -2656,6 +2657,6 @@ export function getDictionary(isEnglishMode: boolean, isKatakanaMode?: boolean):
     return [...convertedCustom, ...convertedBase];
   }
   
-  return [...customItems, ...DICTIONARY];
+  return [...customItems, ...DICTIONARY, ...ENGLISH_CURRICULUM_ITEMS];
 }
 
