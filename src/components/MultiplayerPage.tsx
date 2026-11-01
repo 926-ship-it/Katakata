@@ -31,6 +31,7 @@ import { getSyllableColor, mapWordSegmentsToSyllables } from "../utils/syllableC
 import { TracingKana } from "./TracingKana";
 import { getDictionary, DictionaryItem } from "../data/dictionary";
 import { getAllSpanishWords } from "../data/spanishData";
+import { HarmonySynergyBanner, HarmonyEventPayload } from "./HarmonySynergyBanner";
 
 export interface MultiplayerPlayer {
   id: string;
@@ -67,7 +68,7 @@ export interface MultiplayerRoom {
   coopTotalScore: number;
 }
 
-const AVATAR_OPTIONS = [
+export const AVATAR_OPTIONS = [
   { id: "fox", icon: "🦊", label: "福狸酱", color: "from-amber-500 to-orange-600" },
   { id: "cat", icon: "🐱", label: "招财喵", color: "from-rose-400 to-pink-500" },
   { id: "daruma", icon: "🏮", label: "达摩翁", color: "from-red-500 to-rose-700" },
@@ -161,16 +162,6 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
   const [floatingReactions, setFloatingReactions] = useState<Array<{ id: string; sender: string; emoji: string; text: string }>>([]);
 
   // Syllable Harmony Ensemble Live Event
-  interface HarmonyEventPayload {
-    player1Id: string;
-    player1Name: string;
-    player2Id: string;
-    player2Name: string;
-    syllable1: string;
-    syllable2: string;
-    coopBonus: number;
-    timeDiffMs: number;
-  }
   const [harmonyEvent, setHarmonyEvent] = useState<HarmonyEventPayload | null>(null);
 
   // Fetch Public Rooms
@@ -202,6 +193,28 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
     setPlayerAvatar(id);
     try { localStorage.setItem("katakata_mp_avatar", id); } catch (_) {}
     audioSynth.playCardSlide();
+  };
+
+  // Preview Harmony Ensemble Animation & Audio in Lobby / Waiting Room
+  const handlePreviewHarmonyAnimation = () => {
+    audioSynth.playHarmonyEnsemble();
+    const guestPlayer = otherPlayers[0];
+    setHarmonyEvent({
+      player1Id: playerId || "p1",
+      player1Name: playerName || "浅草修习生",
+      player1Avatar: playerAvatar || "fox",
+      player2Id: guestPlayer?.id || "p2",
+      player2Name: guestPlayer?.name || "招财喵",
+      player2Avatar: guestPlayer?.avatar || "cat",
+      syllable1: "さ",
+      syllable2: "し",
+      coopBonus: 60,
+      timeDiffMs: 145,
+      harmonyCount: 1,
+    });
+    setTimeout(() => {
+      setHarmonyEvent((cur) => (cur?.syllable1 === "さ" && cur?.syllable2 === "し" ? null : cur));
+    }, 2800);
   };
 
   // Connect & Join WebSocket
@@ -351,7 +364,7 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
 
         else if (type === "harmony_syllable") {
           // Both players completed a syllable in close synchrony!
-          // Play unique crisp ensemble audio cue
+          // Play unique crisp ensemble audio cue & trigger magnificent synergy banner
           audioSynth.playHarmonyEnsemble();
           setHarmonyEvent(payload);
           if (payload.room) {
@@ -359,7 +372,7 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
           }
           setTimeout(() => {
             setHarmonyEvent((cur) => (cur === payload ? null : cur));
-          }, 2500);
+          }, 2800);
         }
       } catch (e) {
         console.error("WS message error", e);
@@ -627,35 +640,14 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
 
   return (
     <div className="min-h-screen bg-stone-100 text-stone-900 pb-16 font-sans relative select-none">
-      {/* Crystalline Harmony Ensemble Banner (双人和鸣·音节同步合奏) */}
+      {/* Magnificent Crystalline Harmony Synergy Banner (华丽双人和鸣连携特效) */}
       <AnimatePresence>
         {harmonyEvent && (
-          <motion.div
-            key={`harmony_${harmonyEvent.timeDiffMs}_${harmonyEvent.syllable1}_${harmonyEvent.player1Name}`}
-            initial={{ opacity: 0, y: -25, scale: 0.8 }}
-            animate={{ opacity: 1, y: 0, scale: [0.95, 1.05, 1] }}
-            exit={{ opacity: 0, y: -20, scale: 0.9 }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
-            className="fixed top-12 sm:top-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none w-11/12 max-w-md"
-          >
-            <div className="bg-gradient-to-r from-amber-500 via-rose-500 to-amber-600 text-white px-4 sm:px-6 py-2.5 rounded-full shadow-2xl border-2 border-amber-300 flex items-center justify-between gap-3 backdrop-blur-md">
-              <div className="flex items-center gap-2.5">
-                <span className="text-2xl animate-spin" style={{ animationDuration: "2.5s" }}>✨</span>
-                <div>
-                  <div className="flex items-center gap-1.5 font-serif font-black text-xs sm:text-sm tracking-wide">
-                    <span>🎵 同心和鸣 · 双方音节同步合奏！</span>
-                    <span className="bg-white/25 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold">
-                      +{harmonyEvent.coopBonus} 协力分
-                    </span>
-                  </div>
-                  <div className="text-[10px] sm:text-[11px] text-amber-100 font-sans">
-                    {harmonyEvent.player1Name}「{harmonyEvent.syllable1}」＆ {harmonyEvent.player2Name}「{harmonyEvent.syllable2}」默契合奏 ({harmonyEvent.timeDiffMs}ms)
-                  </div>
-                </div>
-              </div>
-              <span className="text-xl">🎶</span>
-            </div>
-          </motion.div>
+          <HarmonySynergyBanner
+            key={`harmony_${harmonyEvent.timeDiffMs}_${harmonyEvent.syllable1}_${harmonyEvent.player1Name}_${harmonyEvent.harmonyCount || 0}`}
+            event={harmonyEvent}
+            avatarOptions={AVATAR_OPTIONS}
+          />
         )}
       </AnimatePresence>
 
@@ -862,12 +854,12 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
                       <div
                         onClick={(e) => {
                           e.stopPropagation();
-                          audioSynth.playHarmonyEnsemble();
+                          handlePreviewHarmonyAnimation();
                         }}
-                        className="mt-2 text-[10px] font-serif font-bold text-amber-800 bg-amber-100/90 hover:bg-amber-200 border border-amber-300/80 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                        title="点击试听双人同步完成音节时的合奏音效"
+                        className="mt-2 text-[10px] font-serif font-bold text-amber-800 bg-amber-100/90 hover:bg-amber-200 border border-amber-300/80 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs active:scale-95"
+                        title="点击试听双人同步完成音节时的合奏天籁与华丽连携动画"
                       >
-                        <span>🎵 试听双人和鸣合奏音</span>
+                        <span>🎵 试听合奏音 ＆ 连携特效</span>
                       </div>
                     </button>
                   </div>
@@ -1082,11 +1074,11 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => audioSynth.playHarmonyEnsemble()}
+                onClick={handlePreviewHarmonyAnimation}
                 className="shrink-0 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-serif font-black text-[11px] transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1"
-                title="试听双人和鸣合奏音效"
+                title="试听双人和鸣合奏音效并预览华丽连携动画"
               >
-                <span>试听合奏音效</span>
+                <span>试听合奏与连携特效</span>
                 <span>🎶</span>
               </button>
             </div>
@@ -1230,6 +1222,11 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
                               🔥{p.combo}
                             </span>
                           )}
+                          {harmonyEvent && (
+                            <span className="text-[9px] font-mono font-bold bg-amber-400 text-stone-950 px-1.5 py-0.2 rounded-full shadow-2xs animate-pulse">
+                              ✨ 和鸣中
+                            </span>
+                          )}
                         </span>
                         <span className="font-mono text-stone-500 text-[10px]">
                           {p.currentWordIndex} / {room.words.length} 词 ({progressPct}%)
@@ -1237,12 +1234,16 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
                       </div>
 
                       {/* Track progress bar */}
-                      <div className="w-full h-3 rounded-full bg-stone-100 border border-stone-300 relative overflow-hidden">
+                      <div className={`w-full h-3 rounded-full bg-stone-100 border relative overflow-hidden transition-all ${
+                        harmonyEvent ? "border-amber-400 ring-2 ring-amber-400/80 shadow-xs shadow-amber-400/50" : "border-stone-300"
+                      }`}>
                         <motion.div
                           animate={{ width: `${progressPct}%` }}
                           transition={{ type: "spring", damping: 18 }}
                           className={`h-full rounded-full ${
-                            isMe
+                            harmonyEvent
+                              ? "bg-gradient-to-r from-amber-400 via-rose-500 to-amber-300 animate-pulse"
+                              : isMe
                               ? "bg-gradient-to-r from-rose-500 to-amber-500 shadow-xs"
                               : "bg-gradient-to-r from-stone-400 to-indigo-500"
                           }`}

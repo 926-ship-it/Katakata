@@ -838,6 +838,7 @@ Return your response strictly as JSON with this structure:
     endTime?: number;
     reactions: Array<{ id: string; sender: string; emoji: string; text: string; time: number }>;
     coopTotalScore?: number;
+    harmonyCount?: number;
     lastSyllable?: {
       playerId: string;
       playerName: string;
@@ -864,6 +865,7 @@ Return your response strictly as JSON with this structure:
       endTime: room.endTime,
       reactions: room.reactions.slice(-10),
       coopTotalScore: room.coopTotalScore || 0,
+      harmonyCount: room.harmonyCount || 0,
     };
   }
 
@@ -1069,6 +1071,7 @@ Return your response strictly as JSON with this structure:
               room.status = "playing";
               room.startTime = Date.now();
               room.countdown = 0;
+              room.harmonyCount = 0;
               // Reset all player game states
               room.players.forEach((p) => {
                 p.score = 0;
@@ -1137,6 +1140,9 @@ Return your response strictly as JSON with this structure:
               otherPlayer.score += bonus;
             }
 
+            room.harmonyCount = (room.harmonyCount || 0) + 1;
+            const currentHarmonyCount = room.harmonyCount;
+
             // Reset lastSyllable to prevent duplicate double-triggers on a single event
             room.lastSyllable = undefined;
 
@@ -1146,12 +1152,15 @@ Return your response strictly as JSON with this structure:
               payload: {
                 player1Id: prev.playerId,
                 player1Name: prev.playerName,
+                player1Avatar: otherPlayer?.avatar || "fox",
                 player2Id: playerId,
                 player2Name: player.name,
+                player2Avatar: player.avatar || "cat",
                 syllable1: prev.syllable,
                 syllable2: syllable,
                 coopBonus: bonus,
                 timeDiffMs: now - prev.time,
+                harmonyCount: currentHarmonyCount,
                 room: serializeRoom(room),
               },
             });
