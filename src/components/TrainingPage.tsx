@@ -455,7 +455,10 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
 
         advanceRoundRef.current = doAdvanceRound;
 
-        const roundFailsafe = setTimeout(doAdvanceRound, 1200);
+        // Dynamic failsafe timeout: provide ample window for longer phrases and international network audio to finish playing
+        const textLen = (item.kanji || item.kanaStr || "").length;
+        const estSafeTimeMs = Math.min(6500, Math.max(3800, Math.round((textLen * 220 + 2000) / Math.max(0.7, audioSynth.getSpeechRate()))));
+        const roundFailsafe = setTimeout(doAdvanceRound, estSafeTimeMs);
 
         audioSynth.speakFullWord(
           item.kanaStr || item.kanji,
@@ -1104,12 +1107,14 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                               className="text-2xl sm:text-3xl md:text-4xl font-black font-serif tracking-wide drop-shadow-2xs select-none"
                             />
                           ) : (
-                            <span 
+                            <ColoredSyllableWord
+                              word={item.kanji}
+                              kanaStr={item.kanaStr}
+                              lang={itemLang}
+                              showDots={false}
+                              enabled={false}
                               className="text-2xl sm:text-3xl md:text-4xl font-black text-stone-900 font-serif tracking-wide drop-shadow-2xs select-none"
-                              style={{ fontFamily: '"Yu Mincho", "MS Mincho", "Hiragino Mincho ProN", serif' }}
-                            >
-                              {item.kanji}
-                            </span>
+                            />
                           )}
 
                           {/* Japanese Kana Furigana Reading Display with matching mora colors */}
@@ -1152,9 +1157,20 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({
                                 );
                               })
                             ) : (
-                              syllables.filter(s => s !== " " && !/^\s+$/.test(s)).length > 1 && (
+                              (syllables.filter(s => s !== " " && !/^\s+$/.test(s)).length > 1 || item.kanji.includes(" ")) && (
                                 syllables.map((syl, sIdx) => {
-                                  if (syl === " " || /^\s+$/.test(syl)) return null;
+                                  if (syl === " " || /^\s+$/.test(syl)) {
+                                    return (
+                                      <span
+                                        key={sIdx}
+                                        className="text-[9px] sm:text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full border border-stone-300 bg-stone-100 text-stone-600 shadow-2xs flex items-center gap-1 select-none"
+                                        title="击键提示：此处按空格键 (Space) 或减号 (-)"
+                                      >
+                                        <span className="font-extrabold text-stone-700">-</span>
+                                        <span className="text-[8px] opacity-80">空格</span>
+                                      </span>
+                                    );
+                                  }
                                   const sylColor = getSyllableColor(sIdx);
                                   return (
                                     <span

@@ -29,6 +29,29 @@ export const ColoredSyllableWord: React.FC<ColoredSyllableWordProps> = ({
   if (!word) return null;
 
   if (!enabled) {
+    if (word.includes(" ")) {
+      const parts = word.split(/(\s+)/);
+      return (
+        <span className={className}>
+          {parts.map((part, pIdx) => {
+            if (/^\s+$/.test(part)) {
+              return (
+                <span
+                  key={pIdx}
+                  className="inline-flex items-center justify-center mx-1 sm:mx-1.5 select-none align-middle"
+                  title="此处有空格 (Space / 按空格键或减号键)"
+                >
+                  <span className="text-stone-400 font-sans font-black text-base sm:text-lg md:text-xl leading-none px-0.5 select-none transform -translate-y-0.5">
+                    -
+                  </span>
+                </span>
+              );
+            }
+            return <span key={pIdx}>{part}</span>;
+          })}
+        </span>
+      );
+    }
     return <span className={className}>{word}</span>;
   }
 
@@ -62,8 +85,8 @@ export const ColoredSyllableWord: React.FC<ColoredSyllableWordProps> = ({
   // English, Spanish, or pure Kana words
   const syllables = splitWordIntoSyllables(word, effectiveLang);
 
-  // If word has only 1 syllable, render with primary emerald
-  if (syllables.length <= 1) {
+  // If word has only 1 syllable and no spaces, render with primary emerald
+  if (syllables.length <= 1 && !word.includes(" ")) {
     return (
       <span className={className}>
         <span className="text-emerald-600 drop-shadow-2xs">{word}</span>
@@ -79,8 +102,14 @@ export const ColoredSyllableWord: React.FC<ColoredSyllableWordProps> = ({
         const isSpace = syl === " " || /^\s+$/.test(syl);
         if (isSpace) {
           return (
-            <span key={idx} className="whitespace-pre">
-              {" "}
+            <span
+              key={idx}
+              className="inline-flex items-center justify-center mx-1 sm:mx-1.5 select-none align-middle"
+              title="此处有空格 (Space / 按空格键或减号键)"
+            >
+              <span className="text-stone-400 font-sans font-black text-base sm:text-lg md:text-xl leading-none px-0.5 select-none transform -translate-y-0.5">
+                -
+              </span>
             </span>
           );
         }
@@ -96,7 +125,7 @@ export const ColoredSyllableWord: React.FC<ColoredSyllableWordProps> = ({
             >
               {syl}
             </span>
-            {showDots && idx < syllables.length - 1 && syllables[idx + 1] !== " " && (
+            {showDots && idx < syllables.length - 1 && syllables[idx + 1] !== " " && !/^\s+$/.test(syllables[idx + 1]) && (
               <span className="text-stone-300 font-sans mx-0.5 text-xs select-none pointer-events-none opacity-60">
                 ·
               </span>

@@ -1236,8 +1236,15 @@ Return your response strictly as JSON with this structure:
         .replace(/[\(（\[【].*?[\)）\]】]/g, "")
         .replace(/[¡¿\?!.,'"·~～\-_/\\#@$%^&*()]/g, " ")
         .trim();
-      const cleanText = sanitized || text;
       const targetLang = lang === "es" ? "es" : lang === "en" ? "en" : "ja";
+      let cleanText = sanitized || text;
+      if (targetLang === "en") {
+        cleanText = cleanText
+          .replace(/([a-z])([A-Z])/g, "$1 $2")
+          .replace(/\bMr\b/g, "Mister")
+          .replace(/\bDr\b/g, "Doctor")
+          .replace(/\bSt\b/g, "Saint");
+      }
       const googleTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${targetLang}&q=${encodeURIComponent(cleanText)}`;
 
       const ttsResp = await fetch(googleTtsUrl, {

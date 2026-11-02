@@ -2603,8 +2603,8 @@ export function getDictionary(isEnglishMode: boolean, isKatakanaMode?: boolean):
         const isSpace = char === " ";
         return {
           kana: char,
-          romaji: isSpace ? [" "] : [char.toLowerCase()],
-          displayRomaji: char,
+          romaji: isSpace ? [" ", "-"] : [char.toLowerCase()],
+          displayRomaji: isSpace ? "␣" : char,
         };
       });
       

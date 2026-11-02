@@ -7,8 +7,8 @@ function buildEnglishSegments(word: string): KanaSegment[] {
     const isSpace = char === " ";
     return {
       kana: char,
-      romaji: isSpace ? [" "] : [char.toLowerCase()],
-      displayRomaji: char,
+      romaji: isSpace ? [" ", "-"] : [char.toLowerCase()],
+      displayRomaji: isSpace ? "␣" : char,
     };
   });
 }

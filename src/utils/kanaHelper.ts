@@ -127,8 +127,8 @@ export function splitAlphabeticIntoSegments(word: string): KanaSegment[] {
     const lower = char.toLowerCase();
     return {
       kana: char,
-      romaji: isSpace ? [" "] : [lower],
-      displayRomaji: char,
+      romaji: isSpace ? [" ", "-"] : [lower],
+      displayRomaji: isSpace ? "␣" : char,
     };
   });
 }

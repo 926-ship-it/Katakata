@@ -761,15 +761,15 @@ export function spanishWordToDictionaryItem(w: SpanishWord): any {
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "");
 
-    // Accept exact character, lowercase, and normalized (e.g. typing 'a' matches 'á')
+    // Accept exact character, lowercase, and normalized (e.g. typing 'a' matches 'á'), plus space and hyphen
     const romajiList = Array.from(
-      new Set([char, lower, normalized, isSpace ? " " : ""].filter(Boolean))
+      new Set([char, lower, normalized, isSpace ? " " : "", isSpace ? "-" : ""].filter(Boolean))
     );
 
     return {
       kana: char,
       romaji: romajiList,
-      displayRomaji: char,
+      displayRomaji: isSpace ? "␣" : char,
     };
   });
 

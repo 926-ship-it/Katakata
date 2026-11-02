@@ -206,8 +206,16 @@ export function resolveJapaneseSpeechPayload(
 
   // Explicit English or Latin characters
   if (langHint === "en" || /^[a-zA-Z0-9\s\.\-\'\,\!\?\(\)]+$/.test(cleanText)) {
+    // Format CamelCase words (e.g. "MrBeast" -> "Mister Beast", "PewDiePie" -> "Pew Die Pie") so speech synthesizers pronounce them without hesitation!
+    const formattedEnglish = cleanText
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/\bMr\b/g, "Mister")
+      .replace(/\bDr\b/g, "Doctor")
+      .replace(/\bSt\b/g, "Saint")
+      .trim();
+
     return {
-      speechText: cleanText,
+      speechText: formattedEnglish || cleanText,
       isEnglish: true,
       isSpanish: false,
       lang: "en-US",
@@ -498,12 +506,12 @@ class RetroAudioSynth {
           audio.onended = onSourceEnd;
           audio.onerror = onSourceFail;
 
-          // Responsive 1200ms timeout per online audio source
+          // 2500ms buffer window per online audio source to accommodate international network latency
           timeoutHandle = setTimeout(() => {
             if (!sourceFinished) {
               onSourceFail();
             }
-          }, 1200);
+          }, 2500);
 
           const playPromise = audio.play();
           if (playPromise) {
@@ -917,9 +925,9 @@ class RetroAudioSynth {
         }
       };
 
-      // Safety watchdog: ensure callback is always reached promptly without stalling the UI
+      // Safety watchdog: ensure callback is always reached promptly without cutting off long words/phrases
       const cleanLen = spokenText.length;
-      const maxEstimatedMs = Math.min(2200, Math.max(750, (cleanLen * 140 + 350) / this.speechRate));
+      const maxEstimatedMs = Math.min(6500, Math.max(2200, (cleanLen * 220 + 1200) / Math.max(0.6, this.speechRate)));
       safetyWatchdog = setTimeout(() => {
         triggerCompletion();
       }, maxEstimatedMs);
@@ -974,7 +982,14 @@ class RetroAudioSynth {
             triggerCompletion();
           };
 
+          let isSwitchingToOnline = false;
+
           freshUtterance.onerror = (e) => {
+            if (isSwitchingToOnline) {
+              // Intentionally switched to online audio fallback; ignore cancellation error
+              return;
+            }
+
             // Crucial: In WebKit/Blink, 'interrupted' or 'canceled' means a cancellation occurred.
             // Never retry or trigger online audio on interrupted, as that causes duplicate double-speech!
             if (e.error === "interrupted" || e.error === "canceled") {
@@ -984,7 +999,8 @@ class RetroAudioSynth {
 
             // If native speech fails with a real error, gracefully fall back to online audio player
             if (!hasStarted && !hasTriggered) {
-              this.playOnlineTTSAudio(text, langCategory, triggerCompletion, true);
+              isSwitchingToOnline = true;
+              this.playOnlineTTSAudio(spokenText || text, langCategory, triggerCompletion, true);
             } else {
               triggerCompletion();
             }
@@ -1004,16 +1020,16 @@ class RetroAudioSynth {
             }
           } catch (_) {}
 
-          // Watchdog: If native speech does not fire 'onstart' within 400ms, it is stalled/hung.
-          // Switch cleanly to online audio so the user never experiences awkward silence!
+          // Watchdog: If native speech does not fire 'onstart' within 1200ms, switch cleanly to online audio
           setTimeout(() => {
             if (!hasStarted && !hasTriggered) {
+              isSwitchingToOnline = true;
               try {
                 window.speechSynthesis.cancel();
               } catch (_) {}
-              this.playOnlineTTSAudio(text, langCategory, triggerCompletion, true);
+              this.playOnlineTTSAudio(spokenText || text, langCategory, triggerCompletion, true);
             }
-          }, 400);
+          }, 1200);
         } catch (err) {
           console.warn("Exception during native speak:", err);
           if (!hasStarted && !hasTriggered) {

@@ -407,8 +407,8 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
           bgGradient: "from-amber-50 to-orange-100",
           segments: w.word.split("").map((ch) => ({
             kana: ch,
-            romaji: [ch.toLowerCase()],
-            displayRomaji: ch,
+            romaji: ch === " " ? [" ", "-"] : [ch.toLowerCase()],
+            displayRomaji: ch === " " ? "␣" : ch,
           })),
         }));
       }
