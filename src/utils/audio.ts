@@ -432,16 +432,23 @@ class RetroAudioSynth {
         return false;
       }
 
-      // Candidate online sources
-      const sources: string[] = [];
+      // Candidate online sources (Dual-Proxy + Domestic CDN + Global Google TTS)
+      const sources: string[] = [
+        // 1. Direct High-Speed Server-Side Proxy (US Cloud Run with unrestricted Google Translate TTS access)
+        `/api/tts?text=${clean}&lang=${langHint}`,
+      ];
+
       if (langHint === "es") {
-        sources.push(`https://dict.youdao.com/dictvoice?audio=${clean}&le=es`);
+        // Youdao dictionary Spanish endpoint requires le=spa
+        sources.push(`https://dict.youdao.com/dictvoice?audio=${clean}&le=spa`);
         sources.push(`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=es&q=${clean}`);
       } else if (langHint === "en") {
+        // Youdao dictionary English endpoint requires type=2
         sources.push(`https://dict.youdao.com/dictvoice?audio=${clean}&type=2`);
         sources.push(`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=${clean}`);
       } else {
-        sources.push(`https://dict.youdao.com/dictvoice?audio=${clean}&le=ja`);
+        // Youdao dictionary Japanese endpoint requires le=jap (NOT le=ja!)
+        sources.push(`https://dict.youdao.com/dictvoice?audio=${clean}&le=jap`);
         sources.push(`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ja&q=${clean}`);
       }
 

@@ -21,6 +21,7 @@ import { DictionaryItem, hiraganaToKatakana } from "../data/dictionary";
 import { splitKanaIntoSyllables } from "../utils/kanaHelper";
 import { audioSynth } from "../utils/audio";
 import { addDailyProgress, getTodayDateString } from "../utils/dailyGoal";
+import { getCuratedDailyChallenge } from "../data/dailyCuratedChallenges";
 
 export interface DailyWordData {
   id: string;
@@ -125,15 +126,22 @@ export const DailyWordChallengeCard: React.FC<DailyWordChallengeCardProps> = ({
         categoryName: c.categoryName,
       }));
 
+      // Abort controller with 3.5s timeout for fast response
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
       const res = await fetch("/api/daily-word-challenge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           date: todayStr,
           forceRefresh,
           candidates: sampleCandidates,
         }),
       });
+
+      clearTimeout(timeoutId);
 
       const data = await res.json();
       if (data && data.success && data.word && data.analysis) {
@@ -157,8 +165,26 @@ export const DailyWordChallengeCard: React.FC<DailyWordChallengeCardProps> = ({
         throw new Error(data?.error || "未能获取今日挑战数据");
       }
     } catch (err: any) {
-      console.error("Failed to load daily challenge:", err);
-      setErrorMsg("加载每日挑战失败，请检查网络或点击重新尝试");
+      console.warn("Daily challenge remote API delayed or unavailable, activating curated database:", err);
+      // Seamless offline-first curated challenge: 100% reliable in mainland China and offline
+      const curated = getCuratedDailyChallenge(todayStr, candidateWords[0]);
+      setDailyWord(curated.word);
+      setAnalysis(curated.analysis);
+      setSource("curated");
+      setErrorMsg(""); // Clear error to never block user experience
+
+      // Cache the curated entry
+      try {
+        localStorage.setItem(
+          STORAGE_CACHE_KEY,
+          JSON.stringify({
+            date: todayStr,
+            word: curated.word,
+            analysis: curated.analysis,
+            source: "curated",
+          })
+        );
+      } catch (_) {}
     } finally {
       setIsLoading(false);
     }

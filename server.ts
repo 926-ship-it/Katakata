@@ -5,6 +5,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import { getCuratedDailyChallenge } from "./src/data/dailyCuratedChallenges";
 
 dotenv.config();
 
@@ -604,7 +605,12 @@ ${promptTargetInfo}
   "challengeTask": "今日挑战任务寄语（鼓励用户闭眼回想假名字形，并点击下方平假名/片假名按钮开启今日击键打卡）"
 }`;
 
-      const response = await ai.models.generateContent({
+      // Race Gemini call against a 3.5s timeout to ensure prompt, responsive UI in all networks
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Gemini API call timed out after 3.5s")), 3500)
+      );
+
+      const generatePromise = ai.models.generateContent({
         model: "gemini-3.8-flash",
         contents: prompt,
         config: {
@@ -612,6 +618,8 @@ ${promptTargetInfo}
           temperature: 0.85,
         },
       });
+
+      const response: any = await Promise.race([generatePromise, timeoutPromise]);
 
       const parsed = JSON.parse(response.text || "{}");
       if (!parsed.word || !parsed.word.kanji || !parsed.etymology) {
@@ -633,39 +641,17 @@ ${promptTargetInfo}
         },
       });
     } catch (error: any) {
-      console.error("Daily word challenge generation error:", error);
-      // Seamless graceful fallback
+      console.warn("Daily word challenge generation error or timeout, switching to curated database:", error?.message || error);
+      // Seamless graceful fallback using curated 31-entry encyclopedia
+      const reqDate = req.body?.date || new Date().toISOString().slice(0, 10);
+      const reqWord = req.body?.preferredWord;
+      const curated = getCuratedDailyChallenge(reqDate, reqWord);
       res.json({
         success: true,
-        source: "fallback",
-        date: req.body?.date || new Date().toISOString().slice(0, 10),
-        word: {
-          id: "komorebi",
-          kanji: "木漏れ日",
-          hiragana: "こもれび",
-          katakana: "コモレビ",
-          romaji: "komorebi",
-          meaning: "树叶间隙穿透洒下的阳光；静谧光影",
-          categoryName: "自然风物 · 和风美学",
-          difficulty: "N2",
-        },
-        analysis: {
-          etymology:
-            "【词源故事考据】：由“木（こ）”、“漏れ（もれ）”与“日（ひ/び）”结合而成的大和言叶。古代日本人视林木树影中透下的束束金光为大自然的恩赐灵气。",
-          culturalStory:
-            "【文化风俗物语】：新海诚、宫崎骏动画中标志性的夏日青翠树影与跃动光斑，便是木漏れ日的完美写照。驻足仰望片刻，浮躁的心情便能瞬间归于安宁。",
-          mnemonicTip:
-            "【五十音假名记忆巧思】：拆为「こ・も・れ・び」，平假名柔美如微风拂树，片假名「コ・モ・レ・ビ」清晰似枝丫投影。",
-          exampleSentence: {
-            japanese: "木漏れ日の中で、静かに本を読むのが好きです。",
-            kana: "こもれびのなかで、しずかにほんをよむのがすきです。",
-            translation: "我喜欢在斑驳林隙的阳光下，静静地阅读书卷。",
-          },
-          funFact:
-            "【冷知识】：它是世界公认最难用单个外语单词翻译的独创日语词汇之一，传达着东方特有的光阴静美。",
-          challengeTask:
-            "今日挑战任务：点击「平假名」或「片假名」练习按钮，完成今日份的专注击键打卡！",
-        },
+        source: "curated",
+        date: reqDate,
+        word: curated.word,
+        analysis: curated.analysis,
       });
     }
   });
@@ -880,7 +866,465 @@ Return your response strictly as JSON with this structure:
     });
   }
 
-  // REST endpoints for room queries
+  function handlePlayerLeave(roomId: string, playerId: string) {
+    clientSockets.delete(playerId);
+    const room = multiplayerRooms.get(roomId);
+    if (room) {
+      room.players.delete(playerId);
+      if (room.players.size === 0) {
+        multiplayerRooms.delete(roomId);
+      } else {
+        // If the host left, assign new host
+        const remaining = Array.from(room.players.values());
+        if (!remaining.some((p) => p.isHost)) {
+          remaining[0].isHost = true;
+        }
+        broadcastToRoom(roomId, {
+          type: "room_updated",
+          payload: serializeRoom(room),
+        });
+      }
+    }
+  }
+
+  function processRoomAction(type: string, payload: any, senderWs?: WebSocket): any {
+    if (type === "join_room") {
+      const roomId = (payload?.roomId || "").trim().toUpperCase();
+      const playerId = payload?.playerId || `p_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+
+      let room = multiplayerRooms.get(roomId);
+      const isNewRoom = !room;
+
+      if (!room) {
+        room = {
+          id: roomId,
+          name: payload?.roomName || `${payload?.playerName || "旅人"}的和风茶室`,
+          mode: payload?.mode || "duel",
+          language: payload?.language || "ja",
+          status: "waiting",
+          countdown: 3,
+          wordCount: payload?.words?.length || payload?.wordCount || 8,
+          words: payload?.words || [],
+          players: new Map(),
+          reactions: [],
+          coopTotalScore: 0,
+        };
+        multiplayerRooms.set(roomId, room);
+      }
+
+      const isHost = isNewRoom || room.players.size === 0;
+      let player = room.players.get(playerId);
+      if (!player) {
+        player = {
+          id: playerId,
+          name: payload?.playerName || (isHost ? "房主" : `同行者 ${room.players.size + 1}`),
+          avatar: payload?.playerAvatar || "fox",
+          isHost,
+          isReady: isHost,
+          score: 0,
+          currentWordIndex: 0,
+          currentSegmentIndex: 0,
+          combo: 0,
+          maxCombo: 0,
+          finished: false,
+          accuracy: 100,
+          wpm: 0,
+          connected: true,
+        };
+        room.players.set(playerId, player);
+      } else {
+        player.connected = true;
+        if (payload?.playerName) player.name = payload.playerName;
+        if (payload?.playerAvatar) player.avatar = payload.playerAvatar;
+      }
+
+      if (senderWs) {
+        clientSockets.set(playerId, { ws: senderWs, roomId, playerId });
+      }
+
+      const serialized = serializeRoom(room);
+
+      // Notify others in room
+      broadcastToRoom(roomId, {
+        type: "room_updated",
+        payload: serialized,
+      }, playerId);
+
+      return {
+        type: "joined_room",
+        payload: {
+          roomId,
+          playerId,
+          isHost: player.isHost,
+          room: serialized,
+        },
+      };
+    }
+
+    if (type === "toggle_ready") {
+      const { roomId, playerId, isReady } = payload || {};
+      const room = multiplayerRooms.get((roomId || "").toUpperCase());
+      if (room && room.players.has(playerId)) {
+        const p = room.players.get(playerId)!;
+        p.isReady = Boolean(isReady);
+        const serialized = serializeRoom(room);
+        broadcastToRoom(roomId, {
+          type: "room_updated",
+          payload: serialized,
+        });
+        return { type: "room_updated", payload: serialized };
+      }
+    }
+
+    if (type === "start_game") {
+      const { roomId } = payload || {};
+      const room = multiplayerRooms.get((roomId || "").toUpperCase());
+      if (!room || room.status !== "waiting") return;
+
+      room.status = "countdown";
+      room.countdown = 3;
+      broadcastToRoom(roomId, {
+        type: "room_updated",
+        payload: serializeRoom(room),
+      });
+
+      let count = 3;
+      const countdownInterval = setInterval(() => {
+        count--;
+        if (count > 0) {
+          room.countdown = count;
+          broadcastToRoom(roomId, {
+            type: "countdown_tick",
+            payload: { count },
+          });
+        } else {
+          clearInterval(countdownInterval);
+          room.status = "playing";
+          room.startTime = Date.now();
+          room.countdown = 0;
+          room.harmonyCount = 0;
+          room.players.forEach((p) => {
+            p.score = 0;
+            p.currentWordIndex = 0;
+            p.currentSegmentIndex = 0;
+            p.combo = 0;
+            p.maxCombo = 0;
+            p.finished = false;
+            p.finishTime = undefined;
+          });
+          broadcastToRoom(roomId, {
+            type: "game_started",
+            payload: {
+              room: serializeRoom(room),
+              startTime: room.startTime,
+            },
+          });
+        }
+      }, 1000);
+      return { type: "countdown_started", payload: { count: 3 } };
+    }
+
+    if (type === "typing_progress") {
+      const { roomId, playerId, wordIndex, segmentIndex, romajiProgress, combo } = payload || {};
+      const room = multiplayerRooms.get((roomId || "").toUpperCase());
+      if (!room || room.status !== "playing") return;
+      const player = room.players.get(playerId);
+      if (player) {
+        player.currentWordIndex = wordIndex;
+        player.currentSegmentIndex = segmentIndex;
+        player.romajiProgress = romajiProgress;
+        player.combo = combo;
+        player.maxCombo = Math.max(player.maxCombo, combo);
+
+        broadcastToRoom(roomId, {
+          type: "player_progress",
+          payload: {
+            playerId,
+            wordIndex,
+            segmentIndex,
+            romajiProgress,
+            combo,
+          },
+        }, playerId);
+      }
+      return { type: "progress_acknowledged" };
+    }
+
+    if (type === "syllable_completed") {
+      const { roomId, playerId, syllable } = payload || {};
+      const room = multiplayerRooms.get((roomId || "").toUpperCase());
+      if (!room || room.status !== "playing") return;
+      const player = room.players.get(playerId);
+      if (!player) return;
+
+      const now = Date.now();
+      const prev = room.lastSyllable;
+
+      if (prev && prev.playerId !== playerId && (now - prev.time) <= 1800) {
+        const bonus = room.mode === "coop" ? 60 : 30;
+        if (room.mode === "coop") {
+          room.coopTotalScore = (room.coopTotalScore || 0) + bonus;
+        }
+        player.score += bonus;
+        const otherPlayer = room.players.get(prev.playerId);
+        if (otherPlayer) {
+          otherPlayer.score += bonus;
+        }
+
+        room.harmonyCount = (room.harmonyCount || 0) + 1;
+        const currentHarmonyCount = room.harmonyCount;
+        room.lastSyllable = undefined;
+
+        const harmonyPayload = {
+          player1Id: prev.playerId,
+          player1Name: prev.playerName,
+          player1Avatar: otherPlayer?.avatar || "fox",
+          player2Id: playerId,
+          player2Name: player.name,
+          player2Avatar: player.avatar || "cat",
+          syllable1: prev.syllable,
+          syllable2: syllable,
+          coopBonus: bonus,
+          timeDiffMs: now - prev.time,
+          harmonyCount: currentHarmonyCount,
+          room: serializeRoom(room),
+        };
+
+        broadcastToRoom(roomId, {
+          type: "harmony_syllable",
+          payload: harmonyPayload,
+        });
+
+        return { type: "harmony_syllable", payload: harmonyPayload };
+      } else {
+        room.lastSyllable = {
+          playerId,
+          playerName: player.name,
+          syllable: syllable || "",
+          time: now,
+        };
+        return { type: "syllable_recorded" };
+      }
+    }
+
+    if (type === "word_completed") {
+      const { roomId, playerId, wordIndex, accuracy, combo } = payload || {};
+      const room = multiplayerRooms.get((roomId || "").toUpperCase());
+      if (!room || room.status !== "playing") return;
+      const player = room.players.get(playerId);
+      if (player) {
+        player.score += 100 + (combo * 10);
+        player.combo = combo;
+        player.maxCombo = Math.max(player.maxCombo, combo);
+        player.accuracy = Math.round((player.accuracy + (accuracy || 100)) / 2);
+        player.currentWordIndex = wordIndex + 1;
+        player.currentSegmentIndex = 0;
+        player.romajiProgress = "";
+
+        if (room.mode === "coop") {
+          room.coopTotalScore = (room.coopTotalScore || 0) + 100 + (combo * 10);
+        }
+
+        if (player.currentWordIndex >= room.words.length) {
+          player.finished = true;
+          player.finishTime = Date.now();
+        }
+
+        const allFinished = Array.from(room.players.values()).every((p) => p.finished);
+        if (allFinished || (room.mode === "duel" && player.finished && room.players.size === 1)) {
+          room.status = "finished";
+          room.endTime = Date.now();
+        }
+
+        const scoredPayload = {
+          playerId,
+          player: { ...player },
+          room: serializeRoom(room),
+          isGameOver: room.status === "finished",
+        };
+
+        broadcastToRoom(roomId, {
+          type: "player_scored",
+          payload: scoredPayload,
+        });
+
+        return { type: "player_scored", payload: scoredPayload };
+      }
+    }
+
+    if (type === "send_reaction") {
+      const { roomId, playerId, emoji, text } = payload || {};
+      const room = multiplayerRooms.get((roomId || "").toUpperCase());
+      if (room) {
+        const player = room.players.get(playerId);
+        const reaction = {
+          id: `rx_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          sender: player?.name || "匿名伙伴",
+          emoji: emoji || "👏",
+          text: text || "加油！",
+          time: Date.now(),
+        };
+        room.reactions.push(reaction);
+        broadcastToRoom(roomId, {
+          type: "reaction_received",
+          payload: reaction,
+        });
+        return { type: "reaction_received", payload: reaction };
+      }
+    }
+
+    if (type === "rematch") {
+      const { roomId } = payload || {};
+      const room = multiplayerRooms.get((roomId || "").toUpperCase());
+      if (room) {
+        room.status = "waiting";
+        room.startTime = undefined;
+        room.endTime = undefined;
+        room.reactions = [];
+        room.coopTotalScore = 0;
+        room.players.forEach((p) => {
+          p.score = 0;
+          p.currentWordIndex = 0;
+          p.currentSegmentIndex = 0;
+          p.romajiProgress = "";
+          p.combo = 0;
+          p.maxCombo = 0;
+          p.finished = false;
+          p.finishTime = undefined;
+          p.isReady = p.isHost;
+        });
+        const serialized = serializeRoom(room);
+        broadcastToRoom(roomId, {
+          type: "room_updated",
+          payload: serialized,
+        });
+        return { type: "room_updated", payload: serialized };
+      }
+    }
+
+    if (type === "leave_room") {
+      const { roomId, playerId } = payload || {};
+      handlePlayerLeave(roomId, playerId);
+      return { type: "left_room" };
+    }
+
+    return null;
+  }
+
+  // High-performance server-side TTS proxy
+  // Cloud Run in us-east5 has full unrestricted access to Google Translate TTS
+  const ttsCache = new Map<string, { buffer: Buffer; contentType: string }>();
+
+  app.get("/api/tts", async (req, res) => {
+    const text = String(req.query.text || "").trim();
+    const lang = String(req.query.lang || "ja").toLowerCase();
+
+    if (!text) {
+      return res.status(400).send("Missing text parameter");
+    }
+
+    const cacheKey = `${lang}:${text}`;
+    const cached = ttsCache.get(cacheKey);
+    if (cached) {
+      res.setHeader("Content-Type", cached.contentType);
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      return res.send(cached.buffer);
+    }
+
+    try {
+      const sanitized = text
+        .replace(/[\(（\[【].*?[\)）\]】]/g, "")
+        .replace(/[¡¿\?!.,'"·~～\-_/\\#@$%^&*()]/g, " ")
+        .trim();
+      const cleanText = sanitized || text;
+      const targetLang = lang === "es" ? "es" : lang === "en" ? "en" : "ja";
+      const googleTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${targetLang}&q=${encodeURIComponent(cleanText)}`;
+
+      const ttsResp = await fetch(googleTtsUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        },
+      });
+
+      if (ttsResp.ok) {
+        const arrayBuf = await ttsResp.arrayBuffer();
+        const buffer = Buffer.from(arrayBuf);
+        const contentType = ttsResp.headers.get("content-type") || "audio/mpeg";
+
+        if (ttsCache.size > 200) {
+          const firstKey = ttsCache.keys().next().value;
+          if (firstKey) ttsCache.delete(firstKey);
+        }
+        ttsCache.set(cacheKey, { buffer, contentType });
+
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Cache-Control", "public, max-age=86400");
+        return res.send(buffer);
+      }
+    } catch (err) {
+      console.warn("TTS proxy fetch error:", err);
+    }
+
+    // Fallback: If Google TTS fails, try Youdao
+    try {
+      const youdaoLang = lang === "es" ? "spa" : lang === "en" ? "en" : "jap";
+      const youdaoUrl = lang === "en"
+        ? `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&type=2`
+        : `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&le=${youdaoLang}`;
+
+      const ydResp = await fetch(youdaoUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      });
+      if (ydResp.ok) {
+        const arrayBuf = await ydResp.arrayBuffer();
+        const buffer = Buffer.from(arrayBuf);
+        res.setHeader("Content-Type", "audio/mpeg");
+        return res.send(buffer);
+      }
+    } catch (_) {}
+
+    res.status(502).send("TTS audio unavailable");
+  });
+
+  // REST endpoints for room queries and dual-engine fallback (HTTP Long-Polling)
+  app.post("/api/multiplayer/room/join", (req, res) => {
+    try {
+      const result = processRoomAction("join_room", req.body);
+      res.json(result?.payload || { error: "Failed to join room" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Failed to join room" });
+    }
+  });
+
+  app.post("/api/multiplayer/room/action", (req, res) => {
+    try {
+      const { type, payload } = req.body;
+      const result = processRoomAction(type, payload);
+      const roomId = (payload?.roomId || "").toUpperCase();
+      const room = multiplayerRooms.get(roomId);
+      res.json({
+        success: true,
+        actionResult: result,
+        room: room ? serializeRoom(room) : null,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Failed to execute action" });
+    }
+  });
+
+  app.get("/api/multiplayer/room/:id/poll", (req, res) => {
+    const room = multiplayerRooms.get(req.params.id.toUpperCase());
+    if (!room) {
+      return res.status(404).json({ error: "Room not found" });
+    }
+    res.json({
+      room: serializeRoom(room),
+      serverTime: Date.now(),
+    });
+  });
+
   app.get("/api/multiplayer/room/:id", (req, res) => {
     const room = multiplayerRooms.get(req.params.id.toUpperCase());
     if (!room) {
@@ -938,27 +1382,6 @@ Return your response strictly as JSON with this structure:
     }
   });
 
-  function handlePlayerLeave(roomId: string, playerId: string) {
-    clientSockets.delete(playerId);
-    const room = multiplayerRooms.get(roomId);
-    if (room) {
-      room.players.delete(playerId);
-      if (room.players.size === 0) {
-        multiplayerRooms.delete(roomId);
-      } else {
-        // If the host left, assign new host
-        const remaining = Array.from(room.players.values());
-        if (!remaining.some((p) => p.isHost)) {
-          remaining[0].isHost = true;
-        }
-        broadcastToRoom(roomId, {
-          type: "room_updated",
-          payload: serializeRoom(room),
-        });
-      }
-    }
-  }
-
   wss.on("connection", (ws: WebSocket) => {
     let currentSocketId = "";
 
@@ -967,306 +1390,13 @@ Return your response strictly as JSON with this structure:
         const msg = JSON.parse(data.toString());
         const { type, payload } = msg;
 
-        if (type === "join_room") {
-          const roomId = (payload.roomId || "").trim().toUpperCase();
-          const playerId = (payload.playerId || `p_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`);
-          currentSocketId = playerId;
-
-          let room = multiplayerRooms.get(roomId);
-          const isNewRoom = !room;
-
-          if (!room) {
-            room = {
-              id: roomId,
-              name: payload.roomName || `${payload.playerName || "旅人"}的和风茶室`,
-              mode: payload.mode || "duel",
-              language: payload.language || "ja",
-              status: "waiting",
-              countdown: 3,
-              wordCount: payload.words?.length || payload.wordCount || 8,
-              words: payload.words || [],
-              players: new Map(),
-              reactions: [],
-              coopTotalScore: 0,
-            };
-            multiplayerRooms.set(roomId, room);
-          }
-
-          const isHost = isNewRoom || room.players.size === 0;
-          const player: MultiplayerPlayer = {
-            id: playerId,
-            name: payload.playerName || (isHost ? "房主" : `同行者 ${room.players.size + 1}`),
-            avatar: payload.playerAvatar || "fox",
-            isHost,
-            isReady: isHost, // Host is ready by default
-            score: 0,
-            currentWordIndex: 0,
-            currentSegmentIndex: 0,
-            combo: 0,
-            maxCombo: 0,
-            finished: false,
-            accuracy: 100,
-            wpm: 0,
-            connected: true,
-          };
-
-          room.players.set(playerId, player);
-          clientSockets.set(playerId, { ws, roomId, playerId });
-
-          // Send confirmation to client
-          ws.send(JSON.stringify({
-            type: "joined_room",
-            payload: {
-              roomId,
-              playerId,
-              isHost,
-              room: serializeRoom(room),
-            },
-          }));
-
-          // Notify others in room
-          broadcastToRoom(roomId, {
-            type: "room_updated",
-            payload: serializeRoom(room),
-          }, playerId);
+        if (type === "join_room" && payload?.playerId) {
+          currentSocketId = payload.playerId;
         }
 
-        else if (type === "toggle_ready") {
-          const { roomId, playerId, isReady } = payload;
-          const room = multiplayerRooms.get(roomId);
-          if (room && room.players.has(playerId)) {
-            const p = room.players.get(playerId)!;
-            p.isReady = Boolean(isReady);
-            broadcastToRoom(roomId, {
-              type: "room_updated",
-              payload: serializeRoom(room),
-            });
-          }
-        }
-
-        else if (type === "start_game") {
-          const { roomId } = payload;
-          const room = multiplayerRooms.get(roomId);
-          if (!room || room.status !== "waiting") return;
-
-          room.status = "countdown";
-          room.countdown = 3;
-          broadcastToRoom(roomId, {
-            type: "room_updated",
-            payload: serializeRoom(room),
-          });
-
-          // Countdown sequence 3 -> 2 -> 1 -> 0 -> PLAY
-          let count = 3;
-          const countdownInterval = setInterval(() => {
-            count--;
-            if (count > 0) {
-              room.countdown = count;
-              broadcastToRoom(roomId, {
-                type: "countdown_tick",
-                payload: { count },
-              });
-            } else {
-              clearInterval(countdownInterval);
-              room.status = "playing";
-              room.startTime = Date.now();
-              room.countdown = 0;
-              room.harmonyCount = 0;
-              // Reset all player game states
-              room.players.forEach((p) => {
-                p.score = 0;
-                p.currentWordIndex = 0;
-                p.currentSegmentIndex = 0;
-                p.combo = 0;
-                p.maxCombo = 0;
-                p.finished = false;
-                p.finishTime = undefined;
-              });
-              broadcastToRoom(roomId, {
-                type: "game_started",
-                payload: {
-                  room: serializeRoom(room),
-                  startTime: room.startTime,
-                },
-              });
-            }
-          }, 1000);
-        }
-
-        else if (type === "typing_progress") {
-          const { roomId, playerId, wordIndex, segmentIndex, romajiProgress, combo } = payload;
-          const room = multiplayerRooms.get(roomId);
-          if (!room || room.status !== "playing") return;
-          const player = room.players.get(playerId);
-          if (player) {
-            player.currentWordIndex = wordIndex;
-            player.currentSegmentIndex = segmentIndex;
-            player.romajiProgress = romajiProgress;
-            player.combo = combo;
-            player.maxCombo = Math.max(player.maxCombo, combo);
-
-            broadcastToRoom(roomId, {
-              type: "player_progress",
-              payload: {
-                playerId,
-                wordIndex,
-                segmentIndex,
-                romajiProgress,
-                combo,
-              },
-            }, playerId);
-          }
-        }
-
-        else if (type === "syllable_completed") {
-          const { roomId, playerId, syllable } = payload;
-          const room = multiplayerRooms.get(roomId);
-          if (!room || room.status !== "playing") return;
-          const player = room.players.get(playerId);
-          if (!player) return;
-
-          const now = Date.now();
-          const prev = room.lastSyllable;
-
-          // If another player in the room completed a syllable within synchronous window (<= 1800ms)
-          if (prev && prev.playerId !== playerId && (now - prev.time) <= 1800) {
-            const bonus = room.mode === "coop" ? 60 : 30;
-            if (room.mode === "coop") {
-              room.coopTotalScore = (room.coopTotalScore || 0) + bonus;
-            }
-            player.score += bonus;
-            const otherPlayer = room.players.get(prev.playerId);
-            if (otherPlayer) {
-              otherPlayer.score += bonus;
-            }
-
-            room.harmonyCount = (room.harmonyCount || 0) + 1;
-            const currentHarmonyCount = room.harmonyCount;
-
-            // Reset lastSyllable to prevent duplicate double-triggers on a single event
-            room.lastSyllable = undefined;
-
-            // Broadcast the ceremonial harmony ensemble event to all connected clients in the room!
-            broadcastToRoom(roomId, {
-              type: "harmony_syllable",
-              payload: {
-                player1Id: prev.playerId,
-                player1Name: prev.playerName,
-                player1Avatar: otherPlayer?.avatar || "fox",
-                player2Id: playerId,
-                player2Name: player.name,
-                player2Avatar: player.avatar || "cat",
-                syllable1: prev.syllable,
-                syllable2: syllable,
-                coopBonus: bonus,
-                timeDiffMs: now - prev.time,
-                harmonyCount: currentHarmonyCount,
-                room: serializeRoom(room),
-              },
-            });
-          } else {
-            room.lastSyllable = {
-              playerId,
-              playerName: player.name,
-              syllable: syllable || "",
-              time: now,
-            };
-          }
-        }
-
-        else if (type === "word_completed") {
-          const { roomId, playerId, wordIndex, accuracy, timeTakenMs, combo } = payload;
-          const room = multiplayerRooms.get(roomId);
-          if (!room || room.status !== "playing") return;
-          const player = room.players.get(playerId);
-          if (player) {
-            player.score += 100 + (combo * 10);
-            player.combo = combo;
-            player.maxCombo = Math.max(player.maxCombo, combo);
-            player.accuracy = Math.round((player.accuracy + accuracy) / 2);
-            player.currentWordIndex = wordIndex + 1;
-            player.currentSegmentIndex = 0;
-            player.romajiProgress = "";
-
-            if (room.mode === "coop") {
-              room.coopTotalScore = (room.coopTotalScore || 0) + 100 + (combo * 10);
-            }
-
-            // Check if player finished all words
-            if (player.currentWordIndex >= room.words.length) {
-              player.finished = true;
-              player.finishTime = Date.now();
-            }
-
-            // Check if game is over
-            const allFinished = Array.from(room.players.values()).every((p) => p.finished);
-            if (allFinished || (room.mode === "duel" && player.finished && room.players.size === 1)) {
-              room.status = "finished";
-              room.endTime = Date.now();
-            }
-
-            broadcastToRoom(roomId, {
-              type: "player_scored",
-              payload: {
-                playerId,
-                player: { ...player },
-                room: serializeRoom(room),
-                isGameOver: room.status === "finished",
-              },
-            });
-          }
-        }
-
-        else if (type === "send_reaction") {
-          const { roomId, playerId, emoji, text } = payload;
-          const room = multiplayerRooms.get(roomId);
-          if (room) {
-            const player = room.players.get(playerId);
-            const reaction = {
-              id: `rx_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-              sender: player?.name || "匿名伙伴",
-              emoji: emoji || "👏",
-              text: text || "加油！",
-              time: Date.now(),
-            };
-            room.reactions.push(reaction);
-            broadcastToRoom(roomId, {
-              type: "reaction_received",
-              payload: reaction,
-            });
-          }
-        }
-
-        else if (type === "rematch") {
-          const { roomId } = payload;
-          const room = multiplayerRooms.get(roomId);
-          if (room) {
-            room.status = "waiting";
-            room.startTime = undefined;
-            room.endTime = undefined;
-            room.reactions = [];
-            room.coopTotalScore = 0;
-            room.players.forEach((p) => {
-              p.score = 0;
-              p.currentWordIndex = 0;
-              p.currentSegmentIndex = 0;
-              p.romajiProgress = "";
-              p.combo = 0;
-              p.maxCombo = 0;
-              p.finished = false;
-              p.finishTime = undefined;
-              p.isReady = p.isHost;
-            });
-            broadcastToRoom(roomId, {
-              type: "room_updated",
-              payload: serializeRoom(room),
-            });
-          }
-        }
-
-        else if (type === "leave_room") {
-          const { roomId, playerId } = payload;
-          handlePlayerLeave(roomId, playerId);
+        const reply = processRoomAction(type, payload, ws);
+        if (reply && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(reply));
         }
       } catch (err) {
         console.error("Multiplayer message parse error:", err);

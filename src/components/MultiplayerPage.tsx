@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Users,
@@ -217,7 +217,161 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
     }, 2800);
   };
 
-  // Connect & Join WebSocket
+  // Dual-Engine Connection Infrastructure (WebSocket + HTTP Polling Fallback)
+  const isPollingModeRef = useRef<boolean>(false);
+  const pollingIntervalRef = useRef<any>(null);
+  const activeRoomIdRef = useRef<string>("");
+  const roomStatusRef = useRef<string>("waiting");
+  const roomCountdownRef = useRef<number>(3);
+  const lastReactionIdRef = useRef<string>("");
+
+  const handleIncomingRoomState = useCallback((newRoom: MultiplayerRoom) => {
+    if (!newRoom) return;
+
+    // Detect state changes for audio cues & local typing resets
+    const prevStatus = roomStatusRef.current;
+    roomStatusRef.current = newRoom.status;
+
+    if (newRoom.status === "waiting" && prevStatus !== "waiting") {
+      setCurrentWordIndex(0);
+      setCurrentSegmentIndex(0);
+      setRomajiProgress("");
+      setWordCorrect(false);
+      setRewardAwarded(false);
+    } else if (newRoom.status === "countdown") {
+      if (roomCountdownRef.current !== newRoom.countdown) {
+        roomCountdownRef.current = newRoom.countdown;
+        audioSynth.playTypewriterBell();
+      }
+    } else if (newRoom.status === "playing" && prevStatus !== "playing") {
+      setCurrentWordIndex(0);
+      setCurrentSegmentIndex(0);
+      setRomajiProgress("");
+      setWordCorrect(false);
+      setCombo(0);
+      setMaxCombo(0);
+      setKeystrokeCount(0);
+      setCorrectKeyCount(0);
+      setWordStartTime(Date.now());
+      setRewardAwarded(false);
+      audioSynth.playCarriageReturn();
+    } else if (newRoom.status === "finished" && prevStatus !== "finished") {
+      audioSynth.playTimeCompleted();
+    }
+
+    // Check for recent reactions in polling mode
+    if (newRoom.reactions && newRoom.reactions.length > 0) {
+      const latestRx = newRoom.reactions[newRoom.reactions.length - 1];
+      if (latestRx && latestRx.id !== lastReactionIdRef.current) {
+        lastReactionIdRef.current = latestRx.id;
+        setFloatingReactions((prev) => [...prev.slice(-4), latestRx]);
+        setTimeout(() => {
+          setFloatingReactions((prev) => prev.filter((r) => r.id !== latestRx.id));
+        }, 3500);
+      }
+    }
+
+    setRoom(newRoom);
+  }, []);
+
+  const handleIncomingWsMessage = useCallback((msg: any) => {
+    const { type, payload } = msg;
+
+    if (type === "joined_room" || type === "room_updated") {
+      handleIncomingRoomState(payload.room || payload);
+    } else if (type === "countdown_tick") {
+      setRoom((prev) => (prev ? { ...prev, countdown: payload.count } : null));
+      audioSynth.playTypewriterBell();
+    } else if (type === "game_started") {
+      handleIncomingRoomState(payload.room);
+    } else if (type === "player_progress") {
+      setRoom((prev) => {
+        if (!prev) return null;
+        const updated = prev.players.map((p) => {
+          if (p.id === payload.playerId) {
+            return {
+              ...p,
+              currentWordIndex: payload.wordIndex,
+              currentSegmentIndex: payload.segmentIndex,
+              romajiProgress: payload.romajiProgress,
+              combo: payload.combo,
+            };
+          }
+          return p;
+        });
+        return { ...prev, players: updated };
+      });
+    } else if (type === "player_scored") {
+      handleIncomingRoomState(payload.room);
+    } else if (type === "reaction_received") {
+      setFloatingReactions((prev) => [...prev.slice(-4), payload]);
+      setTimeout(() => {
+        setFloatingReactions((prev) => prev.filter((r) => r.id !== payload.id));
+      }, 3500);
+      audioSynth.playCardSlide();
+    } else if (type === "harmony_syllable") {
+      audioSynth.playHarmonyEnsemble();
+      setHarmonyEvent(payload);
+      if (payload.room) {
+        handleIncomingRoomState(payload.room);
+      }
+      setTimeout(() => {
+        setHarmonyEvent((cur) => (cur === payload ? null : cur));
+      }, 2800);
+    }
+  }, [handleIncomingRoomState]);
+
+  const sendAction = useCallback(async (type: string, payload: any) => {
+    // 1. WebSocket Engine
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      try {
+        wsRef.current.send(JSON.stringify({ type, payload }));
+        return;
+      } catch (_) {}
+    }
+
+    // 2. HTTP REST Engine Fallback (100% reliable HTTPS in mainland China and strict proxies)
+    try {
+      const res = await fetch("/api/multiplayer/room/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, payload }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.room) {
+          handleIncomingRoomState(data.room);
+        }
+        if (data?.actionResult?.type === "harmony_syllable" && data.actionResult.payload) {
+          audioSynth.playHarmonyEnsemble();
+          setHarmonyEvent(data.actionResult.payload);
+          setTimeout(() => setHarmonyEvent(null), 2800);
+        }
+      }
+    } catch (err) {
+      console.warn("HTTP action error:", err);
+    }
+  }, [handleIncomingRoomState]);
+
+  const startPolling = useCallback((roomId: string) => {
+    activeRoomIdRef.current = roomId;
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/multiplayer/room/${roomId}/poll`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.room) {
+            handleIncomingRoomState(data.room);
+          }
+        }
+      } catch (_) {}
+    }, 900);
+  }, [handleIncomingRoomState]);
+
+  // Connect & Join Room (Dual-Engine: WebSocket with auto-fallback to HTTP Long-Polling)
   const connectAndJoin = (targetRoomId: string, isHostCreating: boolean = false) => {
     setErrorMsg("");
     const rid = targetRoomId.trim().toUpperCase();
@@ -226,167 +380,133 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
       return;
     }
 
+    activeRoomIdRef.current = rid;
+
+    // Generate seed words for new room based on chosen language
+    let wordsToUse: DictionaryItem[] = [];
+    if (isHostCreating) {
+      if (selectedLang === "ja") {
+        const dict = getDictionary(false, false);
+        wordsToUse = [...dict].sort(() => Math.random() - 0.5).slice(0, selectedWordCount);
+      } else if (selectedLang === "en") {
+        const dict = getDictionary(true, false);
+        wordsToUse = [...dict].sort(() => Math.random() - 0.5).slice(0, selectedWordCount);
+      } else {
+        const esList = getAllSpanishWords();
+        wordsToUse = esList.sort(() => Math.random() - 0.5).slice(0, selectedWordCount).map((w) => ({
+          id: w.id,
+          kanji: w.word,
+          kanaStr: w.word,
+          category: "culture" as any,
+          categoryName: "西班牙语",
+          meaning: w.meaning,
+          rarity: "SR" as any,
+          rarityName: "珍藏",
+          glowColor: "rgba(245, 158, 11, 0.3)",
+          borderColor: "border-amber-300",
+          bgGradient: "from-amber-50 to-orange-100",
+          segments: w.word.split("").map((ch) => ({
+            kana: ch,
+            romaji: [ch.toLowerCase()],
+            displayRomaji: ch,
+          })),
+        }));
+      }
+    }
+
+    const joinPayload = {
+      roomId: rid,
+      roomName: `${playerName}的和风茶寮`,
+      playerId,
+      playerName,
+      playerAvatar,
+      mode: selectedMode,
+      language: selectedLang,
+      wordCount: selectedWordCount,
+      words: wordsToUse,
+    };
+
+    // Helper: start HTTP REST mode immediately
+    const activateHttpEngine = async () => {
+      isPollingModeRef.current = true;
+      try {
+        const res = await fetch("/api/multiplayer/room/join", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(joinPayload),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.room) {
+            setIsConnected(true);
+            setErrorMsg("");
+            handleIncomingRoomState(data.room);
+            startPolling(rid);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("HTTP join failed:", err);
+      }
+    };
+
+    // Attempt WebSocket with an immediate 1500ms safety switch to HTTP polling
     if (wsRef.current) {
       try { wsRef.current.close(); } catch (_) {}
     }
 
-    // Determine protocol and url
-    const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
-    const protocol = isHttps ? "wss:" : "ws:";
-    const host = typeof window !== "undefined" ? window.location.host : "localhost:3000";
-    const wsUrl = `${protocol}//${host}/ws/multiplayer`;
+    try {
+      const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+      const protocol = isHttps ? "wss:" : "ws:";
+      const host = typeof window !== "undefined" ? window.location.host : "localhost:3000";
+      const wsUrl = `${protocol}//${host}/ws/multiplayer`;
 
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
-    ws.onopen = () => {
-      setIsConnected(true);
-
-      // Generate seed words for new room based on chosen language
-      let wordsToUse: DictionaryItem[] = [];
-      if (isHostCreating) {
-        if (selectedLang === "ja") {
-          const dict = getDictionary(false, false);
-          wordsToUse = [...dict].sort(() => Math.random() - 0.5).slice(0, selectedWordCount);
-        } else if (selectedLang === "en") {
-          const dict = getDictionary(true, false);
-          wordsToUse = [...dict].sort(() => Math.random() - 0.5).slice(0, selectedWordCount);
-        } else {
-          // Spanish
-          const esList = getAllSpanishWords();
-          wordsToUse = esList.sort(() => Math.random() - 0.5).slice(0, selectedWordCount).map((w) => ({
-            id: w.id,
-            kanji: w.word,
-            kanaStr: w.word,
-            category: "culture" as any,
-            categoryName: "西班牙语",
-            meaning: w.meaning,
-            rarity: "SR" as any,
-            rarityName: "珍藏",
-            glowColor: "rgba(245, 158, 11, 0.3)",
-            borderColor: "border-amber-300",
-            bgGradient: "from-amber-50 to-orange-100",
-            segments: w.word.split("").map((ch) => ({
-              kana: ch,
-              romaji: [ch.toLowerCase()],
-              displayRomaji: ch,
-            })),
-          }));
+      let wsConnected = false;
+      const timeoutTimer = setTimeout(() => {
+        if (!wsConnected) {
+          console.warn("WebSocket upgrade delayed, activating high-speed HTTP polling mode...");
+          activateHttpEngine();
         }
-      }
+      }, 1500);
 
-      ws.send(JSON.stringify({
-        type: "join_room",
-        payload: {
-          roomId: rid,
-          roomName: `${playerName}的和风茶寮`,
-          playerId,
-          playerName,
-          playerAvatar,
-          mode: selectedMode,
-          language: selectedLang,
-          wordCount: selectedWordCount,
-          words: wordsToUse,
-        },
-      }));
-    };
+      ws.onopen = () => {
+        wsConnected = true;
+        clearTimeout(timeoutTimer);
+        setIsConnected(true);
+        setErrorMsg("");
+        ws.send(JSON.stringify({
+          type: "join_room",
+          payload: joinPayload,
+        }));
+      };
 
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        const { type, payload } = msg;
-
-        if (type === "joined_room" || type === "room_updated") {
-          setRoom(payload.room || payload);
-          if (payload.room?.status === "waiting" || payload.status === "waiting") {
-            // Reset local typing state
-            setCurrentWordIndex(0);
-            setCurrentSegmentIndex(0);
-            setRomajiProgress("");
-            setWordCorrect(false);
-            setRewardAwarded(false);
-          }
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          handleIncomingWsMessage(msg);
+        } catch (e) {
+          console.error("WS message error", e);
         }
+      };
 
-        else if (type === "countdown_tick") {
-          setRoom((prev) => prev ? { ...prev, countdown: payload.count } : null);
-          audioSynth.playTypewriterBell();
+      ws.onclose = () => {
+        if (!isPollingModeRef.current && wsConnected) {
+          console.warn("WebSocket closed, transferring to HTTP polling engine...");
+          activateHttpEngine();
         }
+      };
 
-        else if (type === "game_started") {
-          setRoom(payload.room);
-          setCurrentWordIndex(0);
-          setCurrentSegmentIndex(0);
-          setRomajiProgress("");
-          setWordCorrect(false);
-          setCombo(0);
-          setMaxCombo(0);
-          setKeystrokeCount(0);
-          setCorrectKeyCount(0);
-          setWordStartTime(Date.now());
-          setRewardAwarded(false);
-          audioSynth.playCarriageReturn();
-        }
-
-        else if (type === "player_progress") {
-          setRoom((prev) => {
-            if (!prev) return null;
-            const updated = prev.players.map((p) => {
-              if (p.id === payload.playerId) {
-                return {
-                  ...p,
-                  currentWordIndex: payload.wordIndex,
-                  currentSegmentIndex: payload.segmentIndex,
-                  romajiProgress: payload.romajiProgress,
-                  combo: payload.combo,
-                };
-              }
-              return p;
-            });
-            return { ...prev, players: updated };
-          });
-        }
-
-        else if (type === "player_scored") {
-          setRoom(payload.room);
-          if (payload.isGameOver) {
-            audioSynth.playTimeCompleted();
-          }
-        }
-
-        else if (type === "reaction_received") {
-          setFloatingReactions((prev) => [...prev.slice(-4), payload]);
-          setTimeout(() => {
-            setFloatingReactions((prev) => prev.filter((r) => r.id !== payload.id));
-          }, 3500);
-          audioSynth.playCardSlide();
-        }
-
-        else if (type === "harmony_syllable") {
-          // Both players completed a syllable in close synchrony!
-          // Play unique crisp ensemble audio cue & trigger magnificent synergy banner
-          audioSynth.playHarmonyEnsemble();
-          setHarmonyEvent(payload);
-          if (payload.room) {
-            setRoom(payload.room);
-          }
-          setTimeout(() => {
-            setHarmonyEvent((cur) => (cur === payload ? null : cur));
-          }, 2800);
-        }
-      } catch (e) {
-        console.error("WS message error", e);
-      }
-    };
-
-    ws.onclose = () => {
-      setIsConnected(false);
-    };
-
-    ws.onerror = () => {
-      setErrorMsg("连线遭遇波动，请确认网络畅通");
-      setIsConnected(false);
-    };
+      ws.onerror = () => {
+        clearTimeout(timeoutTimer);
+        console.warn("WebSocket blocked by proxy/firewall, activating HTTP polling engine...");
+        activateHttpEngine();
+      };
+    } catch (_) {
+      activateHttpEngine();
+    }
   };
 
   // If initial room code is provided in URL, auto-join
@@ -396,9 +516,12 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
     }
   }, [initialRoomCode]);
 
-  // Clean up socket on unmount
+  // Clean up socket and polling interval on unmount
   useEffect(() => {
     return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
       if (wsRef.current) {
         try { wsRef.current.close(); } catch (_) {}
       }
@@ -407,65 +530,53 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
 
   // Send ready status
   const handleToggleReady = () => {
-    if (!wsRef.current || !room) return;
+    if (!room) return;
     const me = room.players.find((p) => p.id === playerId);
     const nextReady = !me?.isReady;
-    wsRef.current.send(JSON.stringify({
-      type: "toggle_ready",
-      payload: {
-        roomId: room.id,
-        playerId,
-        isReady: nextReady,
-      },
-    }));
+    sendAction("toggle_ready", {
+      roomId: room.id,
+      playerId,
+      isReady: nextReady,
+    });
     audioSynth.playCardSlide();
   };
 
   // Host starts the match
   const handleStartGame = () => {
-    if (!wsRef.current || !room) return;
-    wsRef.current.send(JSON.stringify({
-      type: "start_game",
-      payload: { roomId: room.id },
-    }));
+    if (!room) return;
+    sendAction("start_game", { roomId: room.id });
     audioSynth.playCarriageReturn();
   };
 
   // Send Taunt / Cheer
   const handleSendReaction = (taunt: { emoji: string; text: string }) => {
-    if (!wsRef.current || !room) return;
-    wsRef.current.send(JSON.stringify({
-      type: "send_reaction",
-      payload: {
-        roomId: room.id,
-        playerId,
-        emoji: taunt.emoji,
-        text: taunt.text,
-      },
-    }));
+    if (!room) return;
+    sendAction("send_reaction", {
+      roomId: room.id,
+      playerId,
+      emoji: taunt.emoji,
+      text: taunt.text,
+    });
     audioSynth.playCardSlide();
   };
 
   // Rematch
   const handleRematch = () => {
-    if (!wsRef.current || !room) return;
-    wsRef.current.send(JSON.stringify({
-      type: "rematch",
-      payload: { roomId: room.id },
-    }));
+    if (!room) return;
+    sendAction("rematch", { roomId: room.id });
     audioSynth.playCardSlide();
   };
 
   // Leave room
   const handleLeaveRoom = () => {
-    if (wsRef.current && room) {
-      try {
-        wsRef.current.send(JSON.stringify({
-          type: "leave_room",
-          payload: { roomId: room.id, playerId },
-        }));
-        wsRef.current.close();
-      } catch (_) {}
+    if (room) {
+      sendAction("leave_room", { roomId: room.id, playerId });
+    }
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+    if (wsRef.current) {
+      try { wsRef.current.close(); } catch (_) {}
     }
     setRoom(null);
     setIsConnected(false);
@@ -537,28 +648,22 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
           setRomajiProgress("");
 
           // Broadcast syllable completion & progress for synchronous harmony
-          if (wsRef.current && isConnected) {
-            wsRef.current.send(JSON.stringify({
-              type: "syllable_completed",
-              payload: {
-                roomId: room.id,
-                playerId,
-                wordIndex: currentWordIndex,
-                segmentIndex: currentSegmentIndex,
-                syllable: targetSegment.kana || targetSegment.displayRomaji || targetSegment.romaji[0],
-              },
-            }));
-            wsRef.current.send(JSON.stringify({
-              type: "typing_progress",
-              payload: {
-                roomId: room.id,
-                playerId,
-                wordIndex: currentWordIndex,
-                segmentIndex: nextSegIdx,
-                romajiProgress: "",
-                combo: nextCombo,
-              },
-            }));
+          if (isConnected) {
+            sendAction("syllable_completed", {
+              roomId: room.id,
+              playerId,
+              wordIndex: currentWordIndex,
+              segmentIndex: currentSegmentIndex,
+              syllable: targetSegment.kana || targetSegment.displayRomaji || targetSegment.romaji[0],
+            });
+            sendAction("typing_progress", {
+              roomId: room.id,
+              playerId,
+              wordIndex: currentWordIndex,
+              segmentIndex: nextSegIdx,
+              romajiProgress: "",
+              combo: nextCombo,
+            });
           }
         } else {
           // Word completed!
@@ -566,28 +671,22 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
           const timeTaken = Date.now() - wordStartTime;
           const accuracy = Math.round((correctKeyCount / Math.max(1, keystrokeCount)) * 100);
 
-          if (wsRef.current && isConnected) {
-            wsRef.current.send(JSON.stringify({
-              type: "syllable_completed",
-              payload: {
-                roomId: room.id,
-                playerId,
-                wordIndex: currentWordIndex,
-                segmentIndex: currentSegmentIndex,
-                syllable: targetSegment.kana || targetSegment.displayRomaji || targetSegment.romaji[0],
-              },
-            }));
-            wsRef.current.send(JSON.stringify({
-              type: "word_completed",
-              payload: {
-                roomId: room.id,
-                playerId,
-                wordIndex: currentWordIndex,
-                accuracy,
-                timeTakenMs: timeTaken,
-                combo: nextCombo,
-              },
-            }));
+          if (isConnected) {
+            sendAction("syllable_completed", {
+              roomId: room.id,
+              playerId,
+              wordIndex: currentWordIndex,
+              segmentIndex: currentSegmentIndex,
+              syllable: targetSegment.kana || targetSegment.displayRomaji || targetSegment.romaji[0],
+            });
+            sendAction("word_completed", {
+              roomId: room.id,
+              playerId,
+              wordIndex: currentWordIndex,
+              accuracy,
+              timeTakenMs: timeTaken,
+              combo: nextCombo,
+            });
           }
 
           // Advance to next word after brief celebratory flash
@@ -607,18 +706,15 @@ export const MultiplayerPage: React.FC<MultiplayerPageProps> = ({
         setRomajiProgress(testPrefix);
         audioSynth.playTyping({ volume: 0.9, isCompletion: false });
 
-        if (wsRef.current && isConnected) {
-          wsRef.current.send(JSON.stringify({
-            type: "typing_progress",
-            payload: {
-              roomId: room.id,
-              playerId,
-              wordIndex: currentWordIndex,
-              segmentIndex: currentSegmentIndex,
-              romajiProgress: testPrefix,
-              combo,
-            },
-          }));
+        if (isConnected) {
+          sendAction("typing_progress", {
+            roomId: room.id,
+            playerId,
+            wordIndex: currentWordIndex,
+            segmentIndex: currentSegmentIndex,
+            romajiProgress: testPrefix,
+            combo,
+          });
         }
       } else {
         // Miss / Error
